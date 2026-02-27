@@ -42,6 +42,7 @@ import type { RootState } from '../../store';
 import { deleteProduct, updateProduct, type Product, resolveProductImage, placeholderFallback } from '../../features/inventory/inventorySlice';
 import { useNavigate } from 'react-router-dom';
 import { alpha, useTheme } from '@mui/material/styles';
+import { sendInventoryCsv } from '../../lib/email';
 
 const ProductList: React.FC = () => {
     const theme = useTheme();
@@ -152,6 +153,28 @@ const ProductList: React.FC = () => {
         document.body.removeChild(link);
     };
 
+    const emailCsvToAdmin = () => {
+        const headers = ['ID', 'Name', 'Category', 'Price', 'Stock', 'Min Stock', 'Last Updated'];
+        const rows = products.map(p => [
+            p.id,
+            p.name,
+            p.category,
+            p.price,
+            p.stock,
+            p.minStock,
+            p.lastUpdated
+        ]);
+
+        const csvContent = [
+            headers.join(','),
+            ...rows.map(row => row.join(','))
+        ].join('\n');
+
+        sendInventoryCsv(csvContent)
+            .then(() => showSnack('CSV emailed to admin successfully', 'success'))
+            .catch(() => showSnack('Email setup missing. Configure Firebase function URL.', 'warning'));
+    };
+
     const categories = Array.from(new Set(products.map(p => p.category))).sort();
 
     const filteredProducts = products.filter(p => {
@@ -218,6 +241,9 @@ const ProductList: React.FC = () => {
                         </Button>
                         <Button variant="outlined" startIcon={<Download size={18} />} color="inherit" sx={{ borderColor: 'divider' }} onClick={exportToCSV}>
                             Export CSV
+                        </Button>
+                        <Button variant="contained" color="primary" onClick={emailCsvToAdmin}>
+                            Email CSV
                         </Button>
                     </Box>
 
