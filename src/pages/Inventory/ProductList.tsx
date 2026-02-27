@@ -39,7 +39,7 @@ import {
 } from 'lucide-react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
-import { deleteProduct, updateProduct, type Product, resolveProductImage } from '../../features/inventory/inventorySlice';
+import { deleteProduct, updateProduct, type Product, resolveProductImage, placeholderFallback } from '../../features/inventory/inventorySlice';
 import { useNavigate } from 'react-router-dom';
 import { alpha, useTheme } from '@mui/material/styles';
 
@@ -283,6 +283,14 @@ const ProductList: React.FC = () => {
                                                     variant="rounded"
                                                     src={resolveProductImage(product)}
                                                     alt={product.name}
+                                                    imgProps={{
+                                                        onError: (e) => {
+                                                            const target = e.currentTarget as HTMLImageElement;
+                                                            if (target.src !== placeholderFallback) {
+                                                                target.src = placeholderFallback;
+                                                            }
+                                                        }
+                                                    }}
                                                     sx={{
                                                         bgcolor: alpha(theme.palette.primary.main, 0.12),
                                                         color: 'primary.main',
@@ -365,6 +373,12 @@ const ProductList: React.FC = () => {
                                     component="img"
                                     src={resolveProductImage(viewProduct)}
                                     alt={viewProduct.name}
+                                    onError={(e) => {
+                                        const target = e.currentTarget as HTMLImageElement;
+                                        if (target.src !== placeholderFallback) {
+                                            target.src = placeholderFallback;
+                                        }
+                                    }}
                                     sx={{
                                         width: 120,
                                         height: 120,

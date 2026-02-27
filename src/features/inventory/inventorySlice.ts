@@ -1,10 +1,5 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import stockCsv from '../../tableau_stock.csv?raw';
-import snackImage from '../../assets/product-snack.svg';
-import jamImage from '../../assets/product-jam.svg';
-import gumImage from '../../assets/product-gum.svg';
-import supplyImage from '../../assets/product-supply.svg';
-import placeholderImage from '../../assets/product-placeholder.svg';
 
 export interface Product {
     id: string;
@@ -94,21 +89,43 @@ const inferCategory = (name: string): string => {
     return 'General';
 };
 
+const makePlaceholder = (label: string): string =>
+    `https://placehold.co/160x160/png?text=${encodeURIComponent(label)}`;
+
+const IMAGE_SNACKS = makePlaceholder('Snacks');
+const IMAGE_OREO = makePlaceholder('Oreo');
+const IMAGE_TWIX = makePlaceholder('Twix');
+const IMAGE_SNICKERS = makePlaceholder('Snickers');
+const IMAGE_MENTOS = makePlaceholder('Mentos');
+const IMAGE_RIZLA = makePlaceholder('Rizla');
+const IMAGE_JAM = makePlaceholder('Jam');
+
 export const getImageForProduct = (name: string, category: string): string => {
     const n = name.toLowerCase();
-    if (/(jam|confiture)/.test(n)) return jamImage;
-    if (category === 'Gum & Mints') return gumImage;
-    if (category === 'Rolling Supplies' || category === 'Accessories') return supplyImage;
-    if (category === 'Snacks & Candy' || category === 'Groceries') return snackImage;
-    return placeholderImage;
+    if (/(jam|confiture)/.test(n)) return IMAGE_JAM;
+    if (/(oreo)/.test(n)) return IMAGE_OREO;
+    if (/(twix)/.test(n)) return IMAGE_TWIX;
+    if (/(snicker)/.test(n)) return IMAGE_SNICKERS;
+    if (/(m\&m)/.test(n)) return IMAGE_SNACKS;
+    if (/(mentos)/.test(n)) return IMAGE_MENTOS;
+    if (/(rizla|rolling|filter|tips)/.test(n)) return IMAGE_RIZLA;
+    if (category === 'Gum & Mints') return IMAGE_MENTOS;
+    if (category === 'Rolling Supplies' || category === 'Accessories') return IMAGE_RIZLA;
+    if (category === 'Snacks & Candy' || category === 'Groceries') return IMAGE_SNACKS;
+    return IMAGE_SNACKS;
 };
 
 export const resolveProductImage = (product: Pick<Product, 'name' | 'category' | 'imageUrl'>): string => {
     if (product.imageUrl && product.imageUrl.trim().length > 0) {
-        return product.imageUrl;
+        const trimmed = product.imageUrl.trim();
+        if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('data:')) {
+            return trimmed;
+        }
     }
     return getImageForProduct(product.name, product.category);
 };
+
+export const placeholderFallback = makePlaceholder('Item');
 
 export const initialProductsFromCsv = parseStockCsv(stockCsv);
 

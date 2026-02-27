@@ -29,7 +29,7 @@ import type { RootState } from '../../store';
 import { reduceStock } from '../../features/inventory/inventorySlice';
 import { addTransaction } from '../../features/transactions/transactionSlice';
 import { addOrder, type OrderStatus, type Order } from '../../features/orders/ordersSlice';
-import { resolveProductImage } from '../../features/inventory/inventorySlice';
+import { resolveProductImage, placeholderFallback } from '../../features/inventory/inventorySlice';
 import { alpha, useTheme } from '@mui/material/styles';
 
 const OrderDesk: React.FC = () => {
@@ -318,6 +318,14 @@ const OrderDesk: React.FC = () => {
                                             variant="rounded"
                                             src={resolveProductImage(selectedProduct)}
                                             alt={selectedProduct.name}
+                                            imgProps={{
+                                                onError: (e) => {
+                                                    const target = e.currentTarget as HTMLImageElement;
+                                                    if (target.src !== placeholderFallback) {
+                                                        target.src = placeholderFallback;
+                                                    }
+                                                }
+                                            }}
                                             sx={{
                                                 width: 48,
                                                 height: 48,
