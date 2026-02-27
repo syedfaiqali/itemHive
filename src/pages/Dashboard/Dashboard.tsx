@@ -40,8 +40,12 @@ import {
 } from 'recharts';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import { alpha } from '@mui/material/styles';
+import { useTheme } from '@mui/material/styles';
+import heroGraphic from '../../assets/stock-hero.svg';
 
 const Dashboard: React.FC = () => {
+    const theme = useTheme();
     const navigate = useNavigate();
     const { products } = useSelector((state: RootState) => state.inventory);
     const { transactions = [] } = useSelector((state: RootState) => state.transactions || { transactions: [] });
@@ -73,7 +77,12 @@ const Dashboard: React.FC = () => {
         return acc;
     }, {});
 
-    const COLORS = ['#6366f1', '#f43f5e', '#10b981', '#f59e0b'];
+    const COLORS = [
+        theme.palette.primary.main,
+        theme.palette.secondary.main,
+        theme.palette.success.main,
+        theme.palette.warning.main
+    ];
     const dynamicCategoryData = Object.keys(catMap)
         .map((cat, i) => ({
             name: cat,
@@ -88,54 +97,101 @@ const Dashboard: React.FC = () => {
             title: 'Total Products',
             value: products.length,
             icon: <Package size={24} />,
-            color: '#6366f1',
+            color: 'primary',
             trend: 'Live Database'
         },
         {
             title: 'Total Stock',
             value: totalStock,
             icon: <TrendingUp size={24} />,
-            color: '#10b981',
+            color: 'success',
             trend: 'Across all items'
         },
         {
             title: 'Low Stock Alerts',
             value: lowStockItems.length,
             icon: <AlertTriangle size={24} />,
-            color: '#f43f5e',
+            color: 'error',
             trend: `${lowStockItems.length} items need attention`
         },
         {
             title: 'Inventory Value',
             value: `$${totalValue.toLocaleString()}`,
             icon: <DollarSign size={24} />,
-            color: '#f59e0b',
+            color: 'warning',
             trend: 'Calculated current valuation'
         },
     ];
 
     return (
         <Box>
-            <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Box>
-                    <Typography variant="h4" fontWeight={800} gutterBottom>
-                        Welcome back, {user?.username?.split(' ')[0] || 'User'}!
-                    </Typography>
-                    <Typography variant="body1" color="text.secondary">
-                        Here's what's happening with your POS system today.
-                    </Typography>
-                </Box>
-                <Button
-                    variant="contained"
-                    startIcon={<Monitor size={20} />}
-                    sx={{ display: { xs: 'none', md: 'flex' }, borderRadius: 3, py: 1.5, px: 3, fontWeight: 800 }}
-                    onClick={() => navigate('/pos')}
-                >
-                    Open POS Terminal
-                </Button>
-            </Box>
+            <Card
+                className="section-rise"
+                sx={{
+                    borderRadius: 4,
+                    mb: 4,
+                    overflow: 'hidden',
+                    border: '1px solid',
+                    borderColor: alpha(theme.palette.primary.main, 0.18),
+                    background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.12)} 0%, ${alpha(theme.palette.secondary.main, 0.08)} 45%, ${alpha(theme.palette.background.paper, 1)} 100%)`,
+                }}
+            >
+                <CardContent sx={{ p: { xs: 3, md: 4 } }}>
+                    <Grid container spacing={3} alignItems="center">
+                        <Grid size={{ xs: 12, md: 7 }}>
+                            <Chip
+                                label="Live Inventory Intelligence"
+                                size="small"
+                                sx={{
+                                    mb: 2,
+                                    bgcolor: alpha(theme.palette.primary.main, 0.12),
+                                    color: theme.palette.primary.dark,
+                                    fontWeight: 700,
+                                }}
+                            />
+                            <Typography variant="h4" fontWeight={800} gutterBottom>
+                                Welcome back, {user?.username?.split(' ')[0] || 'User'}!
+                            </Typography>
+                            <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+                                Here's what's happening with your POS system today.
+                            </Typography>
+                            <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+                                <Button
+                                    variant="contained"
+                                    startIcon={<Monitor size={20} />}
+                                    sx={{ py: 1.3, px: 3, fontWeight: 800 }}
+                                    onClick={() => navigate('/pos')}
+                                >
+                                    Open POS Terminal
+                                </Button>
+                                <Button
+                                    variant="outlined"
+                                    startIcon={<Package size={18} />}
+                                    onClick={() => navigate('/inventory')}
+                                >
+                                    View Inventory
+                                </Button>
+                            </Box>
+                        </Grid>
+                        <Grid size={{ xs: 12, md: 5 }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+                                <Box
+                                    component="img"
+                                    src={heroGraphic}
+                                    alt="Inventory overview"
+                                    sx={{
+                                        width: { xs: '100%', md: 360 },
+                                        maxWidth: 420,
+                                        filter: 'drop-shadow(0 18px 30px rgba(15, 23, 42, 0.18))'
+                                    }}
+                                />
+                            </Box>
+                        </Grid>
+                    </Grid>
+                </CardContent>
+            </Card>
 
-            <Grid container spacing={3}>
+            <Grid container spacing={3} className="section-rise-delay">
                 {stats.map((stat, index) => (
                     <Grid size={{ xs: 12, sm: 6, md: 3 }} key={stat.title}>
                         <motion.div
@@ -148,11 +204,12 @@ const Dashboard: React.FC = () => {
                                     <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
                                         <Avatar
                                             sx={{
-                                                bgcolor: `${stat.color}15`,
-                                                color: stat.color,
+                                                bgcolor: alpha(theme.palette[stat.color].main, 0.12),
+                                                color: theme.palette[stat.color].main,
                                                 width: 48,
                                                 height: 48,
-                                                borderRadius: 3
+                                                borderRadius: 2,
+                                                boxShadow: `0 6px 14px -10px ${alpha(theme.palette[stat.color].main, 0.7)}`
                                             }}
                                         >
                                             {stat.icon}
@@ -171,7 +228,7 @@ const Dashboard: React.FC = () => {
                     </Grid>
                 ))}
 
-                <Grid size={{ xs: 12, md: 8 }}>
+                <Grid size={{ xs: 12, md: 8 }} className="section-rise-delay">
                     <Card sx={{ borderRadius: 4 }}>
                         <CardContent>
                             <Typography variant="h6" fontWeight={700} gutterBottom>
@@ -182,13 +239,13 @@ const Dashboard: React.FC = () => {
                                     <AreaChart data={last7Days}>
                                         <defs>
                                             <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="5%" stopColor="#6366f1" stopOpacity={0.1} />
-                                                <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                                                <stop offset="5%" stopColor={theme.palette.primary.main} stopOpacity={0.12} />
+                                                <stop offset="95%" stopColor={theme.palette.primary.main} stopOpacity={0} />
                                             </linearGradient>
                                         </defs>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
-                                        <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={alpha(theme.palette.text.primary, 0.08)} />
+                                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: theme.palette.text.secondary, fontSize: 12 }} />
+                                        <YAxis axisLine={false} tickLine={false} tick={{ fill: theme.palette.text.secondary, fontSize: 12 }} />
                                         <Tooltip
                                             contentStyle={{
                                                 borderRadius: '12px',
@@ -199,7 +256,7 @@ const Dashboard: React.FC = () => {
                                         <Area
                                             type="monotone"
                                             dataKey="sales"
-                                            stroke="#6366f1"
+                                            stroke={theme.palette.primary.main}
                                             strokeWidth={3}
                                             fillOpacity={1}
                                             fill="url(#colorSales)"
@@ -212,7 +269,7 @@ const Dashboard: React.FC = () => {
                     </Card>
                 </Grid>
 
-                <Grid size={{ xs: 12, md: 4 }}>
+                <Grid size={{ xs: 12, md: 4 }} className="section-rise-delay">
                     <Card sx={{ borderRadius: 4, height: '100%' }}>
                         <CardContent>
                             <Typography variant="h6" fontWeight={700} gutterBottom>
@@ -222,7 +279,7 @@ const Dashboard: React.FC = () => {
                                 <ResponsiveContainer width="100%" height="100%">
                                     <BarChart data={dynamicCategoryData} layout="vertical">
                                         <XAxis type="number" hide />
-                                        <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12, fontWeight: 600 }} width={80} />
+                                        <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fill: theme.palette.text.secondary, fontSize: 12, fontWeight: 600 }} width={80} />
                                         <Tooltip
                                             cursor={{ fill: 'transparent' }}
                                             formatter={(value: any) => [`$${(value || 0).toLocaleString()}`, 'Value']}
@@ -250,7 +307,7 @@ const Dashboard: React.FC = () => {
                     </Card>
                 </Grid>
 
-                <Grid size={12}>
+                <Grid size={12} className="section-rise-delay">
                     <Card sx={{ borderRadius: 4 }}>
                         <CardContent>
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
@@ -267,7 +324,7 @@ const Dashboard: React.FC = () => {
                                 <Box>
                                     <TableContainer>
                                         <Table size="small">
-                                            <TableHead sx={{ bgcolor: 'rgba(0,0,0,0.02)' }}>
+                                            <TableHead>
                                                 <TableRow>
                                                     <TableCell sx={{ fontWeight: 700 }}>ID</TableCell>
                                                     <TableCell sx={{ fontWeight: 700 }}>Product</TableCell>

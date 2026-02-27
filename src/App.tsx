@@ -20,6 +20,8 @@ const POSTerminal = React.lazy(() => import('./pages/POS/POSTerminal'));
 const TransactionHistory = React.lazy(() => import('./pages/Transactions/TransactionHistory'));
 const ReportsPage = React.lazy(() => import('./pages/Reports/ReportsPage'));
 const Signup = React.lazy(() => import('./pages/Auth/Signup'));
+const OrderDesk = React.lazy(() => import('./pages/Orders/OrderDesk'));
+const SettingsPage = React.lazy(() => import('./pages/Settings/SettingsPage'));
 
 const AppContent: React.FC = () => {
   const { mode } = useSelector((state: RootState) => state.theme);
@@ -55,8 +57,18 @@ const AppContent: React.FC = () => {
                   <POSTerminal />
                 </ProtectedRoute>
               } />
+              <Route path="orders" element={
+                <ProtectedRoute allowedRoles={['user', 'admin']}>
+                  <OrderDesk />
+                </ProtectedRoute>
+              } />
               <Route path="transactions" element={<TransactionHistory />} />
               <Route path="reports" element={<ReportsPage />} />
+              <Route path="settings" element={
+                <ProtectedRoute allowedRoles={['admin', 'user']}>
+                  <SettingsPage />
+                </ProtectedRoute>
+              } />
             </Route>
 
             <Route path="*" element={<Navigate to="/" replace />} />

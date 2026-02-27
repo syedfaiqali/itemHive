@@ -39,10 +39,12 @@ import {
 } from 'lucide-react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
-import { deleteProduct, updateProduct, type Product } from '../../features/inventory/inventorySlice';
+import { deleteProduct, updateProduct, type Product, resolveProductImage } from '../../features/inventory/inventorySlice';
 import { useNavigate } from 'react-router-dom';
+import { alpha, useTheme } from '@mui/material/styles';
 
 const ProductList: React.FC = () => {
+    const theme = useTheme();
     const dispatch = useDispatch();
     const navigate = useNavigate();
     const { products } = useSelector((state: RootState) => state.inventory);
@@ -59,6 +61,9 @@ const ProductList: React.FC = () => {
         message: '',
         severity: 'success'
     });
+    const [showFilters, setShowFilters] = useState(false);
+    const [categoryFilter, setCategoryFilter] = useState('all');
+    const [stockFilter, setStockFilter] = useState<'all' | 'in' | 'low' | 'out'>('all');
 
     const handleSnackClose = () => setSnack({ ...snack, open: false });
 
@@ -147,30 +152,47 @@ const ProductList: React.FC = () => {
         document.body.removeChild(link);
     };
 
-    const filteredProducts = products.filter(p =>
-        p.name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-        p.category.toLowerCase().includes(debouncedSearch.toLowerCase())
-    );
+    const categories = Array.from(new Set(products.map(p => p.category))).sort();
+
+    const filteredProducts = products.filter(p => {
+        const matchesSearch =
+            p.name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+            p.category.toLowerCase().includes(debouncedSearch.toLowerCase());
+        const matchesCategory = categoryFilter === 'all' || p.category === categoryFilter;
+        const matchesStock = stockFilter === 'all'
+            ? true
+            : stockFilter === 'out'
+                ? p.stock <= 0
+                : stockFilter === 'low'
+                    ? p.stock > 0 && p.stock <= p.minStock
+                    : p.stock > p.minStock;
+        return matchesSearch && matchesCategory && matchesStock;
+    });
 
     return (
         <Box>
-            <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Typography variant="h4" fontWeight={800}>Inventory Management</Typography>
+            <Box className="section-rise" sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Box>
+                    <Typography variant="h4" fontWeight={800}>Inventory Management</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                        Track stock levels, pricing, and low-stock alerts in one view.
+                    </Typography>
+                </Box>
                 {isAdmin && (
                     <Button
                         variant="contained"
                         startIcon={<Plus size={20} />}
                         onClick={() => navigate('/inventory/add')}
-                        sx={{ borderRadius: 2 }}
+                        sx={{ borderRadius: 2, px: 3, py: 1.2, fontWeight: 800 }}
                     >
                         Add Product
                     </Button>
                 )}
             </Box>
 
-            <Card sx={{ borderRadius: 4, overflow: 'hidden' }}>
+            <Card className="section-rise-delay" sx={{ borderRadius: 4, overflow: 'hidden' }}>
                 <CardContent sx={{ p: 0 }}>
-                    <Box sx={{ p: 2, display: 'flex', gap: 2, alignItems: 'center', borderBottom: '1px solid', borderColor: 'divider' }}>
+                    <Box sx={{ p: 2.5, display: 'flex', gap: 2, alignItems: 'center', borderBottom: '1px solid', borderColor: 'divider' }}>
                         <TextField
                             placeholder="Search products..."
                             size="small"
@@ -183,9 +205,15 @@ const ProductList: React.FC = () => {
                                     </InputAdornment>
                                 ),
                             }}
-                            sx={{ flexGrow: 1, maxWidth: 400 }}
+                            sx={{ flexGrow: 1, maxWidth: 420 }}
                         />
-                        <Button variant="outlined" startIcon={<Filter size={18} />} color="inherit" sx={{ borderColor: 'divider' }}>
+                        <Button
+                            variant="outlined"
+                            startIcon={<Filter size={18} />}
+                            color="inherit"
+                            sx={{ borderColor: 'divider' }}
+                            onClick={() => setShowFilters(!showFilters)}
+                        >
                             Filters
                         </Button>
                         <Button variant="outlined" startIcon={<Download size={18} />} color="inherit" sx={{ borderColor: 'divider' }} onClick={exportToCSV}>
@@ -193,9 +221,50 @@ const ProductList: React.FC = () => {
                         </Button>
                     </Box>
 
+                    {showFilters && (
+                        <Box sx={{ px: 2.5, py: 2, display: 'flex', gap: 2, alignItems: 'center', borderBottom: '1px solid', borderColor: 'divider', flexWrap: 'wrap' }}>
+                            <TextField
+                                select
+                                label="Category"
+                                size="small"
+                                value={categoryFilter}
+                                onChange={(e) => setCategoryFilter(e.target.value)}
+                                sx={{ minWidth: 180 }}
+                            >
+                                <MenuItem value="all">All</MenuItem>
+                                {categories.map((cat) => (
+                                    <MenuItem key={cat} value={cat}>{cat}</MenuItem>
+                                ))}
+                            </TextField>
+                            <TextField
+                                select
+                                label="Stock"
+                                size="small"
+                                value={stockFilter}
+                                onChange={(e) => setStockFilter(e.target.value as 'all' | 'in' | 'low' | 'out')}
+                                sx={{ minWidth: 160 }}
+                            >
+                                <MenuItem value="all">All</MenuItem>
+                                <MenuItem value="in">In Stock</MenuItem>
+                                <MenuItem value="low">Low Stock</MenuItem>
+                                <MenuItem value="out">Out of Stock</MenuItem>
+                            </TextField>
+                            <Button
+                                variant="text"
+                                color="inherit"
+                                onClick={() => {
+                                    setCategoryFilter('all');
+                                    setStockFilter('all');
+                                }}
+                            >
+                                Clear Filters
+                            </Button>
+                        </Box>
+                    )}
+
                     <TableContainer component={Box}>
                         <Table>
-                            <TableHead sx={{ bgcolor: 'rgba(0,0,0,0.02)' }}>
+                            <TableHead>
                                 <TableRow>
                                     <TableCell sx={{ fontWeight: 700 }}>PRODUCT NAME</TableCell>
                                     <TableCell sx={{ fontWeight: 700 }}>CATEGORY</TableCell>
@@ -212,7 +281,15 @@ const ProductList: React.FC = () => {
                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                                                 <Avatar
                                                     variant="rounded"
-                                                    sx={{ bgcolor: 'rgba(99, 102, 241, 0.1)', color: 'primary.main', fontWeight: 700 }}
+                                                    src={resolveProductImage(product)}
+                                                    alt={product.name}
+                                                    sx={{
+                                                        bgcolor: alpha(theme.palette.primary.main, 0.12),
+                                                        color: 'primary.main',
+                                                        fontWeight: 700,
+                                                        width: 48,
+                                                        height: 48
+                                                    }}
                                                 >
                                                     {product.name.charAt(0)}
                                                 </Avatar>
@@ -226,7 +303,8 @@ const ProductList: React.FC = () => {
                                             <Chip
                                                 label={product.category}
                                                 size="small"
-                                                sx={{ fontWeight: 600, bgcolor: 'rgba(0,0,0,0.05)' }}
+                                                variant="outlined"
+                                                sx={{ fontWeight: 700 }}
                                             />
                                         </TableCell>
                                         <TableCell>
@@ -283,6 +361,19 @@ const ProductList: React.FC = () => {
                                 <Avatar variant="rounded" sx={{ width: 100, height: 100, fontSize: '3rem', bgcolor: 'primary.light' }}>
                                     {viewProduct.name.charAt(0)}
                                 </Avatar>
+                                <Box
+                                    component="img"
+                                    src={resolveProductImage(viewProduct)}
+                                    alt={viewProduct.name}
+                                    sx={{
+                                        width: 120,
+                                        height: 120,
+                                        borderRadius: 2,
+                                        objectFit: 'cover',
+                                        border: '1px solid',
+                                        borderColor: 'divider',
+                                    }}
+                                />
                                 <Box>
                                     <Typography variant="h5" fontWeight={800}>{viewProduct.name}</Typography>
                                     <Typography color="text.secondary" gutterBottom>{viewProduct.category}</Typography>

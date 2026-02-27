@@ -1,0 +1,41 @@
+import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
+
+export type OrderStatus = 'pending' | 'fulfilled' | 'rejected';
+
+export interface Order {
+    id: string;
+    productId: string;
+    productName: string;
+    quantity: number;
+    requestedBy: string;
+    status: OrderStatus;
+    timestamp: string;
+    notes?: string;
+}
+
+interface OrdersState {
+    orders: Order[];
+}
+
+const initialState: OrdersState = {
+    orders: [],
+};
+
+const ordersSlice = createSlice({
+    name: 'orders',
+    initialState,
+    reducers: {
+        addOrder: (state, action: PayloadAction<Order>) => {
+            state.orders.unshift(action.payload);
+        },
+        updateOrderStatus: (state, action: PayloadAction<{ id: string; status: OrderStatus }>) => {
+            const order = state.orders.find(o => o.id === action.payload.id);
+            if (order) {
+                order.status = action.payload.status;
+            }
+        },
+    },
+});
+
+export const { addOrder, updateOrderStatus } = ordersSlice.actions;
+export default ordersSlice.reducer;

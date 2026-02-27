@@ -18,7 +18,8 @@ import {
     BarChart3,
     Settings,
     PlusCircle,
-    Monitor as TerminalIcon
+    Monitor as TerminalIcon,
+    ClipboardList
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
@@ -41,8 +42,10 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onDrawerToggle }) => {
         { text: 'POS Terminal', icon: <TerminalIcon size={20} />, path: '/pos', roles: ['admin', 'user'] },
         { text: 'Inventory', icon: <Package size={20} />, path: '/inventory', roles: ['admin', 'user'] },
         { text: 'Add Product', icon: <PlusCircle size={20} />, path: '/inventory/add', roles: ['admin'] },
+        { text: 'Order Desk', icon: <ClipboardList size={20} />, path: '/orders', roles: ['admin', 'user'] },
         { text: 'Transactions', icon: <History size={20} />, path: '/transactions', roles: ['admin', 'user'] },
         { text: 'Reports', icon: <BarChart3 size={20} />, path: '/reports', roles: ['admin'] },
+        { text: 'Settings', icon: <Settings size={20} />, path: '/settings', roles: ['admin', 'user'] },
     ];
 
     const drawer = (
@@ -100,14 +103,9 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onDrawerToggle }) => {
             </List>
             <Box sx={{ mt: 'auto', p: 2 }}>
                 <Divider sx={{ mb: 2 }} />
-                <ListItem disablePadding>
-                    <ListItemButton sx={{ borderRadius: 2 }}>
-                        <ListItemIcon sx={{ minWidth: 40 }}>
-                            <Settings size={20} />
-                        </ListItemIcon>
-                        <ListItemText primary="Settings" primaryTypographyProps={{ fontSize: '0.9rem' }} />
-                    </ListItemButton>
-                </ListItem>
+                <Typography variant="caption" color="text.secondary" sx={{ px: 2 }}>
+                    Account
+                </Typography>
             </Box>
         </Box>
     );
