@@ -57,14 +57,15 @@ const Login: React.FC = () => {
         <Box
             sx={{
                 position: 'relative',
-                minHeight: '100vh',
+                minHeight: '100dvh',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                overflow: 'hidden',
                 background: theme.palette.mode === 'light'
                     ? 'radial-gradient(circle at 15% 10%, rgba(14, 165, 165, 0.2), transparent 45%), radial-gradient(circle at 85% 0%, rgba(37, 99, 235, 0.14), transparent 45%), linear-gradient(180deg, #eef6f7 0%, #e8eff7 100%)'
                     : 'radial-gradient(circle at 15% 10%, rgba(45, 212, 191, 0.2), transparent 45%), radial-gradient(circle at 85% 0%, rgba(59, 130, 246, 0.18), transparent 45%), linear-gradient(180deg, #0b1220 0%, #0f172a 100%)',
-                p: 2
+                p: { xs: 1, md: 0.5 }
             }}
         >
             {floatingWidgets.map((item, index) => (
@@ -115,7 +116,8 @@ const Login: React.FC = () => {
                             display: 'flex',
                             flexDirection: { xs: 'column', md: 'row' },
                             boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
-                            minHeight: 600
+                            minHeight: { xs: 'auto', md: 540 },
+                            maxHeight: { xs: 'none', md: '90dvh' }
                         }}
                     >
                         <Box
@@ -161,14 +163,14 @@ const Login: React.FC = () => {
                         <Box
                             sx={{
                                 flex: 1,
-                                p: { xs: 4, md: 6 },
+                                p: { xs: 2.25, md: 3 },
                                 bgcolor: 'background.paper',
                                 display: 'flex',
                                 flexDirection: 'column',
                                 justifyContent: 'center'
                             }}
                         >
-                            <Box sx={{ mb: 4, textAlign: 'center' }}>
+                            <Box sx={{ mb: 2, textAlign: 'center' }}>
                                 <Typography variant="h4" fontWeight={800} color="primary.main" gutterBottom>
                                     ItemHive
                                 </Typography>
@@ -177,14 +179,14 @@ const Login: React.FC = () => {
                                 </Typography>
                             </Box>
 
-                            {error && <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>{error}</Alert>}
+                            {error && <Alert severity="error" sx={{ mb: 1.5, borderRadius: 2 }}>{error}</Alert>}
 
                             <form onSubmit={handleLogin}>
                                 <TextField
                                     fullWidth
                                     label="Email Address"
                                     variant="outlined"
-                                    margin="normal"
+                                    margin="dense"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                     InputProps={{
@@ -194,14 +196,14 @@ const Login: React.FC = () => {
                                             </InputAdornment>
                                         ),
                                     }}
-                                    sx={{ mb: 2 }}
+                                    sx={{ mb: 1 }}
                                 />
                                 <TextField
                                     fullWidth
                                     label="Password"
                                     type={showPassword ? 'text' : 'password'}
                                     variant="outlined"
-                                    margin="normal"
+                                    margin="dense"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     InputProps={{
@@ -218,7 +220,7 @@ const Login: React.FC = () => {
                                             </InputAdornment>
                                         ),
                                     }}
-                                    sx={{ mb: 3 }}
+                                    sx={{ mb: 1.5 }}
                                 />
 
                                 <Button
@@ -239,13 +241,13 @@ const Login: React.FC = () => {
                                 </Button>
                             </form>
 
-                            <Box sx={{ mt: 4, textAlign: 'center' }}>
+                            <Box sx={{ mt: 2, textAlign: 'center' }}>
                                 <Typography variant="body2" color="text.secondary">
                                     Don't have an account? <Button variant="text" onClick={() => navigate('/signup')} sx={{ fontWeight: 700 }}>Sign Up</Button>
                                 </Typography>
                             </Box>
 
-                            <Divider sx={{ my: 3 }}>
+                            <Divider sx={{ my: 1.5 }}>
                                 <Typography variant="caption" color="text.secondary">DEMO CREDENTIALS</Typography>
                             </Divider>
 

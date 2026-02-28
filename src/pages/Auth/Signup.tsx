@@ -44,14 +44,15 @@ const Signup: React.FC = () => {
         <Box
             sx={{
                 position: 'relative',
-                minHeight: '100vh',
+                minHeight: '100dvh',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                overflow: 'hidden',
                 background: theme.palette.mode === 'light'
                     ? 'radial-gradient(circle at 15% 10%, rgba(14, 165, 165, 0.2), transparent 45%), radial-gradient(circle at 85% 0%, rgba(37, 99, 235, 0.14), transparent 45%), linear-gradient(180deg, #eef6f7 0%, #e8eff7 100%)'
                     : 'radial-gradient(circle at 15% 10%, rgba(45, 212, 191, 0.2), transparent 45%), radial-gradient(circle at 85% 0%, rgba(59, 130, 246, 0.18), transparent 45%), linear-gradient(180deg, #0b1220 0%, #0f172a 100%)',
-                p: 2
+                p: { xs: 1.25, md: 2 }
             }}
         >
             {floatingWidgets.map((item, index) => (
@@ -94,8 +95,8 @@ const Signup: React.FC = () => {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5 }}
                 >
-                    <Paper elevation={24} sx={{ borderRadius: 4, p: 4 }}>
-                        <Box sx={{ mb: 4, textAlign: 'center' }}>
+                    <Paper elevation={24} sx={{ borderRadius: 4, p: { xs: 2.25, md: 3 }, maxHeight: { xs: 'none', md: '90dvh' } }}>
+                        <Box sx={{ mb: 2, textAlign: 'center' }}>
                             <Typography variant="h4" fontWeight={800} color="primary.main" gutterBottom>
                                 Join ItemHive
                             </Typography>
@@ -105,7 +106,7 @@ const Signup: React.FC = () => {
                         </Box>
 
                         {success && (
-                            <Alert severity="success" sx={{ mb: 3, borderRadius: 2 }}>
+                            <Alert severity="success" sx={{ mb: 1.5, borderRadius: 2 }}>
                                 Account created successfully! Redirecting to login...
                             </Alert>
                         )}
@@ -115,7 +116,7 @@ const Signup: React.FC = () => {
                                 fullWidth
                                 label="Full Name"
                                 variant="outlined"
-                                margin="normal"
+                                margin="dense"
                                 required
                                 InputProps={{
                                     startAdornment: (
@@ -129,7 +130,7 @@ const Signup: React.FC = () => {
                                 fullWidth
                                 label="Email Address"
                                 variant="outlined"
-                                margin="normal"
+                                margin="dense"
                                 required
                                 InputProps={{
                                     startAdornment: (
@@ -144,7 +145,7 @@ const Signup: React.FC = () => {
                                 fullWidth
                                 label="Role"
                                 variant="outlined"
-                                margin="normal"
+                                margin="dense"
                                 defaultValue="user"
                                 required
                             >
@@ -156,7 +157,7 @@ const Signup: React.FC = () => {
                                 label="Password"
                                 type={showPassword ? 'text' : 'password'}
                                 variant="outlined"
-                                margin="normal"
+                                margin="dense"
                                 required
                                 InputProps={{
                                     startAdornment: (
@@ -172,7 +173,7 @@ const Signup: React.FC = () => {
                                         </InputAdornment>
                                     ),
                                 }}
-                                sx={{ mb: 3 }}
+                                sx={{ mb: 1.5 }}
                             />
 
                             <Button
@@ -187,7 +188,7 @@ const Signup: React.FC = () => {
                             </Button>
                         </form>
 
-                        <Box sx={{ mt: 4, textAlign: 'center' }}>
+                        <Box sx={{ mt: 2, textAlign: 'center' }}>
                             <Typography variant="body2" color="text.secondary">
                                 Already have an account? <Button variant="text" onClick={() => navigate('/login')} sx={{ fontWeight: 700 }}>Sign In</Button>
                             </Typography>
