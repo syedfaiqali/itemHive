@@ -12,10 +12,12 @@ import {
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState } from '../../store';
 import { setDarkMode } from '../../features/theme/themeSlice';
+import { setLowStockAlertsEnabled, setOrderUpdatesEnabled } from '../../features/settings/settingsSlice';
 
 const SettingsPage: React.FC = () => {
     const dispatch = useDispatch();
     const { mode } = useSelector((state: RootState) => state.theme);
+    const { notifications } = useSelector((state: RootState) => state.settings);
 
     return (
         <Box>
@@ -50,8 +52,24 @@ const SettingsPage: React.FC = () => {
                         <CardContent>
                             <Typography variant="h6" fontWeight={700} gutterBottom>Notifications</Typography>
                             <Divider sx={{ mb: 2 }} />
-                            <FormControlLabel control={<Switch defaultChecked />} label="Order updates" />
-                            <FormControlLabel control={<Switch defaultChecked />} label="Low stock alerts" />
+                            <FormControlLabel
+                                control={
+                                    <Switch
+                                        checked={notifications.orderUpdates}
+                                        onChange={(e) => dispatch(setOrderUpdatesEnabled(e.target.checked))}
+                                    />
+                                }
+                                label="Order updates"
+                            />
+                            <FormControlLabel
+                                control={
+                                    <Switch
+                                        checked={notifications.lowStockAlerts}
+                                        onChange={(e) => dispatch(setLowStockAlertsEnabled(e.target.checked))}
+                                    />
+                                }
+                                label="Low stock alerts"
+                            />
                         </CardContent>
                     </Card>
                 </Grid>

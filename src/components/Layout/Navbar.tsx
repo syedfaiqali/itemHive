@@ -35,8 +35,9 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
     const navigate = useNavigate();
     const { user } = useSelector((state: RootState) => state.auth);
     const { mode } = useSelector((state: RootState) => state.theme);
-    const { transactions } = useSelector((state: RootState) => state.transactions);
     const { orders } = useSelector((state: RootState) => state.orders);
+    const { products } = useSelector((state: RootState) => state.inventory);
+    const { notifications } = useSelector((state: RootState) => state.settings);
     const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
     const [notifAnchorEl, setNotifAnchorEl] = React.useState<null | HTMLElement>(null);
 
@@ -72,18 +73,25 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
     };
 
     const recentNotifications = [
-        ...orders.slice(0, 2).map((order) => ({
-            id: `order-${order.id}`,
-            title: `Order ${order.status === 'fulfilled' ? 'fulfilled' : 'rejected'}`,
-            detail: `${order.productName} • ${order.quantity} units`,
-            time: new Date(order.timestamp).toLocaleString(),
-        })),
-        ...transactions.slice(0, 2).map((tx) => ({
-            id: `tx-${tx.id}`,
-            title: tx.type === 'addition' ? 'Stock Added' : 'Stock Reduced',
-            detail: `${tx.productName} • ${tx.amount} units`,
-            time: new Date(tx.timestamp).toLocaleString(),
-        }))
+        ...(notifications.orderUpdates
+            ? orders.slice(0, 2).map((order) => ({
+                id: `order-${order.id}`,
+                title: `Order ${order.status === 'fulfilled' ? 'fulfilled' : 'rejected'}`,
+                detail: `${order.productName} - ${order.quantity} units`,
+                time: new Date(order.timestamp).toLocaleString(),
+            }))
+            : []),
+        ...(notifications.lowStockAlerts
+            ? products
+                .filter((p) => p.stock > 0 && p.stock <= p.minStock)
+                .slice(0, 2)
+                .map((p) => ({
+                    id: `low-stock-${p.id}`,
+                    title: 'Low stock alert',
+                    detail: `${p.name} - ${p.stock} left`,
+                    time: 'Needs restock',
+                }))
+            : [])
     ].slice(0, 4);
 
     return (
@@ -250,7 +258,9 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
                         <Box sx={{ px: 2, py: 1 }}>
                             <Typography variant="subtitle2">Notifications</Typography>
                             <Typography variant="caption" color="text.secondary">
-                                Latest order and stock updates
+                                {notifications.orderUpdates || notifications.lowStockAlerts
+                                    ? 'Latest order and stock updates'
+                                    : 'Notifications are turned off in Settings'}
                             </Typography>
                         </Box>
                         {recentNotifications.length === 0 ? (
@@ -280,6 +290,5 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
         </AppBar>
     );
 };
-
 
 export default Navbar;

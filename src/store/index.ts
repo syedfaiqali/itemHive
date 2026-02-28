@@ -16,6 +16,7 @@ import transactionReducer from '../features/transactions/transactionSlice';
 import themeReducer from '../features/theme/themeSlice';
 import posReducer from '../features/pos/posSlice';
 import ordersReducer from '../features/orders/ordersSlice';
+import settingsReducer from '../features/settings/settingsSlice';
 
 const rootReducer = combineReducers({
     auth: authReducer,
@@ -24,19 +25,20 @@ const rootReducer = combineReducers({
     theme: themeReducer,
     pos: posReducer,
     orders: ordersReducer,
+    settings: settingsReducer,
 });
 
 const persistConfig = {
     key: 'root',
-    version: 3,
+    version: 4,
     storage,
-    whitelist: ['auth', 'inventory', 'transactions', 'theme', 'orders'], // Persist these slices
-    migrate: (state: any) => {
+    whitelist: ['auth', 'inventory', 'transactions', 'theme', 'orders', 'settings'], // Persist these slices
+    migrate: (state: unknown) => {
         if (!state) return Promise.resolve(state);
-        const nextState = { ...state };
+        const nextState = { ...(state as Record<string, unknown>) } as Record<string, unknown>;
         if (nextState.inventory) {
             nextState.inventory = {
-                ...nextState.inventory,
+                ...(nextState.inventory as Record<string, unknown>),
                 products: initialProductsFromCsv,
                 loading: false,
                 error: null,
