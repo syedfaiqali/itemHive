@@ -24,6 +24,10 @@ import {
     MenuItem,
     Select,
     Stack,
+    Snackbar,
+    Alert,
+    Slide,
+    type SlideProps,
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import {
@@ -65,8 +69,11 @@ const TransactionHistory: React.FC = () => {
     const [toDate, setToDate] = useState('');
     const [activeDateField, setActiveDateField] = useState<'from' | 'to'>('from');
     const [calendarMonth, setCalendarMonth] = useState(new Date());
+    const [exportingCsv, setExportingCsv] = useState(false);
+    const [exportSnackOpen, setExportSnackOpen] = useState(false);
     const isInvalidRange = Boolean(fromDate && toDate && fromDate > toDate);
     const isDatePickerOpen = Boolean(datePickerAnchorEl);
+    const TopSlideTransition = (props: SlideProps) => <Slide {...props} direction="down" />;
 
     const formatDateInput = (date: Date) => date.toISOString().split('T')[0];
 
@@ -125,6 +132,7 @@ const TransactionHistory: React.FC = () => {
     };
 
     const exportToCSV = () => {
+        setExportingCsv(true);
         const headers = ['TX ID', 'Timestamp', 'Product', 'User', 'Type', 'Quantity', 'Value'];
         const rows = filteredTransactions.map(t => [
             t.id,
@@ -150,6 +158,10 @@ const TransactionHistory: React.FC = () => {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        setTimeout(() => {
+            setExportingCsv(false);
+            setExportSnackOpen(true);
+        }, 350);
     };
 
     return (
@@ -160,12 +172,23 @@ const TransactionHistory: React.FC = () => {
                     <Button
                         variant="outlined"
                         startIcon={<Calendar size={20} />}
-                        sx={{ borderRadius: 2 }}
+                        sx={{ borderRadius: 2, transition: 'all 0.2s ease' }}
                         onClick={(e) => setDatePickerAnchorEl(e.currentTarget)}
                     >
                         Date Range
                     </Button>
-                    <Button variant="contained" startIcon={<FileDown size={20} />} sx={{ borderRadius: 2 }} onClick={exportToCSV}>
+                    <Button
+                        variant="contained"
+                        startIcon={<FileDown size={20} />}
+                        sx={{
+                            borderRadius: 2,
+                            transition: 'all 0.2s ease',
+                            transform: exportingCsv ? 'translateY(-1px) scale(1.02)' : 'translateY(0) scale(1)',
+                            opacity: exportingCsv ? 0.9 : 1
+                        }}
+                        onClick={exportToCSV}
+                        disabled={exportingCsv}
+                    >
                         Export CSV
                     </Button>
                 </Box>
@@ -296,6 +319,7 @@ const TransactionHistory: React.FC = () => {
                         }
                     }
                 }}
+                transitionDuration={{ enter: 180, exit: 140 }}
             >
                 <Stack spacing={1.5}>
                     <Typography variant="subtitle1" fontWeight={800}>Date Range</Typography>
@@ -417,7 +441,13 @@ const TransactionHistory: React.FC = () => {
             </Popover>
 
             {/* Print Friendly Invoice Dialog */}
-            <Dialog open={Boolean(selectedTx)} onClose={() => setSelectedTx(null)} maxWidth="sm" fullWidth>
+            <Dialog
+                open={Boolean(selectedTx)}
+                onClose={() => setSelectedTx(null)}
+                maxWidth="sm"
+                fullWidth
+                transitionDuration={{ enter: 220, exit: 170 }}
+            >
                 <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Typography variant="h6" fontWeight={800}>Invoice Detail</Typography>
                     <IconButton onClick={() => setSelectedTx(null)} size="small">
@@ -483,6 +513,18 @@ const TransactionHistory: React.FC = () => {
                     </Button>
                 </DialogActions>
             </Dialog>
+
+            <Snackbar
+                open={exportSnackOpen}
+                autoHideDuration={1800}
+                onClose={() => setExportSnackOpen(false)}
+                anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+                TransitionComponent={TopSlideTransition}
+            >
+                <Alert severity="success" variant="filled" onClose={() => setExportSnackOpen(false)}>
+                    CSV downloaded
+                </Alert>
+            </Snackbar>
 
             {/* Global Print Style */}
             <style>

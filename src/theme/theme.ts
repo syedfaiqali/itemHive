@@ -165,6 +165,21 @@ export const getAppTheme = (mode: PaletteMode) => createTheme({
                 },
             },
         },
+        MuiDialog: {
+            defaultProps: {
+                transitionDuration: { enter: 220, exit: 170 },
+            },
+            styleOverrides: {
+                paper: {
+                    transition: 'transform 220ms ease, opacity 180ms ease',
+                },
+            },
+        },
+        MuiPopover: {
+            defaultProps: {
+                transitionDuration: { enter: 180, exit: 140 },
+            },
+        },
     },
 });
 

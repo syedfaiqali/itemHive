@@ -116,7 +116,7 @@ const POSTerminal: React.FC = () => {
                 gap: 2,
                 height: { xs: 'auto', lg: 'calc(100dvh - 140px)' },
                 minHeight: { xs: 0, lg: 'calc(100dvh - 130px)' },
-                overflow: 'hidden'
+                overflow: { xs: 'visible', lg: 'hidden' }
             }}
         >
             {/* Left Side: Product Selection */}
@@ -155,12 +155,16 @@ const POSTerminal: React.FC = () => {
                 <Box
                     sx={{
                         flexGrow: 1,
-                        minHeight: 0,
-                        overflowY: 'auto',
+                        minHeight: { xs: 'auto', lg: 0 },
+                        overflowY: { xs: 'visible', lg: 'auto' },
                         overflowX: 'hidden',
                         px: 0.5,
                         pt: 0.75,
-                        pb: 0.5
+                        pb: 0.5,
+                        scrollbarWidth: 'none',
+                        '&::-webkit-scrollbar': {
+                            display: 'none'
+                        }
                     }}
                 >
                     <Grid container spacing={2}>
@@ -213,11 +217,11 @@ const POSTerminal: React.FC = () => {
                     maxWidth: { xs: '100%', lg: 330 },
                     minWidth: { lg: 320 },
                     height: { xs: 'auto', lg: '99%' },
-                    minHeight: { xs: 360, lg: 0 },
+                    minHeight: { xs: 'auto', lg: 0 },
                     display: 'flex',
                     flexDirection: 'column',
                     borderRadius: 4,
-                    overflow: 'hidden',
+                    overflow: { xs: 'visible', lg: 'hidden' },
                     bgcolor: 'background.paper',
                     border: '1px solid',
                     borderColor: 'divider',
@@ -234,9 +238,23 @@ const POSTerminal: React.FC = () => {
                     </IconButton>
                 </Box>
 
-                <Box sx={{ flexGrow: 1, overflowY: 'auto', p: 2, minHeight: 0 }}>
+                <Box
+                    sx={{
+                        flexGrow: { xs: 0, lg: 1 },
+                        overflowY: { xs: 'visible', lg: 'auto' },
+                        p: 2,
+                        minHeight: { xs: 'auto', lg: 0 },
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: cart.length === 0 ? 'center' : 'flex-start',
+                        scrollbarWidth: 'none',
+                        '&::-webkit-scrollbar': {
+                            display: 'none'
+                        }
+                    }}
+                >
                     {cart.length === 0 ? (
-                        <Box sx={{ textAlign: 'center', mt: { xs: 4, lg: 10 }, opacity: 0.3 }}>
+                        <Box sx={{ textAlign: 'center', opacity: 0.35, py: 2 }}>
                             <ShoppingCart size={80} strokeWidth={1} style={{ marginBottom: 16 }} />
                             <Typography variant="h6" fontWeight={600}>Cart is empty</Typography>
                             <Typography variant="body2">Select products to start</Typography>

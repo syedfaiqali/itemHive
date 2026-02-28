@@ -29,7 +29,7 @@ import type { RootState } from '../../store';
 import { reduceStock } from '../../features/inventory/inventorySlice';
 import { addTransaction } from '../../features/transactions/transactionSlice';
 import { addOrder, type OrderStatus, type Order } from '../../features/orders/ordersSlice';
-import { resolveProductImage, placeholderFallback } from '../../features/inventory/inventorySlice';
+import { resolveProductImage, placeholderFallback, type Product } from '../../features/inventory/inventorySlice';
 import { alpha, useTheme } from '@mui/material/styles';
 
 const OrderDesk: React.FC = () => {
@@ -39,7 +39,7 @@ const OrderDesk: React.FC = () => {
     const { user } = useSelector((state: RootState) => state.auth);
     const { orders } = useSelector((state: RootState) => state.orders);
 
-    const [selectedProduct, setSelectedProduct] = useState<any>(null);
+    const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
     const [quantity, setQuantity] = useState<number | string>(1);
     const [note, setNote] = useState('');
     const [feedback, setFeedback] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
@@ -382,7 +382,17 @@ const OrderDesk: React.FC = () => {
                                 <Chip label={`Rejected: ${summary.rejected}`} size="small" color="error" sx={{ fontWeight: 700 }} />
                                 <Chip label={`Pending: ${summary.pending}`} size="small" color="warning" sx={{ fontWeight: 700 }} />
                             </Box>
-                            <Box sx={{ p: 2.5, display: 'flex', gap: 2, alignItems: 'center', borderBottom: '1px solid', borderColor: 'divider' }}>
+                            <Box
+                                sx={{
+                                    p: 2.5,
+                                    display: 'flex',
+                                    gap: 1.5,
+                                    alignItems: 'center',
+                                    flexWrap: 'wrap',
+                                    borderBottom: '1px solid',
+                                    borderColor: 'divider'
+                                }}
+                            >
                                 <TextField
                                     placeholder="Search order, product, or requester..."
                                     size="small"
@@ -395,7 +405,7 @@ const OrderDesk: React.FC = () => {
                                             </InputAdornment>
                                         ),
                                     }}
-                                    sx={{ flexGrow: 1 }}
+                                    sx={{ flexGrow: 1, minWidth: { xs: '100%', sm: 280 } }}
                                 />
                                 <TextField
                                     select
@@ -403,7 +413,7 @@ const OrderDesk: React.FC = () => {
                                     label="Status"
                                     value={statusFilter}
                                     onChange={(e) => setStatusFilter(e.target.value as 'all' | OrderStatus)}
-                                    sx={{ minWidth: 140 }}
+                                    sx={{ minWidth: { xs: '100%', sm: 150 } }}
                                 >
                                     <MenuItem value="all">All</MenuItem>
                                     <MenuItem value="fulfilled">Fulfilled</MenuItem>
@@ -415,7 +425,7 @@ const OrderDesk: React.FC = () => {
                                     startIcon={<Download size={18} />}
                                     color="inherit"
                                     onClick={exportOrdersToCSV}
-                                    sx={{ borderColor: 'divider' }}
+                                    sx={{ borderColor: 'divider', whiteSpace: 'nowrap', ml: { xs: 0, sm: 'auto' } }}
                                 >
                                     Export CSV
                                 </Button>
@@ -428,8 +438,17 @@ const OrderDesk: React.FC = () => {
                                     Download PDF
                                 </Button>
                             </Box>
-                            <TableContainer component={Paper} sx={{ borderRadius: 0 }} id="orders-print-area">
-                                <Table>
+                            <TableContainer
+                                component={Paper}
+                                sx={{
+                                    borderRadius: 0,
+                                    overflowX: 'auto',
+                                    scrollbarWidth: 'none',
+                                    '&::-webkit-scrollbar': { display: 'none' }
+                                }}
+                                id="orders-print-area"
+                            >
+                                <Table sx={{ minWidth: 860 }}>
                                     <TableHead>
                                         <TableRow>
                                             <TableCell sx={{ fontWeight: 700 }}>ORDER ID</TableCell>

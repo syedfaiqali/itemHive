@@ -28,9 +28,6 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../../store';
 
-import itemHiveLightLogo from '../../assets/itemhive-light.svg';
-import itemHiveDarkLogo from '../../assets/itemhive-dark.svg';
-
 const expandedDrawerWidth = 260;
 const collapsedDrawerWidth = 92;
 
@@ -148,7 +145,14 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onDrawerToggle, collapsed
     return (
         <Box
             component="nav"
-            sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 } }}
+            sx={{
+                width: { sm: drawerWidth },
+                flexShrink: { sm: 0 },
+                transition: (theme) => theme.transitions.create('width', {
+                    duration: 260,
+                    easing: theme.transitions.easing.easeInOut,
+                })
+            }}
         >
             <Drawer
                 variant="temporary"
@@ -171,6 +175,10 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onDrawerToggle, collapsed
                         width: drawerWidth,
                         borderRight: '1px solid',
                         borderColor: 'divider',
+                        transition: (theme) => theme.transitions.create(['width', 'padding'], {
+                            duration: 260,
+                            easing: theme.transitions.easing.easeInOut,
+                        }),
                     },
                 }}
                 open

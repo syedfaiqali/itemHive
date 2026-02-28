@@ -24,7 +24,9 @@ import {
     DialogActions,
     Grid,
     Snackbar,
-    Alert
+    Alert,
+    Slide,
+    type SlideProps
 } from '@mui/material';
 import {
     Search,
@@ -44,6 +46,7 @@ import { alpha, useTheme } from '@mui/material/styles';
 import { sendInventoryCsv } from '../../lib/email';
 
 const categoryOptions = ['Electronics', 'Clothing', 'Home', 'Food', 'Accessories', 'Beauty'];
+const TopSlideTransition = (props: SlideProps) => <Slide {...props} direction="down" />;
 
 const ProductList: React.FC = () => {
     const theme = useTheme();
@@ -66,6 +69,7 @@ const ProductList: React.FC = () => {
     const [categoryFilter, setCategoryFilter] = useState('all');
     const [stockFilter, setStockFilter] = useState<'all' | 'in' | 'low' | 'out'>('all');
     const [addDialogOpen, setAddDialogOpen] = useState(false);
+    const [exportingCsv, setExportingCsv] = useState(false);
     const [addFormData, setAddFormData] = useState({
         sku: '',
         name: '',
@@ -183,6 +187,7 @@ const ProductList: React.FC = () => {
     };
 
     const exportToCSV = () => {
+        setExportingCsv(true);
         const headers = ['ID', 'Name', 'Category', 'Price', 'Stock', 'Min Stock', 'Last Updated'];
         const rows = products.map(p => [
             p.id,
@@ -208,6 +213,10 @@ const ProductList: React.FC = () => {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        setTimeout(() => {
+            setExportingCsv(false);
+            showSnack('CSV downloaded successfully', 'success');
+        }, 300);
     };
 
     const emailCsvToAdmin = () => {
@@ -296,7 +305,19 @@ const ProductList: React.FC = () => {
                         >
                             Filters
                         </Button>
-                        <Button variant="outlined" startIcon={<Download size={18} />} color="inherit" sx={{ borderColor: 'divider' }} onClick={exportToCSV}>
+                        <Button
+                            variant="outlined"
+                            startIcon={<Download size={18} />}
+                            color="inherit"
+                            sx={{
+                                borderColor: 'divider',
+                                transition: 'all 0.2s ease',
+                                transform: exportingCsv ? 'translateY(-1px) scale(1.02)' : 'translateY(0) scale(1)',
+                                opacity: exportingCsv ? 0.9 : 1
+                            }}
+                            onClick={exportToCSV}
+                            disabled={exportingCsv}
+                        >
                             Export CSV
                         </Button>
                         <Button variant="contained" color="primary" onClick={emailCsvToAdmin}>
@@ -710,7 +731,8 @@ const ProductList: React.FC = () => {
                 open={snack.open}
                 autoHideDuration={4000}
                 onClose={handleSnackClose}
-                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+                TransitionComponent={TopSlideTransition}
             >
                 <Alert onClose={handleSnackClose} severity={snack.severity} variant="filled" sx={{ width: '100%' }}>
                     {snack.message}
