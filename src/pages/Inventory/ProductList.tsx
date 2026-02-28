@@ -39,15 +39,15 @@ import {
 } from 'lucide-react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
-import { deleteProduct, updateProduct, type Product, resolveProductImage, placeholderFallback } from '../../features/inventory/inventorySlice';
-import { useNavigate } from 'react-router-dom';
+import { addProduct, deleteProduct, updateProduct, type Product, resolveProductImage, placeholderFallback } from '../../features/inventory/inventorySlice';
 import { alpha, useTheme } from '@mui/material/styles';
 import { sendInventoryCsv } from '../../lib/email';
+
+const categoryOptions = ['Electronics', 'Clothing', 'Home', 'Food', 'Accessories', 'Beauty'];
 
 const ProductList: React.FC = () => {
     const theme = useTheme();
     const dispatch = useDispatch();
-    const navigate = useNavigate();
     const { products } = useSelector((state: RootState) => state.inventory);
     const { user } = useSelector((state: RootState) => state.auth);
     const [searchTerm, setSearchTerm] = useState('');
@@ -65,11 +65,33 @@ const ProductList: React.FC = () => {
     const [showFilters, setShowFilters] = useState(false);
     const [categoryFilter, setCategoryFilter] = useState('all');
     const [stockFilter, setStockFilter] = useState<'all' | 'in' | 'low' | 'out'>('all');
+    const [addDialogOpen, setAddDialogOpen] = useState(false);
+    const [addFormData, setAddFormData] = useState({
+        sku: '',
+        name: '',
+        category: '',
+        price: '',
+        stock: '',
+        minStock: '',
+        description: ''
+    });
 
     const handleSnackClose = () => setSnack({ ...snack, open: false });
 
     const showSnack = (message: string, severity: 'success' | 'error' | 'info' | 'warning' = 'success') => {
         setSnack({ open: true, message, severity });
+    };
+
+    const resetAddForm = () => {
+        setAddFormData({
+            sku: '',
+            name: '',
+            category: '',
+            price: '',
+            stock: '',
+            minStock: '',
+            description: ''
+        });
     };
 
     React.useEffect(() => {
@@ -123,6 +145,41 @@ const ProductList: React.FC = () => {
             setEditProduct(null);
             showSnack('Product updated successfully', 'success');
         }
+    };
+
+    const handleAddProductSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+
+        const skuUpper = addFormData.sku.trim().toUpperCase();
+        if (products.some((p: Product) => p.sku.toUpperCase() === skuUpper)) {
+            showSnack('A product with this SKU already exists', 'error');
+            return;
+        }
+
+        const price = parseFloat(addFormData.price);
+        const stock = parseInt(addFormData.stock, 10);
+        const minStock = parseInt(addFormData.minStock, 10);
+
+        if (Number.isNaN(price) || Number.isNaN(stock) || Number.isNaN(minStock)) {
+            showSnack('Please enter valid numeric values for price and stock', 'warning');
+            return;
+        }
+
+        dispatch(addProduct({
+            id: Math.random().toString(36).substr(2, 9),
+            sku: skuUpper,
+            name: addFormData.name.trim(),
+            category: addFormData.category || 'Uncategorized',
+            price,
+            stock,
+            minStock,
+            description: addFormData.description.trim(),
+            lastUpdated: new Date().toISOString()
+        }));
+
+        setAddDialogOpen(false);
+        resetAddForm();
+        showSnack('Product added successfully', 'success');
     };
 
     const exportToCSV = () => {
@@ -205,7 +262,7 @@ const ProductList: React.FC = () => {
                     <Button
                         variant="contained"
                         startIcon={<Plus size={20} />}
-                        onClick={() => navigate('/inventory/add')}
+                        onClick={() => setAddDialogOpen(true)}
                         sx={{ borderRadius: 2, px: 3, py: 1.2, fontWeight: 800 }}
                     >
                         Add Product
@@ -530,6 +587,110 @@ const ProductList: React.FC = () => {
                     <DialogActions sx={{ p: 2 }}>
                         <Button onClick={() => setEditProduct(null)}>Cancel</Button>
                         <Button type="submit" variant="contained" startIcon={<Save size={20} />}>Save Changes</Button>
+                    </DialogActions>
+                </form>
+            </Dialog>
+
+            <Dialog
+                open={addDialogOpen}
+                onClose={() => {
+                    setAddDialogOpen(false);
+                    resetAddForm();
+                }}
+                maxWidth="md"
+                fullWidth
+            >
+                <form onSubmit={handleAddProductSubmit}>
+                    <DialogTitle sx={{ fontWeight: 800 }}>Add New Product</DialogTitle>
+                    <DialogContent dividers>
+                        <Grid container spacing={3} sx={{ mt: 1 }}>
+                            <Grid size={{ xs: 12, md: 6 }}>
+                                <TextField
+                                    fullWidth
+                                    label="SKU"
+                                    required
+                                    value={addFormData.sku}
+                                    onChange={(e) => setAddFormData({ ...addFormData, sku: e.target.value })}
+                                    placeholder="e.g. ELE-MAC-001"
+                                />
+                            </Grid>
+                            <Grid size={{ xs: 12, md: 6 }}>
+                                <TextField
+                                    fullWidth
+                                    label="Product Name"
+                                    required
+                                    value={addFormData.name}
+                                    onChange={(e) => setAddFormData({ ...addFormData, name: e.target.value })}
+                                />
+                            </Grid>
+                            <Grid size={{ xs: 12, md: 6 }}>
+                                <TextField
+                                    select
+                                    fullWidth
+                                    label="Category"
+                                    required
+                                    value={addFormData.category}
+                                    onChange={(e) => setAddFormData({ ...addFormData, category: e.target.value })}
+                                >
+                                    {categoryOptions.map((cat) => (
+                                        <MenuItem key={cat} value={cat}>{cat}</MenuItem>
+                                    ))}
+                                </TextField>
+                            </Grid>
+                            <Grid size={{ xs: 12, md: 6 }}>
+                                <TextField
+                                    fullWidth
+                                    label="Price ($)"
+                                    type="number"
+                                    required
+                                    value={addFormData.price}
+                                    onChange={(e) => setAddFormData({ ...addFormData, price: e.target.value })}
+                                />
+                            </Grid>
+                            <Grid size={{ xs: 12, md: 6 }}>
+                                <TextField
+                                    fullWidth
+                                    label="Initial Stock"
+                                    type="number"
+                                    required
+                                    value={addFormData.stock}
+                                    onChange={(e) => setAddFormData({ ...addFormData, stock: e.target.value })}
+                                />
+                            </Grid>
+                            <Grid size={{ xs: 12, md: 6 }}>
+                                <TextField
+                                    fullWidth
+                                    label="Min Stock Threshold"
+                                    type="number"
+                                    required
+                                    value={addFormData.minStock}
+                                    onChange={(e) => setAddFormData({ ...addFormData, minStock: e.target.value })}
+                                />
+                            </Grid>
+                            <Grid size={12}>
+                                <TextField
+                                    fullWidth
+                                    multiline
+                                    rows={3}
+                                    label="Description"
+                                    value={addFormData.description}
+                                    onChange={(e) => setAddFormData({ ...addFormData, description: e.target.value })}
+                                />
+                            </Grid>
+                        </Grid>
+                    </DialogContent>
+                    <DialogActions sx={{ p: 2 }}>
+                        <Button
+                            onClick={() => {
+                                setAddDialogOpen(false);
+                                resetAddForm();
+                            }}
+                        >
+                            Cancel
+                        </Button>
+                        <Button type="submit" variant="contained" startIcon={<Plus size={18} />}>
+                            Add Product
+                        </Button>
                     </DialogActions>
                 </form>
             </Dialog>

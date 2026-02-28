@@ -8,11 +8,26 @@ import type { RootState } from '../../store';
 
 const MainLayout: React.FC = () => {
     const [mobileOpen, setMobileOpen] = useState(false);
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const { mode } = useSelector((state: RootState) => state.theme);
+
+    React.useEffect(() => {
+        const root = document.documentElement;
+        root.setAttribute('data-theme', mode);
+        root.style.setProperty('--scrollbar-track', mode === 'light' ? '#e2e8f0' : '#0f172a');
+        root.style.setProperty('--scrollbar-thumb', mode === 'light' ? '#0ea5a5' : '#14b8a6');
+        root.style.setProperty('--scrollbar-thumb-hover', mode === 'light' ? '#0f766e' : '#2dd4bf');
+    }, [mode]);
 
     const handleDrawerToggle = () => {
         setMobileOpen(!mobileOpen);
     };
+
+    const handleSidebarCollapseToggle = () => {
+        setSidebarCollapsed((prev) => !prev);
+    };
+
+    const sidebarWidth = sidebarCollapsed ? 92 : 260;
 
     const backgroundStyle = mode === 'light'
         ? 'radial-gradient(circle at 15% 10%, rgba(14, 165, 165, 0.14), transparent 50%), radial-gradient(circle at 85% 0%, rgba(37, 99, 235, 0.12), transparent 45%), linear-gradient(180deg, #f5f7fb 0%, #eef2f7 100%)'
@@ -30,13 +45,18 @@ const MainLayout: React.FC = () => {
         >
             <CssBaseline />
             <Navbar onMenuClick={handleDrawerToggle} />
-            <Sidebar mobileOpen={mobileOpen} onDrawerToggle={handleDrawerToggle} />
+            <Sidebar
+                mobileOpen={mobileOpen}
+                onDrawerToggle={handleDrawerToggle}
+                collapsed={sidebarCollapsed}
+                onCollapseToggle={handleSidebarCollapseToggle}
+            />
             <Box
                 component="main"
                 sx={{
                     flexGrow: 1,
                     p: { xs: 2, sm: 3 },
-                    width: { sm: `calc(100% - 260px)` },
+                    width: { sm: `calc(100% - ${sidebarWidth}px)` },
                     transition: 'all 0.3s ease',
                 }}
             >

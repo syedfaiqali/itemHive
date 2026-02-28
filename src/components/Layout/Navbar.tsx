@@ -23,6 +23,8 @@ import type { RootState } from '../../store';
 import { logout } from '../../features/auth/authSlice';
 import { toggleDarkMode, setDarkMode } from '../../features/theme/themeSlice';
 import { useNavigate } from 'react-router-dom';
+import itemHiveLightLogo from '../../assets/itemhive-light.svg';
+import itemHiveDarkLogo from '../../assets/itemhive-dark.svg';
 
 interface NavbarProps {
     onMenuClick: () => void;
@@ -103,19 +105,16 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
                 </IconButton>
 
                 <Box sx={{ display: 'flex', alignItems: 'center', flexGrow: 1 }}>
-                    <Typography
-                        variant="h6"
-                        noWrap
-                        component="div"
-                        className="gradient-text"
+                    <Box
+                        component="img"
+                        src={mode === 'light' ? itemHiveLightLogo : itemHiveDarkLogo}
+                        alt="ItemHive logo"
                         sx={{
-                            fontWeight: 800,
-                            letterSpacing: -1,
-                            fontSize: '1.5rem'
+                            height: 38,
+                            width: 'auto',
+                            objectFit: 'contain'
                         }}
-                    >
-                        ItemHive
-                    </Typography>
+                    />
                 </Box>
 
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
