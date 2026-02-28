@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import {
     Box,
-    Card,
-    CardContent,
     Typography,
     TextField,
     Button,
@@ -13,19 +11,31 @@ import {
     Container,
     Paper
 } from '@mui/material';
-import { Mail, Lock, Eye, EyeOff, LogIn } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, LogIn, Smartphone, Tablet, Package, ScanLine, Boxes, ShoppingCart, Barcode } from 'lucide-react';
 import { useDispatch } from 'react-redux';
 import { loginSuccess } from '../../features/auth/authSlice';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { alpha, useTheme } from '@mui/material/styles';
 
 const Login: React.FC = () => {
+    const theme = useTheme();
     const dispatch = useDispatch();
     const navigate = useNavigate();
     const [showPassword, setShowPassword] = useState(false);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
+    const floatingWidgets = [
+        { icon: <Smartphone size={20} />, left: '10%', top: '16%', rotate: -6 },
+        { icon: <Tablet size={20} />, left: '27%', top: '34%', rotate: 7 },
+        { icon: <Package size={20} />, left: '78%', top: '18%', rotate: -5 },
+        { icon: <ScanLine size={20} />, left: '72%', top: '56%', rotate: 6 },
+        { icon: <Boxes size={20} />, left: '18%', top: '62%', rotate: -8 },
+        { icon: <ShoppingCart size={20} />, left: '84%', top: '40%', rotate: 5 },
+        { icon: <Barcode size={20} />, left: '43%', top: '12%', rotate: -4 },
+        { icon: <Package size={20} />, left: '52%', top: '70%', rotate: 8 },
+    ];
 
     const handleLogin = (e: React.FormEvent) => {
         e.preventDefault();
@@ -46,14 +56,51 @@ const Login: React.FC = () => {
     return (
         <Box
             sx={{
+                position: 'relative',
                 minHeight: '100vh',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)',
+                background: theme.palette.mode === 'light'
+                    ? 'radial-gradient(circle at 15% 10%, rgba(14, 165, 165, 0.2), transparent 45%), radial-gradient(circle at 85% 0%, rgba(37, 99, 235, 0.14), transparent 45%), linear-gradient(180deg, #eef6f7 0%, #e8eff7 100%)'
+                    : 'radial-gradient(circle at 15% 10%, rgba(45, 212, 191, 0.2), transparent 45%), radial-gradient(circle at 85% 0%, rgba(59, 130, 246, 0.18), transparent 45%), linear-gradient(180deg, #0b1220 0%, #0f172a 100%)',
                 p: 2
             }}
         >
+            {floatingWidgets.map((item, index) => (
+                <motion.div
+                    key={`${item.left}-${item.top}`}
+                    initial={{ y: 0, opacity: 0.48, rotate: item.rotate }}
+                    animate={{ y: [0, -12, 0], rotate: [item.rotate, item.rotate + 3, item.rotate] }}
+                    transition={{ duration: 4 + index * 0.6, repeat: Infinity, ease: 'easeInOut' }}
+                    style={{
+                        position: 'absolute',
+                        left: item.left,
+                        top: item.top,
+                        zIndex: 0,
+                        pointerEvents: 'none',
+                    }}
+                >
+                    <Box
+                        sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: 44,
+                            height: 44,
+                            borderRadius: '50%',
+                            bgcolor: alpha(theme.palette.background.paper, theme.palette.mode === 'light' ? 0.78 : 0.2),
+                            border: '1px solid',
+                            borderColor: alpha(theme.palette.primary.main, 0.35),
+                            color: theme.palette.primary.main,
+                            boxShadow: '0 10px 24px -14px rgba(2, 6, 23, 0.5)',
+                            backdropFilter: 'blur(6px)'
+                        }}
+                    >
+                        {item.icon}
+                    </Box>
+                </motion.div>
+            ))}
             <Container maxWidth="sm">
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
@@ -95,7 +142,7 @@ const Login: React.FC = () => {
                                     left: 0,
                                     width: '100%',
                                     height: '100%',
-                                    background: 'linear-gradient(to top, rgba(99, 102, 241, 0.8), transparent)',
+                                    background: 'linear-gradient(to top, rgba(14, 165, 165, 0.82), transparent)',
                                     display: 'flex',
                                     flexDirection: 'column',
                                     justifyContent: 'flex-end',
@@ -185,7 +232,7 @@ const Login: React.FC = () => {
                                         borderRadius: 2,
                                         fontSize: '1rem',
                                         fontWeight: 700,
-                                        boxShadow: '0 10px 15px -3px rgba(99, 102, 241, 0.4)'
+                                        boxShadow: `0 10px 18px -8px ${alpha(theme.palette.primary.main, 0.65)}`
                                     }}
                                 >
                                     Sign In
@@ -194,7 +241,7 @@ const Login: React.FC = () => {
 
                             <Box sx={{ mt: 4, textAlign: 'center' }}>
                                 <Typography variant="body2" color="text.secondary">
-                                    Don't have an account? <Button variant="text" sx={{ fontWeight: 700 }}>Sign Up</Button>
+                                    Don't have an account? <Button variant="text" onClick={() => navigate('/signup')} sx={{ fontWeight: 700 }}>Sign Up</Button>
                                 </Typography>
                             </Box>
 
