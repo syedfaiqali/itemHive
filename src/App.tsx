@@ -22,6 +22,7 @@ const ReportsPage = React.lazy(() => import('./pages/Reports/ReportsPage'));
 const Signup = React.lazy(() => import('./pages/Auth/Signup'));
 const OrderDesk = React.lazy(() => import('./pages/Orders/OrderDesk'));
 const SettingsPage = React.lazy(() => import('./pages/Settings/SettingsPage'));
+const ProfilePage = React.lazy(() => import('./pages/Profile/ProfilePage'));
 
 const AppContent: React.FC = () => {
   const { mode } = useSelector((state: RootState) => state.theme);
@@ -67,6 +68,11 @@ const AppContent: React.FC = () => {
               <Route path="settings" element={
                 <ProtectedRoute allowedRoles={['admin', 'user']}>
                   <SettingsPage />
+                </ProtectedRoute>
+              } />
+              <Route path="profile" element={
+                <ProtectedRoute allowedRoles={['admin', 'user']}>
+                  <ProfilePage />
                 </ProtectedRoute>
               } />
             </Route>

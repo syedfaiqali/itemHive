@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
     Box,
     Typography,
@@ -20,7 +20,12 @@ import {
     DialogContent,
     DialogActions,
     Divider,
+    Popover,
+    MenuItem,
+    Select,
+    Stack,
 } from '@mui/material';
+import { alpha, useTheme } from '@mui/material/styles';
 import {
     Search,
     FileDown,
@@ -33,17 +38,86 @@ import {
 } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../../store';
-import { format } from 'date-fns';
+import type { Transaction } from '../../features/transactions/transactionSlice';
+import {
+    addDays,
+    endOfMonth,
+    endOfWeek,
+    format,
+    isAfter,
+    isBefore,
+    isSameDay,
+    isSameMonth,
+    parseISO,
+    startOfMonth,
+    startOfWeek,
+    subMonths,
+    addMonths
+} from 'date-fns';
 
 const TransactionHistory: React.FC = () => {
+    const theme = useTheme();
     const { transactions } = useSelector((state: RootState) => state.transactions || { transactions: [] });
     const [searchTerm, setSearchTerm] = useState('');
-    const [selectedTx, setSelectedTx] = useState<any>(null);
+    const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
+    const [datePickerAnchorEl, setDatePickerAnchorEl] = useState<HTMLElement | null>(null);
+    const [fromDate, setFromDate] = useState('');
+    const [toDate, setToDate] = useState('');
+    const [activeDateField, setActiveDateField] = useState<'from' | 'to'>('from');
+    const [calendarMonth, setCalendarMonth] = useState(new Date());
+    const isInvalidRange = Boolean(fromDate && toDate && fromDate > toDate);
+    const isDatePickerOpen = Boolean(datePickerAnchorEl);
+
+    const formatDateInput = (date: Date) => date.toISOString().split('T')[0];
+
+    const setQuickRange = (days: number) => {
+        const end = new Date();
+        const start = new Date();
+        start.setDate(end.getDate() - (days - 1));
+        setFromDate(formatDateInput(start));
+        setToDate(formatDateInput(end));
+    };
+
+    const openCalendarFor = (field: 'from' | 'to') => {
+        setActiveDateField(field);
+        const seedDate = field === 'from' ? fromDate : toDate;
+        if (seedDate) {
+            setCalendarMonth(parseISO(seedDate));
+        }
+    };
+
+    const handleSelectDate = (date: Date) => {
+        const value = format(date, 'yyyy-MM-dd');
+        if (activeDateField === 'from') setFromDate(value);
+        if (activeDateField === 'to') setToDate(value);
+    };
+
+    const calendarGridStart = startOfWeek(startOfMonth(calendarMonth), { weekStartsOn: 0 });
+    const calendarGridEnd = endOfWeek(endOfMonth(calendarMonth), { weekStartsOn: 0 });
+    const calendarDays: Date[] = [];
+    let dayCursor = calendarGridStart;
+    while (isBefore(dayCursor, calendarGridEnd) || isSameDay(dayCursor, calendarGridEnd)) {
+        calendarDays.push(dayCursor);
+        dayCursor = addDays(dayCursor, 1);
+    }
+
+    const selectedFrom = fromDate ? parseISO(fromDate) : null;
+    const selectedTo = toDate ? parseISO(toDate) : null;
+    const monthOptions = useMemo(() => Array.from({ length: 12 }, (_, i) => ({
+        value: i,
+        label: format(new Date(2026, i, 1), 'MMMM')
+    })), []);
+    const currentYear = new Date().getFullYear();
+    const yearOptions = useMemo(() => Array.from({ length: 16 }, (_, i) => currentYear - 10 + i), [currentYear]);
 
     const filteredTransactions = (transactions || []).filter(t =>
-        t.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        t.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        t.id.toLowerCase().includes(searchTerm.toLowerCase())
+        (
+            t.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            t.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            t.id.toLowerCase().includes(searchTerm.toLowerCase())
+        ) &&
+        (!fromDate || new Date(t.timestamp) >= new Date(`${fromDate}T00:00:00`)) &&
+        (!toDate || new Date(t.timestamp) <= new Date(`${toDate}T23:59:59.999`))
     );
 
     const handlePrint = () => {
@@ -83,7 +157,12 @@ const TransactionHistory: React.FC = () => {
             <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Typography variant="h4" fontWeight={800}>Transaction History</Typography>
                 <Box sx={{ display: 'flex', gap: 2 }}>
-                    <Button variant="outlined" startIcon={<Calendar size={20} />} sx={{ borderRadius: 2 }}>
+                    <Button
+                        variant="outlined"
+                        startIcon={<Calendar size={20} />}
+                        sx={{ borderRadius: 2 }}
+                        onClick={(e) => setDatePickerAnchorEl(e.currentTarget)}
+                    >
                         Date Range
                     </Button>
                     <Button variant="contained" startIcon={<FileDown size={20} />} sx={{ borderRadius: 2 }} onClick={exportToCSV}>
@@ -195,6 +274,147 @@ const TransactionHistory: React.FC = () => {
                     </TableContainer>
                 </CardContent>
             </Card>
+
+            <Popover
+                open={isDatePickerOpen}
+                anchorEl={datePickerAnchorEl}
+                onClose={() => setDatePickerAnchorEl(null)}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+                slotProps={{
+                    paper: {
+                        elevation: 12,
+                        sx: {
+                            mt: 1,
+                            width: 360,
+                            borderRadius: 3,
+                            border: '1px solid',
+                            borderColor: 'divider',
+                            p: 2,
+                            bgcolor: 'background.paper',
+                            backdropFilter: 'blur(6px)'
+                        }
+                    }
+                }}
+            >
+                <Stack spacing={1.5}>
+                    <Typography variant="subtitle1" fontWeight={800}>Date Range</Typography>
+                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                        <Chip label="Last 7 Days" onClick={() => setQuickRange(7)} clickable />
+                        <Chip label="Last 30 Days" onClick={() => setQuickRange(30)} clickable />
+                        <Chip label="This Month" onClick={() => {
+                            const now = new Date();
+                            const first = new Date(now.getFullYear(), now.getMonth(), 1);
+                            setFromDate(formatDateInput(first));
+                            setToDate(formatDateInput(now));
+                        }} clickable />
+                    </Box>
+                    <Stack direction="row" spacing={1}>
+                        <TextField
+                            label="From"
+                            value={fromDate ? format(parseISO(fromDate), 'dd/MM/yyyy') : ''}
+                            onClick={() => openCalendarFor('from')}
+                            fullWidth
+                            InputProps={{ readOnly: true }}
+                            size="small"
+                            sx={{
+                                '& .MuiOutlinedInput-root': {
+                                    borderColor: activeDateField === 'from' ? 'primary.main' : undefined,
+                                }
+                            }}
+                        />
+                        <TextField
+                            label="To"
+                            value={toDate ? format(parseISO(toDate), 'dd/MM/yyyy') : ''}
+                            onClick={() => openCalendarFor('to')}
+                            fullWidth
+                            InputProps={{ readOnly: true }}
+                            size="small"
+                            sx={{
+                                '& .MuiOutlinedInput-root': {
+                                    borderColor: activeDateField === 'to' ? 'primary.main' : undefined,
+                                }
+                            }}
+                        />
+                    </Stack>
+                    <Box
+                        sx={{
+                            border: '1px solid',
+                            borderColor: 'divider',
+                            borderRadius: 2,
+                            p: 1.25,
+                            background: `linear-gradient(180deg, ${alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.1 : 0.06)} 0%, ${alpha(theme.palette.background.paper, 1)} 55%)`
+                        }}
+                    >
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                            <Select
+                                size="small"
+                                value={calendarMonth.getMonth()}
+                                onChange={(e) => setCalendarMonth(new Date(calendarMonth.getFullYear(), Number(e.target.value), 1))}
+                                sx={{ minWidth: 140, borderRadius: 2 }}
+                            >
+                                {monthOptions.map((month) => (
+                                    <MenuItem key={month.value} value={month.value}>{month.label}</MenuItem>
+                                ))}
+                            </Select>
+                            <Select
+                                size="small"
+                                value={calendarMonth.getFullYear()}
+                                onChange={(e) => setCalendarMonth(new Date(Number(e.target.value), calendarMonth.getMonth(), 1))}
+                                sx={{ minWidth: 100, borderRadius: 2 }}
+                            >
+                                {yearOptions.map((year) => (
+                                    <MenuItem key={year} value={year}>{year}</MenuItem>
+                                ))}
+                            </Select>
+                            <IconButton size="small" onClick={() => setCalendarMonth(subMonths(calendarMonth, 1))}>
+                                {'<'}
+                            </IconButton>
+                            <IconButton size="small" onClick={() => setCalendarMonth(addMonths(calendarMonth, 1))}>
+                                {'>'}
+                            </IconButton>
+                        </Box>
+                        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 0.5 }}>
+                            {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((w) => (
+                                <Typography key={w} variant="caption" sx={{ textAlign: 'center', color: 'text.secondary', fontWeight: 700, py: 0.5 }}>
+                                    {w}
+                                </Typography>
+                            ))}
+                            {calendarDays.map((day) => {
+                                const isCurrentMonth = isSameMonth(day, calendarMonth);
+                                const isSelected = (selectedFrom && isSameDay(day, selectedFrom)) || (selectedTo && isSameDay(day, selectedTo));
+                                const inRange = selectedFrom && selectedTo && isAfter(day, selectedFrom) && isBefore(day, selectedTo);
+                                return (
+                                    <Button
+                                        key={day.toISOString()}
+                                        onClick={() => handleSelectDate(day)}
+                                        variant={isSelected ? 'contained' : 'text'}
+                                        sx={{
+                                            minWidth: 0,
+                                            p: 0,
+                                            height: 34,
+                                            borderRadius: '50%',
+                                            fontWeight: 700,
+                                            color: isSelected ? 'primary.contrastText' : isCurrentMonth ? 'text.primary' : 'text.disabled',
+                                            bgcolor: isSelected ? 'primary.main' : inRange ? alpha(theme.palette.primary.main, 0.12) : 'transparent',
+                                            '&:hover': {
+                                                bgcolor: isSelected ? 'primary.dark' : alpha(theme.palette.primary.main, 0.15),
+                                            }
+                                        }}
+                                    >
+                                        {format(day, 'd')}
+                                    </Button>
+                                );
+                            })}
+                        </Box>
+                    </Box>
+                    {isInvalidRange && <Typography variant="caption" color="error.main">From date cannot be later than To date.</Typography>}
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+                        <Button onClick={() => { setFromDate(''); setToDate(''); }}>Clear</Button>
+                        <Button variant="contained" onClick={() => setDatePickerAnchorEl(null)} disabled={isInvalidRange}>Apply</Button>
+                    </Box>
+                </Stack>
+            </Popover>
 
             {/* Print Friendly Invoice Dialog */}
             <Dialog open={Boolean(selectedTx)} onClose={() => setSelectedTx(null)} maxWidth="sm" fullWidth>

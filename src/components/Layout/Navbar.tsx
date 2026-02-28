@@ -62,6 +62,11 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
         handleClose();
     };
 
+    const handleProfileOpen = () => {
+        navigate('/profile');
+        handleClose();
+    };
+
     const handleThemeToggle = () => {
         dispatch(toggleDarkMode());
     };
@@ -194,6 +199,7 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
                         <IconButton onClick={handleMenu} sx={{ p: 0.5, ml: 1 }}>
                             <Avatar
                                 alt={user?.username}
+                                src={user?.photoUrl}
                                 sx={{
                                     width: 35,
                                     height: 35,
@@ -228,8 +234,7 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
                                 {user?.role === 'admin' ? 'Administrator' : 'Staff Member'}
                             </Typography>
                         </Box>
-                        <MenuItem onClick={handleClose}>Profile</MenuItem>
-                        <MenuItem onClick={handleClose}>Settings</MenuItem>
+                        <MenuItem onClick={handleProfileOpen}>Profile</MenuItem>
                         <MenuItem onClick={handleLogout} sx={{ color: 'error.main' }}>Logout</MenuItem>
                     </Menu>
 
