@@ -109,9 +109,18 @@ const POSTerminal: React.FC = () => {
     };
 
     return (
-        <Box sx={{ height: 'calc(100vh - 120px)', display: 'flex', gap: 2, overflow: 'hidden' }}>
+        <Box
+            sx={{
+                display: 'flex',
+                flexDirection: { xs: 'column', lg: 'row' },
+                gap: 2,
+                height: { xs: 'auto', lg: 'calc(100dvh - 140px)' },
+                minHeight: { xs: 0, lg: 'calc(100dvh - 130px)' },
+                overflow: 'hidden'
+            }}
+        >
             {/* Left Side: Product Selection */}
-            <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+            <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
                 <Paper sx={{ p: 2, mb: 2, borderRadius: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
                     <TextField
                         fullWidth
@@ -143,7 +152,17 @@ const POSTerminal: React.FC = () => {
                     ))}
                 </Tabs>
 
-                <Box sx={{ flexGrow: 1, overflowY: 'auto', pr: 1 }}>
+                <Box
+                    sx={{
+                        flexGrow: 1,
+                        minHeight: 0,
+                        overflowY: 'auto',
+                        overflowX: 'hidden',
+                        px: 0.5,
+                        pt: 0.75,
+                        pb: 0.5
+                    }}
+                >
                     <Grid container spacing={2}>
                         {filteredProducts.map((product) => (
                             <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3, xl: 2 }} key={product.id}>
@@ -190,14 +209,19 @@ const POSTerminal: React.FC = () => {
             <Paper
                 elevation={3}
                 sx={{
-                    width: 420,
+                    width: '100%',
+                    maxWidth: { xs: '100%', lg: 330 },
+                    minWidth: { lg: 320 },
+                    height: { xs: 'auto', lg: '99%' },
+                    minHeight: { xs: 360, lg: 0 },
                     display: 'flex',
                     flexDirection: 'column',
                     borderRadius: 4,
                     overflow: 'hidden',
                     bgcolor: 'background.paper',
                     border: '1px solid',
-                    borderColor: 'divider'
+                    borderColor: 'divider',
+                    flexShrink: 0
                 }}
             >
                 <Box sx={{ p: 2.5, bgcolor: 'primary.main', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -212,7 +236,7 @@ const POSTerminal: React.FC = () => {
 
                 <Box sx={{ flexGrow: 1, overflowY: 'auto', p: 2, minHeight: 0 }}>
                     {cart.length === 0 ? (
-                        <Box sx={{ textAlign: 'center', mt: 10, opacity: 0.3 }}>
+                        <Box sx={{ textAlign: 'center', mt: { xs: 4, lg: 10 }, opacity: 0.3 }}>
                             <ShoppingCart size={80} strokeWidth={1} style={{ marginBottom: 16 }} />
                             <Typography variant="h6" fontWeight={600}>Cart is empty</Typography>
                             <Typography variant="body2">Select products to start</Typography>
