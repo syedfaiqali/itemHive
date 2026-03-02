@@ -19,6 +19,8 @@ import {
     DialogContent,
     DialogActions,
     Stack,
+    Snackbar,
+    Alert,
     useTheme,
     alpha
 } from '@mui/material';
@@ -46,11 +48,54 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 const categories = ['All', ...PRODUCT_CATEGORIES];
 
+const escapePdfText = (text: string) => text
+    .replace(/\\/g, '\\\\')
+    .replace(/\(/g, '\\(')
+    .replace(/\)/g, '\\)')
+    .replace(/[^\x20-\x7E]/g, '?');
+
+const buildSimplePdf = (lines: string[]) => {
+    const textStream = [
+        'BT',
+        '/F1 11 Tf',
+        '14 TL',
+        '40 800 Td',
+        ...lines.map((line, index) => `${index === 0 ? '' : 'T* '}(` + escapePdfText(line) + ') Tj'),
+        'ET'
+    ].join('\n');
+
+    const objects: string[] = [];
+    objects[1] = '<< /Type /Catalog /Pages 2 0 R >>';
+    objects[2] = '<< /Type /Pages /Kids [3 0 R] /Count 1 >>';
+    objects[3] = '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>';
+    objects[4] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>';
+    objects[5] = `<< /Length ${textStream.length} >>\nstream\n${textStream}\nendstream`;
+
+    let pdf = '%PDF-1.4\n';
+    const offsets: number[] = [0];
+    for (let i = 1; i <= 5; i += 1) {
+        offsets[i] = pdf.length;
+        pdf += `${i} 0 obj\n${objects[i]}\nendobj\n`;
+    }
+
+    const xrefStart = pdf.length;
+    pdf += 'xref\n';
+    pdf += `0 ${objects.length}\n`;
+    pdf += '0000000000 65535 f \n';
+    for (let i = 1; i <= 5; i += 1) {
+        pdf += `${offsets[i].toString().padStart(10, '0')} 00000 n \n`;
+    }
+    pdf += `trailer\n<< /Size ${objects.length} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`;
+
+    return new Blob([pdf], { type: 'application/pdf' });
+};
+
 const POSTerminal: React.FC = () => {
     const dispatch = useDispatch();
     const theme = useTheme();
     const { user } = useSelector((state: RootState) => state.auth);
     const { products } = useSelector((state: RootState) => state.inventory);
+    const { transactions = [] } = useSelector((state: RootState) => state.transactions || { transactions: [] });
     const { cart, taxRate, activeDiscount } = useSelector((state: RootState) => state.pos);
 
     const [searchTerm, setSearchTerm] = useState('');
@@ -58,6 +103,10 @@ const POSTerminal: React.FC = () => {
     const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | null>(null);
     const [orderDone, setOrderDone] = useState(false);
     const [receiptId, setReceiptId] = useState('');
+    const [receiptTime, setReceiptTime] = useState('');
+    const [stockToast, setStockToast] = useState({ open: false, message: '' });
+    const [confirmOpen, setConfirmOpen] = useState(false);
+    const [pendingMethod, setPendingMethod] = useState<'cash' | 'card' | null>(null);
 
     const filteredProducts = useMemo(() => {
         return products.filter(p => {
@@ -72,19 +121,66 @@ const POSTerminal: React.FC = () => {
     const tax = subtotal * taxRate;
     const total = subtotal + tax - activeDiscount;
 
+    const handleSaveReceiptPdf = (id: string, method: 'cash' | 'card', receiptTimeIso: string) => {
+        const dateLabel = new Date(receiptTimeIso).toLocaleString();
+        const lines = [
+            'ItemHive POS Receipt',
+            `Order ID: ${id}`,
+            `Date: ${dateLabel}`,
+            `Cashier: ${user?.username || 'Staff'}`,
+            `Payment: ${method.toUpperCase()}`,
+            '----------------------------------------',
+            ...cart.map((item) => `${item.name} x${item.quantity} @ $${item.price.toFixed(2)} = $${(item.price * item.quantity).toFixed(2)}`),
+            '----------------------------------------',
+            `Subtotal: $${subtotal.toFixed(2)}`,
+            `Tax (10%): $${tax.toFixed(2)}`,
+            activeDiscount > 0 ? `Discount: -$${activeDiscount.toFixed(2)}` : '',
+            `Total Paid: $${total.toFixed(2)}`,
+            '----------------------------------------',
+            'Thank you for shopping with us!'
+        ].filter(Boolean);
+
+        const pdfBlob = buildSimplePdf(lines);
+        const url = URL.createObjectURL(pdfBlob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = `receipt-${id}.pdf`;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        URL.revokeObjectURL(url);
+    };
+
     const handleAddToCart = (product: Product) => {
         const itemInCart = cart.find(item => item.id === product.id);
         const currentQty = itemInCart ? itemInCart.quantity : 0;
 
-        if (product.stock > currentQty) {
-            dispatch(addToCart(product));
+        if (product.stock <= 0) {
+            setStockToast({ open: true, message: `${product.name} is out of stock.` });
+            return;
         }
+
+        if (product.stock <= currentQty) {
+            setStockToast({ open: true, message: `${product.name} is out of stock.` });
+            return;
+        }
+
+        dispatch(addToCart(product));
     };
 
     const handleCheckout = (method: 'cash' | 'card') => {
-        const id = Math.random().toString(36).substr(2, 9).toUpperCase();
+        setPendingMethod(method);
+        setConfirmOpen(true);
+    };
+
+    const handleConfirmCheckout = () => {
+        if (!pendingMethod) return;
+
+        const id = `R${String(transactions.length + 1).padStart(6, '0')}`;
+        const receiptTimeIso = new Date().toISOString();
         setReceiptId(id);
-        setPaymentMethod(method);
+        setReceiptTime(receiptTimeIso);
+        setPaymentMethod(pendingMethod);
 
         // Process all items in cart
         cart.forEach(item => {
@@ -96,12 +192,19 @@ const POSTerminal: React.FC = () => {
                 type: 'reduction',
                 amount: item.quantity,
                 userName: user?.username || 'Staff',
-                timestamp: new Date().toISOString(),
+                timestamp: receiptTimeIso,
                 totalPrice: item.price * item.quantity
             }));
         });
 
         setOrderDone(true);
+        setConfirmOpen(false);
+        setPendingMethod(null);
+    };
+
+    const handleCancelCheckout = () => {
+        setConfirmOpen(false);
+        setPendingMethod(null);
     };
 
     const handleCloseOrder = () => {
@@ -161,7 +264,7 @@ const POSTerminal: React.FC = () => {
                                     whileTap={{ scale: 0.98 }}
                                 >
                                     <Card
-                                        onClick={() => product.stock > 0 && handleAddToCart(product)}
+                                        onClick={() => handleAddToCart(product)}
                                         sx={{
                                             cursor: product.stock > 0 ? 'pointer' : 'default',
                                             height: '100%',
@@ -223,6 +326,39 @@ const POSTerminal: React.FC = () => {
                                                         textTransform: 'uppercase'
                                                     }}
                                                 />
+                                            )}
+                                            {product.stock === 0 && (
+                                                <Box
+                                                    sx={{
+                                                        position: 'absolute',
+                                                        inset: 0,
+                                                        bgcolor: alpha(theme.palette.error.main, 0.18),
+                                                        backdropFilter: 'blur(1px)',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        zIndex: 2,
+                                                        pointerEvents: 'none',
+                                                    }}
+                                                >
+                                                    <Typography
+                                                        variant="caption"
+                                                        sx={{
+                                                            px: 1.2,
+                                                            py: 0.6,
+                                                            borderRadius: 1,
+                                                            bgcolor: alpha(theme.palette.background.paper, 0.9),
+                                                            color: 'error.main',
+                                                            border: '1px solid',
+                                                            borderColor: alpha(theme.palette.error.main, 0.4),
+                                                            fontWeight: 900,
+                                                            letterSpacing: 0.5,
+                                                            textTransform: 'uppercase'
+                                                        }}
+                                                    >
+                                                        Out of Stock
+                                                    </Typography>
+                                                </Box>
                                             )}
 
                                             <Box
@@ -482,6 +618,37 @@ const POSTerminal: React.FC = () => {
                 </Box>
             </Paper>
 
+            <Dialog
+                open={confirmOpen}
+                onClose={handleCancelCheckout}
+                maxWidth="xs"
+                fullWidth
+                PaperProps={{ sx: { borderRadius: 3 } }}
+            >
+                <DialogTitle sx={{ fontWeight: 800 }}>Confirm Payment</DialogTitle>
+                <DialogContent>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        Confirm this payment to finalize sale and update stock.
+                    </Typography>
+                    <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'action.hover', border: '1px solid', borderColor: 'divider' }}>
+                        <Typography variant="body2" fontWeight={700}>
+                            Method: {(pendingMethod || '').toUpperCase()}
+                        </Typography>
+                        <Typography variant="h6" fontWeight={900} color="primary.main" sx={{ mt: 0.5 }}>
+                            Total: ${total.toFixed(2)}
+                        </Typography>
+                    </Box>
+                </DialogContent>
+                <DialogActions sx={{ p: 2 }}>
+                    <Button variant="outlined" onClick={handleCancelCheckout}>
+                        Cancel
+                    </Button>
+                    <Button variant="contained" onClick={handleConfirmCheckout}>
+                        Confirm Payment
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
             {/* Checkout Success & Receipt Dialog */}
             <Dialog
                 open={orderDone}
@@ -549,6 +716,10 @@ const POSTerminal: React.FC = () => {
                         fullWidth
                         variant="outlined"
                         startIcon={<Download size={18} />}
+                        onClick={() => {
+                            if (!paymentMethod || !receiptId) return;
+                            handleSaveReceiptPdf(receiptId, paymentMethod, receiptTime || new Date().toISOString());
+                        }}
                         sx={{ borderRadius: 2 }}
                     >
                         Save
@@ -570,6 +741,22 @@ const POSTerminal: React.FC = () => {
                     <X size={20} />
                 </IconButton>
             </Dialog>
+
+            <Snackbar
+                open={stockToast.open}
+                autoHideDuration={2200}
+                onClose={() => setStockToast({ open: false, message: '' })}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+            >
+                <Alert
+                    onClose={() => setStockToast({ open: false, message: '' })}
+                    severity="warning"
+                    variant="filled"
+                    sx={{ width: '100%' }}
+                >
+                    {stockToast.message}
+                </Alert>
+            </Snackbar>
 
             {/* Print Friendly Style */}
             <style>
