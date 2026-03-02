@@ -24,7 +24,8 @@ import {
     DialogActions,
     Grid,
     Snackbar,
-    Alert
+    Alert,
+    Stack
 } from '@mui/material';
 import {
     Search,
@@ -36,13 +37,65 @@ import {
     Download,
     Eye,
     Save,
-    Package
+    Package,
+    Layers,
+    DollarSign,
+    Image as ImageIcon,
+    X,
+    TrendingUp,
+    ShieldCheck,
+    History
 } from 'lucide-react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
-import { deleteProduct, updateProduct, type Product, resolveProductImage, placeholderFallback, PRODUCT_CATEGORIES } from '../../features/inventory/inventorySlice';
-import { useNavigate } from 'react-router-dom';
-import { alpha, useTheme } from '@mui/material/styles';
+import { deleteProduct, updateProduct, addProduct, type Product, resolveProductImage, placeholderFallback, PRODUCT_CATEGORIES } from '../../features/inventory/inventorySlice';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { alpha, useTheme, styled } from '@mui/material/styles';
+import { motion } from 'framer-motion';
+
+const IconContainer = styled(Box)(({ theme, color }: { theme?: any, color?: string }) => ({
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: alpha(color || theme.palette.primary.main, 0.1),
+    color: color || theme.palette.primary.main,
+    marginBottom: theme.spacing(1)
+}));
+
+const PremiumDialog = styled(Dialog)(({ theme }) => ({
+    '& .MuiDialog-paper': {
+        borderRadius: 24,
+        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.15)',
+        backgroundImage: 'none',
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+        maxHeight: 'calc(100vh - 64px)',
+        margin: theme.spacing(2)
+    },
+    '& .MuiDialogTitle-root': {
+        padding: theme.spacing(3, 4),
+        fontWeight: 800,
+        fontSize: '1.5rem',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexShrink: 0
+    },
+    '& .MuiDialogContent-root': {
+        padding: theme.spacing(3, 4),
+        flexGrow: 1,
+        overflowY: 'auto'
+    },
+    '& .MuiDialogActions-root': {
+        padding: theme.spacing(2, 4, 3),
+        gap: theme.spacing(1),
+        flexShrink: 0
+    }
+}));
 
 const categories_list = PRODUCT_CATEGORIES;
 
@@ -67,6 +120,27 @@ const ProductList: React.FC = () => {
     const [showFilters, setShowFilters] = useState(false);
     const [categoryFilter, setCategoryFilter] = useState('all');
     const [stockFilter, setStockFilter] = useState<'all' | 'in' | 'low' | 'out'>('all');
+    const [showAddModal, setShowAddModal] = useState(false);
+    const [addFormData, setAddFormData] = useState({
+        sku: '',
+        name: '',
+        category: '',
+        price: '',
+        stock: '',
+        minStock: '',
+        description: ''
+    });
+
+    const location = useLocation();
+
+    React.useEffect(() => {
+        const queryParams = new URLSearchParams(location.search);
+        if (queryParams.get('add') === 'true') {
+            setShowAddModal(true);
+            // Optional: clear the query param after opening if desired
+            navigate('/inventory', { replace: true });
+        }
+    }, [location.search, navigate]);
 
     const handleSnackClose = () => setSnack({ ...snack, open: false });
 
@@ -127,6 +201,44 @@ const ProductList: React.FC = () => {
         }
     };
 
+    const handleAddChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setAddFormData({ ...addFormData, [e.target.name]: e.target.value });
+    };
+
+    const handleAddSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+
+        // Check for duplicate SKU
+        if (products.some((p: Product) => p.sku === addFormData.sku)) {
+            showSnack('A product with this SKU already exists!', 'error');
+            return;
+        }
+
+        dispatch(addProduct({
+            id: Math.random().toString(36).substr(2, 9),
+            sku: addFormData.sku.toUpperCase(),
+            name: addFormData.name,
+            category: addFormData.category || 'Uncategorized',
+            price: parseFloat(addFormData.price),
+            stock: parseInt(addFormData.stock),
+            minStock: parseInt(addFormData.minStock),
+            description: addFormData.description,
+            lastUpdated: new Date().toISOString()
+        }));
+
+        setShowAddModal(false);
+        setAddFormData({
+            sku: '',
+            name: '',
+            category: '',
+            price: '',
+            stock: '',
+            minStock: '',
+            description: ''
+        });
+        showSnack('Product added successfully', 'success');
+    };
+
     const exportToCSV = () => {
         const headers = ['ID', 'Name', 'Category', 'Price', 'Stock', 'Min Stock', 'Last Updated'];
         const rows = products.map(p => [
@@ -185,7 +297,7 @@ const ProductList: React.FC = () => {
                     <Button
                         variant="contained"
                         startIcon={<Plus size={20} />}
-                        onClick={() => navigate('/inventory/add')}
+                        onClick={() => setShowAddModal(true)}
                         sx={{ borderRadius: 2, px: 3, py: 1.2, fontWeight: 800 }}
                     >
                         Add Product
@@ -363,73 +475,143 @@ const ProductList: React.FC = () => {
             </Menu>
 
             {/* View Product Dialog */}
-            <Dialog open={Boolean(viewProduct)} onClose={() => setViewProduct(null)} maxWidth="sm" fullWidth>
-                <DialogTitle sx={{ fontWeight: 800 }}>Product Details</DialogTitle>
+            <PremiumDialog
+                open={Boolean(viewProduct)}
+                onClose={() => setViewProduct(null)}
+                maxWidth="sm"
+                fullWidth
+                scroll="paper"
+                TransitionComponent={React.forwardRef((props: any, ref) => (
+                    <motion.div
+                        ref={ref}
+                        initial={{ opacity: 0, y: 30, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 30, scale: 0.95 }}
+                        transition={{ duration: 0.3, type: "spring", damping: 25, stiffness: 200 }}
+                        {...props}
+                    />
+                ))}
+            >
+                <DialogTitle>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <IconContainer color={theme.palette.secondary.main} sx={{ mb: 0 }}>
+                            <Eye size={22} />
+                        </IconContainer>
+                        <span className="gradient-text">Product Details</span>
+                    </Box>
+                    <IconButton onClick={() => setViewProduct(null)} size="small" sx={{ color: 'text.secondary' }}>
+                        <X size={20} />
+                    </IconButton>
+                </DialogTitle>
                 <DialogContent dividers>
                     {viewProduct && (
-                        <Box sx={{ py: 2 }}>
-                            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 4, mb: 4 }}>
-                                <Box
-                                    component="img"
-                                    src={resolveProductImage(viewProduct)}
-                                    alt={viewProduct.name}
-                                    onError={(e) => {
-                                        const target = e.currentTarget as HTMLImageElement;
-                                        if (target.src !== placeholderFallback) {
-                                            target.src = placeholderFallback;
-                                        }
-                                    }}
-                                    sx={{
-                                        width: { xs: '100%', sm: 160 },
-                                        height: 160,
-                                        borderRadius: 3,
-                                        objectFit: 'cover',
-                                        border: '1px solid',
-                                        borderColor: 'divider',
-                                        boxShadow: (theme) => `0 8px 20px -10px ${alpha(theme.palette.primary.main, 0.3)}`
-                                    }}
-                                />
+                        <Box sx={{ py: 1 }}>
+                            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 4, mb: 4 }}>
+                                <motion.div
+                                    initial={{ opacity: 0, x: -20 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    transition={{ delay: 0.1 }}
+                                >
+                                    <Box
+                                        component="img"
+                                        src={resolveProductImage(viewProduct)}
+                                        alt={viewProduct.name}
+                                        onError={(e) => {
+                                            const target = e.currentTarget as HTMLImageElement;
+                                            if (target.src !== placeholderFallback) {
+                                                target.src = placeholderFallback;
+                                            }
+                                        }}
+                                        sx={{
+                                            width: { xs: '100%', md: 180 },
+                                            height: 180,
+                                            borderRadius: 6,
+                                            objectFit: 'cover',
+                                            border: '4px solid white',
+                                            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+                                        }}
+                                    />
+                                </motion.div>
                                 <Box sx={{ flexGrow: 1 }}>
-                                    <Typography variant="h5" fontWeight={800} gutterBottom>{viewProduct.name}</Typography>
-                                    <Typography color="text.secondary" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                                        <Package size={16} /> {viewProduct.category}
+                                    <Typography variant="h4" fontWeight={900} sx={{ letterSpacing: -1, color: 'text.primary', mb: 1 }}>
+                                        {viewProduct.name}
                                     </Typography>
-                                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                                        <Chip label={`SKU: ${viewProduct.sku}`} size="small" variant="filled" color="primary" sx={{ fontWeight: 700 }} />
-                                        <Chip label={`ID: ${viewProduct.id}`} size="small" variant="outlined" />
+                                    <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
+                                        <Chip
+                                            icon={<Package size={14} />}
+                                            label={viewProduct.category}
+                                            variant="filled"
+                                            color="primary"
+                                            sx={{ fontWeight: 700, borderRadius: 2, bgcolor: alpha(theme.palette.primary.main, 0.1), color: 'primary.main' }}
+                                        />
+                                        <Chip
+                                            label={`SKU: ${viewProduct.sku}`}
+                                            variant="outlined"
+                                            sx={{ fontWeight: 600, borderRadius: 2 }}
+                                        />
                                     </Box>
+                                    <Typography variant="body1" color="text.secondary" sx={{ lineHeight: 1.6, mb: 2 }}>
+                                        {viewProduct.description || 'No detailed description available for this item.'}
+                                    </Typography>
                                 </Box>
                             </Box>
-                            <Grid container spacing={4}>
-                                <Grid size={6}>
-                                    <Typography variant="caption" color="text.secondary" display="block">CURRENT STOCK</Typography>
-                                    <Typography variant="h6" fontWeight={700}>{viewProduct.stock} Units</Typography>
-                                </Grid>
-                                <Grid size={6}>
-                                    <Typography variant="caption" color="text.secondary" display="block">UNIT PRICE</Typography>
-                                    <Typography variant="h6" fontWeight={700}>${viewProduct.price}</Typography>
-                                </Grid>
-                                <Grid size={6}>
-                                    <Typography variant="caption" color="text.secondary" display="block">MINIMUM THRESHOLD</Typography>
-                                    <Typography variant="h6" fontWeight={700}>{viewProduct.minStock} Units</Typography>
-                                </Grid>
-                                <Grid size={6}>
-                                    <Typography variant="caption" color="text.secondary" display="block">LAST UPDATED</Typography>
-                                    <Typography variant="body1">{new Date(viewProduct.lastUpdated).toLocaleDateString()}</Typography>
-                                </Grid>
-                                <Grid size={12}>
-                                    <Typography variant="caption" color="text.secondary" display="block">DESCRIPTION</Typography>
-                                    <Typography variant="body2">{viewProduct.description || 'No description provided.'}</Typography>
-                                </Grid>
+
+                            <Grid container spacing={2}>
+                                {[
+                                    { label: 'PRICE', value: `$${viewProduct.price}`, icon: <DollarSign size={18} />, color: '#10b981' },
+                                    { label: 'STOCK', value: `${viewProduct.stock} Units`, icon: <TrendingUp size={18} />, color: '#6366f1' },
+                                    { label: 'MIN STOCK', value: `${viewProduct.minStock} Units`, icon: <ShieldCheck size={18} />, color: '#f59e0b' },
+                                    { label: 'LAST UPDATE', value: new Date(viewProduct.lastUpdated).toLocaleDateString(), icon: <History size={18} />, color: '#64748b' },
+                                ].map((item, idx) => (
+                                    <Grid size={{ xs: 6, sm: 3 }} key={item.label}>
+                                        <motion.div
+                                            initial={{ opacity: 0, y: 10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ delay: 0.2 + (idx * 0.05) }}
+                                        >
+                                            <Box sx={{
+                                                p: 2,
+                                                borderRadius: 4,
+                                                bgcolor: alpha(item.color, 0.05),
+                                                border: `1px solid ${alpha(item.color, 0.1)}`,
+                                                height: '100%'
+                                            }}>
+                                                <Box sx={{ color: item.color, mb: 1 }}>{item.icon}</Box>
+                                                <Typography variant="caption" fontWeight={800} color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                                                    {item.label}
+                                                </Typography>
+                                                <Typography variant="subtitle1" fontWeight={800} color="text.primary">
+                                                    {item.value}
+                                                </Typography>
+                                            </Box>
+                                        </motion.div>
+                                    </Grid>
+                                ))}
                             </Grid>
                         </Box>
                     )}
                 </DialogContent>
-                <DialogActions sx={{ p: 2 }}>
-                    <Button onClick={() => setViewProduct(null)} variant="outlined">Close</Button>
-                    {isAdmin && <Button onClick={() => { setEditProduct(viewProduct); setViewProduct(null); }} variant="contained">Edit Product</Button>}
+                <DialogActions sx={{ p: 4 }}>
+                    <Button
+                        onClick={() => setViewProduct(null)}
+                        variant="outlined"
+                        color="inherit"
+                        sx={{ borderRadius: 3, px: 3 }}
+                    >
+                        Close
+                    </Button>
+                    {isAdmin && (
+                        <Button
+                            onClick={() => { setEditProduct(viewProduct); setViewProduct(null); }}
+                            variant="contained"
+                            startIcon={<Edit size={18} />}
+                            sx={{ borderRadius: 3, px: 3, fontWeight: 800, boxShadow: theme.shadows[4] }}
+                        >
+                            Edit Product
+                        </Button>
+                    )}
                 </DialogActions>
-            </Dialog>
+            </PremiumDialog>
 
             {/* Edit Product Dialog */}
             <Dialog open={Boolean(editProduct)} onClose={() => setEditProduct(null)} maxWidth="md" fullWidth>
@@ -521,6 +703,210 @@ const ProductList: React.FC = () => {
                     <Button onClick={confirmDelete} color="error" variant="contained">Delete</Button>
                 </DialogActions>
             </Dialog>
+
+            {/* Add Product Modal */}
+            <PremiumDialog
+                open={showAddModal}
+                onClose={() => setShowAddModal(false)}
+                maxWidth="md"
+                fullWidth
+                scroll="paper"
+                PaperProps={{
+                    component: 'form',
+                    onSubmit: handleAddSubmit
+                }}
+                TransitionComponent={React.forwardRef((props: any, ref) => (
+                    <motion.div
+                        ref={ref}
+                        initial={{ opacity: 0, scale: 0.9, y: 40 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.9, y: 40 }}
+                        transition={{ duration: 0.4, type: "spring", damping: 30, stiffness: 200 }}
+                        {...props}
+                    />
+                ))}
+            >
+                <DialogTitle>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <IconContainer sx={{ mb: 0 }}>
+                            <Plus size={24} />
+                        </IconContainer>
+                        <span className="gradient-text">Add New Product</span>
+                    </Box>
+                    <IconButton onClick={() => setShowAddModal(false)} size="small" sx={{ color: 'text.secondary', '&:hover': { color: 'error.main', bgcolor: alpha('#ef4444', 0.1) } }}>
+                        <X size={20} />
+                    </IconButton>
+                </DialogTitle>
+                <DialogContent dividers>
+                    <Grid container spacing={4} sx={{ mt: 0.5 }}>
+                        <Grid size={{ xs: 12, md: 7 }}>
+                            <Box sx={{ mb: 4 }}>
+                                <Typography variant="subtitle1" fontWeight={800} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
+                                    <Layers size={20} color={theme.palette.primary.main} /> Core Details
+                                </Typography>
+                                <Grid container spacing={3}>
+                                    <Grid size={12}>
+                                        <TextField
+                                            fullWidth
+                                            label="SKU / Barcode"
+                                            name="sku"
+                                            required
+                                            value={addFormData.sku}
+                                            onChange={handleAddChange}
+                                            placeholder="e.g. ELE-MAC-001"
+                                            variant="outlined"
+                                            InputProps={{ sx: { borderRadius: 3 } }}
+                                        />
+                                    </Grid>
+                                    <Grid size={12}>
+                                        <TextField
+                                            fullWidth
+                                            label="Full Product Name"
+                                            name="name"
+                                            required
+                                            value={addFormData.name}
+                                            onChange={handleAddChange}
+                                            InputProps={{ sx: { borderRadius: 3 } }}
+                                        />
+                                    </Grid>
+                                    <Grid size={12}>
+                                        <TextField
+                                            select
+                                            fullWidth
+                                            label="Category"
+                                            name="category"
+                                            required
+                                            value={addFormData.category}
+                                            onChange={handleAddChange}
+                                            InputProps={{ sx: { borderRadius: 3 } }}
+                                        >
+                                            {categories_list.map((option) => (
+                                                <MenuItem key={option} value={option} sx={{ fontWeight: 600 }}>
+                                                    {option}
+                                                </MenuItem>
+                                            ))}
+                                        </TextField>
+                                    </Grid>
+                                    <Grid size={12}>
+                                        <TextField
+                                            fullWidth
+                                            multiline
+                                            rows={2}
+                                            label="Product Description"
+                                            name="description"
+                                            value={addFormData.description}
+                                            onChange={handleAddChange}
+                                            placeholder="Write something..."
+                                            InputProps={{ sx: { borderRadius: 3 } }}
+                                        />
+                                    </Grid>
+                                </Grid>
+                            </Box>
+                        </Grid>
+
+                        <Grid size={{ xs: 12, md: 5 }}>
+                            <Box sx={{ p: 3, bgcolor: alpha(theme.palette.primary.main, 0.03), borderRadius: 6, border: '1px solid', borderColor: alpha(theme.palette.primary.main, 0.08), mb: 3 }}>
+                                <Typography variant="subtitle1" fontWeight={800} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
+                                    <DollarSign size={20} color={theme.palette.primary.main} /> Financial & Stock
+                                </Typography>
+                                <Stack spacing={3}>
+                                    <TextField
+                                        fullWidth
+                                        label="Price ($)"
+                                        name="price"
+                                        type="number"
+                                        required
+                                        value={addFormData.price}
+                                        onChange={handleAddChange}
+                                        InputProps={{
+                                            sx: { borderRadius: 3, bgcolor: 'background.paper' },
+                                            startAdornment: <InputAdornment position="start">$</InputAdornment>,
+                                        }}
+                                    />
+                                    <TextField
+                                        fullWidth
+                                        label="Initial Stock"
+                                        name="stock"
+                                        type="number"
+                                        required
+                                        value={addFormData.stock}
+                                        onChange={handleAddChange}
+                                        InputProps={{ sx: { borderRadius: 3, bgcolor: 'background.paper' } }}
+                                    />
+                                    <TextField
+                                        fullWidth
+                                        label="Minimum Alert Level"
+                                        name="minStock"
+                                        type="number"
+                                        required
+                                        value={addFormData.minStock}
+                                        onChange={handleAddChange}
+                                        InputProps={{ sx: { borderRadius: 3, bgcolor: 'background.paper' } }}
+                                        helperText="Alert dashboard when stock drops below this"
+                                    />
+                                </Stack>
+                            </Box>
+
+                            <Box>
+                                <Typography variant="subtitle2" fontWeight={800} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5, color: 'text.secondary' }}>
+                                    <ImageIcon size={18} /> Product Imagery
+                                </Typography>
+                                <Box
+                                    sx={{
+                                        border: '2px dashed',
+                                        borderColor: alpha(theme.palette.primary.main, 0.2),
+                                        borderRadius: 4,
+                                        p: 2,
+                                        textAlign: 'center',
+                                        bgcolor: alpha(theme.palette.primary.main, 0.02),
+                                        cursor: 'pointer',
+                                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                        '&:hover': {
+                                            bgcolor: alpha(theme.palette.primary.main, 0.05),
+                                            borderColor: theme.palette.primary.main,
+                                            transform: 'scale(1.02)'
+                                        }
+                                    }}
+                                >
+                                    <motion.div whileHover={{ rotate: 10 }}>
+                                        <ImageIcon size={32} color={theme.palette.primary.main} style={{ opacity: 0.6, marginBottom: 8 }} />
+                                    </motion.div>
+                                    <Typography variant="caption" fontWeight={700} color="primary.main" sx={{ display: 'block' }}>
+                                        Add Image
+                                    </Typography>
+                                </Box>
+                            </Box>
+                        </Grid>
+                    </Grid>
+                </DialogContent>
+                <DialogActions sx={{ px: 4, pb: 4, pt: 2 }}>
+                    <Button
+                        onClick={() => setShowAddModal(false)}
+                        variant="outlined"
+                        color="inherit"
+                        size="large"
+                        sx={{ borderRadius: 3, px: 4, fontWeight: 700 }}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        type="submit"
+                        variant="contained"
+                        size="large"
+                        startIcon={<Plus size={20} />}
+                        sx={{
+                            borderRadius: 3,
+                            px: 6,
+                            fontWeight: 800,
+                            py: 1.5,
+                            fontSize: '1rem',
+                            boxShadow: `0 8px 20px -6px ${alpha(theme.palette.primary.main, 0.5)}`
+                        }}
+                    >
+                        Create Product
+                    </Button>
+                </DialogActions>
+            </PremiumDialog>
 
             <Snackbar
                 open={snack.open}

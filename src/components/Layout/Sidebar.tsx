@@ -52,7 +52,7 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onDrawerToggle }) => {
         { text: 'Dashboard', icon: <LayoutDashboard size={20} />, path: '/', roles: ['admin', 'user'] },
         { text: 'POS Terminal', icon: <TerminalIcon size={20} />, path: '/pos', roles: ['admin', 'user'] },
         { text: 'Inventory', icon: <Package size={20} />, path: '/inventory', roles: ['admin', 'user'] },
-        { text: 'Add Product', icon: <PlusCircle size={20} />, path: '/inventory/add', roles: ['admin'] },
+        // { text: 'Add Product', icon: <PlusCircle size={20} />, path: '/inventory?add=true', roles: ['admin'] },
         { text: 'Order Desk', icon: <ClipboardList size={20} />, path: '/orders', roles: ['admin', 'user'] },
         { text: 'Transactions', icon: <History size={20} />, path: '/transactions', roles: ['admin', 'user'] },
         { text: 'Reports', icon: <BarChart3 size={20} />, path: '/reports', roles: ['admin'] },
@@ -125,9 +125,7 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onDrawerToggle }) => {
             </Box>
 
             <Box sx={{ p: isSidebarCollapsed ? 2 : 3, textAlign: isSidebarCollapsed ? 'center' : 'left' }}>
-                <Typography variant="overline" color="text.secondary" fontWeight={800} sx={{ opacity: isSidebarCollapsed ? 0 : 0.6 }}>
-                    {isSidebarCollapsed ? '' : 'Main Menu'}
-                </Typography>
+
             </Box>
             <List sx={{ px: 2 }}>
                 {menuItems
@@ -181,9 +179,6 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onDrawerToggle }) => {
             </List>
             <Box sx={{ mt: 'auto', p: 2 }}>
                 <Divider sx={{ mb: 2 }} />
-                <Typography variant="caption" color="text.secondary" sx={{ px: 2 }}>
-                    Account
-                </Typography>
             </Box>
         </Box>
     );

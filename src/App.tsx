@@ -15,7 +15,6 @@ import ScrollToTop from './components/Common/ScrollToTop';
 import Login from './pages/Auth/Login';
 const Dashboard = React.lazy(() => import('./pages/Dashboard/Dashboard'));
 const ProductList = React.lazy(() => import('./pages/Inventory/ProductList'));
-const AddProduct = React.lazy(() => import('./pages/Inventory/AddProduct'));
 const ReduceStock = React.lazy(() => import('./pages/Inventory/ReduceStock'));
 const POSTerminal = React.lazy(() => import('./pages/POS/POSTerminal'));
 const TransactionHistory = React.lazy(() => import('./pages/Transactions/TransactionHistory'));
@@ -45,11 +44,6 @@ const AppContent: React.FC = () => {
             }>
               <Route index element={<Dashboard />} />
               <Route path="inventory" element={<ProductList />} />
-              <Route path="inventory/add" element={
-                <ProtectedRoute allowedRoles={['admin']}>
-                  <AddProduct />
-                </ProtectedRoute>
-              } />
               <Route path="inventory/reduce" element={
                 <ProtectedRoute allowedRoles={['user', 'admin']}>
                   <ReduceStock />
