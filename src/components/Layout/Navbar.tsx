@@ -43,6 +43,8 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
     const { mode, isSidebarCollapsed } = useSelector((state: RootState) => state.theme);
     const { transactions } = useSelector((state: RootState) => state.transactions);
     const { orders } = useSelector((state: RootState) => state.orders);
+    const { products } = useSelector((state: RootState) => state.inventory);
+    const { notifications } = useSelector((state: RootState) => state.settings);
     const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
     const [notifAnchorEl, setNotifAnchorEl] = React.useState<null | HTMLElement>(null);
 
@@ -127,20 +129,37 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
         },
     });
 
-    const recentNotifications = [
-        ...orders.slice(0, 2).map((order) => ({
-            id: `order-${order.id}`,
-            title: `Order ${order.status === 'fulfilled' ? 'fulfilled' : 'rejected'}`,
-            detail: `${order.productName} - ${order.quantity} units`,
-            time: new Date(order.timestamp).toLocaleString(),
-        })),
-        ...transactions.slice(0, 2).map((tx) => ({
-            id: `tx-${tx.id}`,
-            title: tx.type === 'addition' ? 'Stock Added' : 'Stock Reduced',
-            detail: `${tx.productName} - ${tx.amount} units`,
-            time: new Date(tx.timestamp).toLocaleString(),
-        }))
-    ].slice(0, 4);
+    const orderAndStockNotifications = notifications.orderUpdates
+        ? [
+            ...orders.slice(0, 2).map((order) => ({
+                id: `order-${order.id}`,
+                title: `Order ${order.status === 'fulfilled' ? 'fulfilled' : 'rejected'}`,
+                detail: `${order.productName} - ${order.quantity} units`,
+                time: new Date(order.timestamp).toLocaleString(),
+            })),
+            ...transactions.slice(0, 2).map((tx) => ({
+                id: `tx-${tx.id}`,
+                title: tx.type === 'addition' ? 'Stock Added' : 'Stock Reduced',
+                detail: `${tx.productName} - ${tx.amount} units`,
+                time: new Date(tx.timestamp).toLocaleString(),
+            }))
+        ]
+        : [];
+
+    const lowStockNotifications = notifications.lowStockAlerts
+        ? products
+            .filter((p) => p.stock <= p.minStock)
+            .slice(0, 2)
+            .map((p) => ({
+                id: `low-stock-${p.id}`,
+                title: p.stock === 0 ? 'Out of Stock' : 'Low Stock Alert',
+                detail: `${p.name} - ${p.stock} left (min ${p.minStock})`,
+                time: `Updated ${new Date(p.lastUpdated).toLocaleString()}`,
+            }))
+        : [];
+
+    const recentNotifications = [...orderAndStockNotifications, ...lowStockNotifications].slice(0, 6);
+    const notificationsEnabled = notifications.orderUpdates || notifications.lowStockAlerts;
 
     return (
         <AppBar
@@ -381,7 +400,11 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
                                 Latest order and stock updates
                             </Typography>
                         </Box>
-                        {recentNotifications.length === 0 ? (
+                        {!notificationsEnabled ? (
+                            <Box sx={{ px: 2, py: 2, color: 'text.secondary' }}>
+                                Notifications are turned off in Settings.
+                            </Box>
+                        ) : recentNotifications.length === 0 ? (
                             <Box sx={{ px: 2, py: 2, color: 'text.secondary' }}>
                                 No notifications yet.
                             </Box>
