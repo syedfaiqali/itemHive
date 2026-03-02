@@ -52,7 +52,7 @@ const Signup: React.FC = () => {
                 background: theme.palette.mode === 'light'
                     ? 'radial-gradient(circle at 15% 10%, rgba(14, 165, 165, 0.2), transparent 45%), radial-gradient(circle at 85% 0%, rgba(37, 99, 235, 0.14), transparent 45%), linear-gradient(180deg, #eef6f7 0%, #e8eff7 100%)'
                     : 'radial-gradient(circle at 15% 10%, rgba(45, 212, 191, 0.2), transparent 45%), radial-gradient(circle at 85% 0%, rgba(59, 130, 246, 0.18), transparent 45%), linear-gradient(180deg, #0b1220 0%, #0f172a 100%)',
-                p: { xs: 1.25, md: 2 }
+                p: { xs: 0.75, md: 1.25 }
             }}
         >
             {floatingWidgets.map((item, index) => (
@@ -74,8 +74,8 @@ const Signup: React.FC = () => {
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            width: 44,
-                            height: 44,
+                            width: 38,
+                            height: 38,
                             borderRadius: '50%',
                             bgcolor: alpha(theme.palette.background.paper, theme.palette.mode === 'light' ? 0.78 : 0.2),
                             border: '1px solid',
@@ -95,18 +95,27 @@ const Signup: React.FC = () => {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5 }}
                 >
-                    <Paper elevation={24} sx={{ borderRadius: 4, p: { xs: 2.25, md: 3 }, maxHeight: { xs: 'none', md: '90dvh' } }}>
-                        <Box sx={{ mb: 2, textAlign: 'center' }}>
-                            <Typography variant="h4" fontWeight={800} color="primary.main" gutterBottom>
+                    <Paper
+                        elevation={24}
+                        sx={{
+                            borderRadius: { xs: 4, md: 5 },
+                            p: { xs: 1.5, md: 2.25 },
+                            border: '1px solid',
+                            borderColor: 'divider',
+                            maxHeight: { xs: 'none', md: '84dvh' }
+                        }}
+                    >
+                        <Box sx={{ mb: 1.25, textAlign: 'center' }}>
+                            <Typography variant="h4" fontWeight={800} color="primary.main">
                                 Join ItemHive
                             </Typography>
                             <Typography variant="body2" color="text.secondary">
-                                Create an account to start managing your inventory.
+                                Create your workspace access.
                             </Typography>
                         </Box>
 
                         {success && (
-                            <Alert severity="success" sx={{ mb: 1.5, borderRadius: 2 }}>
+                            <Alert severity="success" sx={{ mb: 1.25, borderRadius: 2 }}>
                                 Account created successfully! Redirecting to login...
                             </Alert>
                         )}
@@ -125,6 +134,7 @@ const Signup: React.FC = () => {
                                         </InputAdornment>
                                     ),
                                 }}
+                                sx={{ mb: 0.25 }}
                             />
                             <TextField
                                 fullWidth
@@ -139,6 +149,7 @@ const Signup: React.FC = () => {
                                         </InputAdornment>
                                     ),
                                 }}
+                                sx={{ mb: 0.25 }}
                             />
                             <TextField
                                 select
@@ -148,6 +159,7 @@ const Signup: React.FC = () => {
                                 margin="dense"
                                 defaultValue="user"
                                 required
+                                sx={{ mb: 0.25 }}
                             >
                                 <MenuItem value="admin">Administrator (Manager)</MenuItem>
                                 <MenuItem value="user">Staff Member (Consumption only)</MenuItem>
@@ -173,7 +185,7 @@ const Signup: React.FC = () => {
                                         </InputAdornment>
                                     ),
                                 }}
-                                sx={{ mb: 1.5 }}
+                                sx={{ mb: 1.25 }}
                             />
 
                             <Button
@@ -182,15 +194,29 @@ const Signup: React.FC = () => {
                                 size="large"
                                 type="submit"
                                 startIcon={<UserPlus size={20} />}
-                                sx={{ py: 1.5, borderRadius: 2, fontSize: '1rem', fontWeight: 700, boxShadow: '0 10px 18px -8px rgba(14, 165, 165, 0.55)' }}
+                                sx={{
+                                    py: 1.05,
+                                    borderRadius: 2,
+                                    fontSize: '0.95rem',
+                                    fontWeight: 800,
+                                    boxShadow: `0 12px 22px -12px ${alpha(theme.palette.primary.main, 0.8)}`
+                                }}
                             >
                                 Create Account
                             </Button>
                         </form>
 
-                        <Box sx={{ mt: 2, textAlign: 'center' }}>
+                        <Box sx={{ mt: 1.5, textAlign: 'center' }}>
                             <Typography variant="body2" color="text.secondary">
-                                Already have an account? <Button variant="text" onClick={() => navigate('/login')} sx={{ fontWeight: 700 }}>Sign In</Button>
+                                Already have an account?{' '}
+                                <Button
+                                    variant="text"
+                                    size="small"
+                                    onClick={() => navigate('/login')}
+                                    sx={{ fontWeight: 700, textTransform: 'none' }}
+                                >
+                                    Sign In
+                                </Button>
                             </Typography>
                         </Box>
                     </Paper>
