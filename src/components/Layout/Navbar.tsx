@@ -12,18 +12,23 @@ import {
     Badge,
     Button
 } from '@mui/material';
-import { alpha } from '@mui/material/styles';
+import { alpha, useTheme } from '@mui/material/styles';
 import {
     Menu as MenuIcon,
     Bell as NotificationsIcon,
     Sun,
-    Moon
+    Moon,
+    UserCircle2,
+    Settings,
+    LogOut,
+    Sparkles,
+    ChevronRight
 } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState } from '../../store';
 import { logout } from '../../features/auth/authSlice';
 import { toggleDarkMode, setDarkMode } from '../../features/theme/themeSlice';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 interface NavbarProps {
     onMenuClick: () => void;
@@ -32,6 +37,8 @@ interface NavbarProps {
 const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
     const dispatch = useDispatch();
     const navigate = useNavigate();
+    const location = useLocation();
+    const theme = useTheme();
     const { user } = useSelector((state: RootState) => state.auth);
     const { mode, isSidebarCollapsed } = useSelector((state: RootState) => state.theme);
     const { transactions } = useSelector((state: RootState) => state.transactions);
@@ -74,17 +81,63 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
         dispatch(toggleDarkMode());
     };
 
+    const isActivePath = (path: string) => location.pathname === path;
+    const buildActionItemSx = (isDanger = false, active = false) => ({
+        borderRadius: 2,
+        mx: 1,
+        my: 0.4,
+        px: 1.25,
+        py: 1,
+        minHeight: 42,
+        fontWeight: 700,
+        color: isDanger ? 'error.main' : 'text.primary',
+        border: '1px solid',
+        borderColor: active
+            ? alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.45 : 0.26)
+            : 'transparent',
+        background: active
+            ? `linear-gradient(100deg, ${alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.24 : 0.14)} 0%, ${alpha(theme.palette.secondary.main, theme.palette.mode === 'dark' ? 0.15 : 0.08)} 100%)`
+            : 'transparent',
+        transition: 'all 180ms ease',
+        '& .menu-action-icon': {
+            transition: 'transform 180ms ease, color 180ms ease',
+        },
+        '& .menu-action-arrow': {
+            transition: 'transform 180ms ease, opacity 180ms ease',
+            opacity: active ? 1 : 0.35,
+            color: isDanger ? 'error.main' : 'text.secondary',
+        },
+        '&:hover': {
+            borderColor: isDanger
+                ? alpha(theme.palette.error.main, 0.35)
+                : alpha(theme.palette.primary.main, 0.28),
+            background: isDanger
+                ? alpha(theme.palette.error.main, theme.palette.mode === 'dark' ? 0.2 : 0.08)
+                : `linear-gradient(100deg, ${alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.28 : 0.16)} 0%, ${alpha(theme.palette.secondary.main, theme.palette.mode === 'dark' ? 0.18 : 0.1)} 100%)`,
+            transform: 'translateX(3px)',
+            '& .menu-action-icon': {
+                transform: 'scale(1.08)',
+                color: isDanger ? theme.palette.error.main : theme.palette.primary.main,
+            },
+            '& .menu-action-arrow': {
+                opacity: 1,
+                transform: 'translateX(2px)',
+                color: isDanger ? theme.palette.error.main : theme.palette.primary.main,
+            },
+        },
+    });
+
     const recentNotifications = [
         ...orders.slice(0, 2).map((order) => ({
             id: `order-${order.id}`,
             title: `Order ${order.status === 'fulfilled' ? 'fulfilled' : 'rejected'}`,
-            detail: `${order.productName} • ${order.quantity} units`,
+            detail: `${order.productName} - ${order.quantity} units`,
             time: new Date(order.timestamp).toLocaleString(),
         })),
         ...transactions.slice(0, 2).map((tx) => ({
             id: `tx-${tx.id}`,
             title: tx.type === 'addition' ? 'Stock Added' : 'Stock Reduced',
-            detail: `${tx.productName} • ${tx.amount} units`,
+            detail: `${tx.productName} - ${tx.amount} units`,
             time: new Date(tx.timestamp).toLocaleString(),
         }))
     ].slice(0, 4);
@@ -248,16 +301,69 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
                         }}
                         open={Boolean(anchorEl)}
                         onClose={handleClose}
+                        PaperProps={{
+                            elevation: 0,
+                            sx: {
+                                mt: 1,
+                                width: 250,
+                                overflow: 'visible',
+                                borderRadius: 3,
+                                border: '1px solid',
+                                borderColor: alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.35 : 0.16),
+                                background: `linear-gradient(160deg, ${alpha(theme.palette.background.paper, 0.98)} 0%, ${alpha(theme.palette.background.paper, 0.92)} 100%)`,
+                                backdropFilter: 'blur(12px)',
+                                boxShadow: theme.palette.mode === 'dark'
+                                    ? `0 22px 44px -24px ${alpha('#000', 0.9)}`
+                                    : `0 18px 40px -22px ${alpha(theme.palette.primary.dark, 0.36)}`,
+                            },
+                        }}
                     >
-                        <Box sx={{ px: 2, py: 1 }}>
-                            <Typography variant="subtitle2">{user?.username}</Typography>
-                            <Typography variant="caption" color="text.secondary">
-                                {user?.role === 'admin' ? 'Administrator' : 'Staff Member'}
-                            </Typography>
+                        <Box
+                            sx={{
+                                px: 1.2,
+                                pt: 1.2,
+                                pb: 0.8,
+                            }}
+                        >
+                            <Box
+                                sx={{
+                                    px: 1.4,
+                                    py: 1.15,
+                                    borderRadius: 2.2,
+                                    border: '1px solid',
+                                    borderColor: alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.4 : 0.2),
+                                    bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.14 : 0.06),
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 1.1,
+                                }}
+                            >
+                                <Sparkles size={16} color={theme.palette.primary.main} />
+                                <Box>
+                                    <Typography variant="subtitle2" sx={{ fontWeight: 800, lineHeight: 1.25 }}>
+                                        {user?.username}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary" sx={{ letterSpacing: 0.2 }}>
+                                        {user?.role === 'admin' ? 'Administrator' : 'Staff Member'}
+                                    </Typography>
+                                </Box>
+                            </Box>
                         </Box>
-                        <MenuItem onClick={() => handleNavigateTo('/profile')}>Profile</MenuItem>
-                        <MenuItem onClick={() => handleNavigateTo('/settings')}>Settings</MenuItem>
-                        <MenuItem onClick={handleLogout} sx={{ color: 'error.main' }}>Logout</MenuItem>
+                        <MenuItem onClick={() => handleNavigateTo('/profile')} sx={buildActionItemSx(false, isActivePath('/profile'))}>
+                            <UserCircle2 size={18} className="menu-action-icon" />
+                            <Box sx={{ flexGrow: 1, ml: 1 }}>Profile</Box>
+                            <ChevronRight size={16} className="menu-action-arrow" />
+                        </MenuItem>
+                        <MenuItem onClick={() => handleNavigateTo('/settings')} sx={buildActionItemSx(false, isActivePath('/settings'))}>
+                            <Settings size={18} className="menu-action-icon" />
+                            <Box sx={{ flexGrow: 1, ml: 1 }}>Settings</Box>
+                            <ChevronRight size={16} className="menu-action-arrow" />
+                        </MenuItem>
+                        <MenuItem onClick={handleLogout} sx={buildActionItemSx(true, false)}>
+                            <LogOut size={18} className="menu-action-icon" />
+                            <Box sx={{ flexGrow: 1, ml: 1 }}>Logout</Box>
+                            <ChevronRight size={16} className="menu-action-arrow" />
+                        </MenuItem>
                     </Menu>
 
                     <Menu
@@ -303,7 +409,4 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
     );
 };
 
-
 export default Navbar;
-
-
