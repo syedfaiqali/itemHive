@@ -22,11 +22,11 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { addProduct, type Product } from '../../features/inventory/inventorySlice';
+import { addProduct, type Product, PRODUCT_CATEGORIES } from '../../features/inventory/inventorySlice';
 import type { RootState } from '../../store';
 import { motion } from 'framer-motion';
 
-const categories = ['Electronics', 'Clothing', 'Home', 'Food', 'Accessories', 'Beauty'];
+const categories = PRODUCT_CATEGORIES;
 
 const AddProduct: React.FC = () => {
     const navigate = useNavigate();

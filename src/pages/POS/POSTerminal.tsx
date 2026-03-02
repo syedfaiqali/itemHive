@@ -18,7 +18,9 @@ import {
     DialogTitle,
     DialogContent,
     DialogActions,
-    Stack
+    Stack,
+    useTheme,
+    alpha
 } from '@mui/material';
 import {
     Search,
@@ -37,15 +39,16 @@ import {
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
 import { addToCart, updateQuantity, clearCart } from '../../features/pos/posSlice';
-import { reduceStock } from '../../features/inventory/inventorySlice';
+import { reduceStock, resolveProductImage, PRODUCT_CATEGORIES } from '../../features/inventory/inventorySlice';
 import { addTransaction } from '../../features/transactions/transactionSlice';
 import type { Product } from '../../features/inventory/inventorySlice';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const categories = ['All', 'Electronics', 'Clothing', 'Home', 'Food', 'Accessories', 'Beauty'];
+const categories = ['All', ...PRODUCT_CATEGORIES];
 
 const POSTerminal: React.FC = () => {
     const dispatch = useDispatch();
+    const theme = useTheme();
     const { user } = useSelector((state: RootState) => state.auth);
     const { products } = useSelector((state: RootState) => state.inventory);
     const { cart, taxRate, activeDiscount } = useSelector((state: RootState) => state.pos);
@@ -70,7 +73,10 @@ const POSTerminal: React.FC = () => {
     const total = subtotal + tax - activeDiscount;
 
     const handleAddToCart = (product: Product) => {
-        if (product.stock > 0) {
+        const itemInCart = cart.find(item => item.id === product.id);
+        const currentQty = itemInCart ? itemInCart.quantity : 0;
+
+        if (product.stock > currentQty) {
             dispatch(addToCart(product));
         }
     };
@@ -124,7 +130,7 @@ const POSTerminal: React.FC = () => {
                         InputProps={{
                             startAdornment: (
                                 <InputAdornment position="start">
-                                    <Search size={20} color="#6366f1" />
+                                    <Search size={20} color={theme.palette.primary.main} />
                                 </InputAdornment>
                             ),
                         }}
@@ -143,40 +149,171 @@ const POSTerminal: React.FC = () => {
                     ))}
                 </Tabs>
 
-                <Box sx={{ flexGrow: 1, overflowY: 'auto', pr: 1 }}>
-                    <Grid container spacing={2}>
+                <Box sx={{ flexGrow: 1, overflowY: 'auto', pr: 1, pt: 1, px: 2 }}>
+                    <Grid container spacing={4}>
                         {filteredProducts.map((product) => (
-                            <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3, xl: 2 }} key={product.id}>
-                                <motion.div whileHover={{ y: -4 }} whileTap={{ scale: 0.95 }}>
+                            <Grid
+                                key={product.id}
+                                size={{ xs: 12, sm: 6, md: 4, lg: 3, xl: 3 }}
+                            >
+                                <motion.div
+                                    whileHover={{ y: -8, transition: { duration: 0.25 } }}
+                                    whileTap={{ scale: 0.98 }}
+                                >
                                     <Card
-                                        onClick={() => handleAddToCart(product)}
+                                        onClick={() => product.stock > 0 && handleAddToCart(product)}
                                         sx={{
-                                            cursor: 'pointer',
+                                            cursor: product.stock > 0 ? 'pointer' : 'default',
                                             height: '100%',
-                                            borderRadius: 3,
-                                            border: '2px solid transparent',
-                                            '&:hover': { borderColor: 'primary.main', bgcolor: 'rgba(99, 102, 241, 0.02)' },
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            borderRadius: 4,
+                                            border: '1px solid',
+                                            borderColor: 'divider',
+                                            bgcolor: 'background.paper',
+                                            boxShadow: '0 4px 10px rgba(0,0,0,0.02)',
+                                            overflow: 'hidden',
                                             position: 'relative',
-                                            opacity: product.stock === 0 ? 0.6 : 1,
-                                            transition: 'all 0.2s ease'
+                                            '&:hover': {
+                                                borderColor: product.stock > 0 ? 'primary.main' : 'divider',
+                                                boxShadow: (theme) => product.stock > 0
+                                                    ? `0 25px 50px -12px ${alpha(theme.palette.primary.main, 0.1)}`
+                                                    : '0 4px 10px rgba(0,0,0,0.02)',
+                                                '& .product-img': { transform: product.stock > 0 ? 'scale(1.08)' : 'none' },
+                                                '& .add-btn': { opacity: product.stock > 0 ? 1 : 0.4, transform: 'translateY(0)' }
+                                            },
+                                            opacity: product.stock === 0 ? 0.7 : 1,
+                                            transition: 'all 0.3s'
                                         }}
                                     >
-                                        <CardContent sx={{ p: 2, textAlign: 'center' }}>
-                                            <Typography variant="caption" color="text.secondary" fontWeight={800} display="block">
-                                                {product.sku}
+                                        <Box sx={{
+                                            position: 'relative',
+                                            pt: '90%',
+                                            bgcolor: (theme) => alpha(theme.palette.text.primary, 0.025),
+                                            overflow: 'hidden'
+                                        }}>
+                                            <Box
+                                                className="product-img"
+                                                component="img"
+                                                src={resolveProductImage(product)}
+                                                alt={product.name}
+                                                sx={{
+                                                    position: 'absolute',
+                                                    top: 0,
+                                                    left: 0,
+                                                    width: '100%',
+                                                    height: '100%',
+                                                    objectFit: 'contain',
+                                                    p: 2.5,
+                                                    transition: 'transform 0.5s ease',
+                                                }}
+                                            />
+                                            {product.stock <= 5 && (
+                                                <Chip
+                                                    label={product.stock === 0 ? "Out of Stock" : "Limited Stock"}
+                                                    size="small"
+                                                    color={product.stock === 0 ? "error" : "warning"}
+                                                    sx={{
+                                                        position: 'absolute',
+                                                        top: 10,
+                                                        left: 10,
+                                                        fontSize: '0.6rem',
+                                                        fontWeight: 900,
+                                                        height: 18,
+                                                        textTransform: 'uppercase'
+                                                    }}
+                                                />
+                                            )}
+
+                                            <Box
+                                                className="add-btn"
+                                                sx={{
+                                                    position: 'absolute',
+                                                    bottom: 12,
+                                                    right: 12,
+                                                    p: 1,
+                                                    borderRadius: 2,
+                                                    bgcolor: product.stock > 0 ? 'primary.main' : 'action.disabledBackground',
+                                                    color: product.stock > 0 ? 'white' : 'action.disabled',
+                                                    display: 'flex',
+                                                    opacity: 0,
+                                                    transform: 'translateY(10px)',
+                                                    transition: 'all 0.3s ease',
+                                                    boxShadow: product.stock > 0 ? '0 4px 12px rgba(14, 165, 165, 0.3)' : 'none',
+                                                    cursor: product.stock > 0 ? 'pointer' : 'not-allowed'
+                                                }}
+                                            >
+                                                <Plus size={18} strokeWidth={3} />
+                                            </Box>
+                                        </Box>
+
+                                        <CardContent sx={{ p: 2, flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
+                                            <Typography variant="caption" color="primary.main" fontWeight={900} sx={{ mb: 0.5, letterSpacing: 0.5, opacity: 0.8 }}>
+                                                {product.category.toUpperCase()}
                                             </Typography>
-                                            <Typography variant="body1" fontWeight={700} noWrap sx={{ mt: 1 }}>
+
+                                            <Typography
+                                                variant="subtitle1"
+                                                color="text.primary"
+                                                fontWeight={700}
+                                                sx={{
+                                                    lineHeight: 1.25,
+                                                    mb: 1,
+                                                    fontSize: '0.95rem',
+                                                    height: '2.5em',
+                                                    overflow: 'hidden',
+                                                    display: '-webkit-box',
+                                                    WebkitLineClamp: 2,
+                                                    WebkitBoxOrient: 'vertical',
+                                                }}
+                                            >
                                                 {product.name}
                                             </Typography>
-                                            <Typography variant="h6" color="primary.main" fontWeight={800}>
-                                                ${product.price.toFixed(2)}
-                                            </Typography>
-                                            <Chip
-                                                label={product.stock > 0 ? `${product.stock} in stock` : 'Out of Stock'}
-                                                size="small"
-                                                color={product.stock > 0 ? (product.stock <= product.minStock ? 'warning' : 'success') : 'error'}
-                                                sx={{ mt: 1, fontSize: '0.65rem', height: 20, fontWeight: 700 }}
-                                            />
+
+                                            <Box sx={{ mt: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                <Typography variant="h6" color="primary.main" fontWeight={900}>
+                                                    ${product.price.toFixed(2)}
+                                                </Typography>
+
+                                                <Box sx={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: 0.5,
+                                                    px: 1,
+                                                    py: 0.3,
+                                                    borderRadius: 1.5,
+                                                    bgcolor: (theme) => {
+                                                        if (product.stock === 0) return alpha(theme.palette.error.main, 0.1);
+                                                        if (product.stock <= 5) return alpha(theme.palette.warning.main, 0.1);
+                                                        return alpha(theme.palette.success.main, 0.06);
+                                                    }
+                                                }}>
+                                                    <Box sx={{
+                                                        width: 6,
+                                                        height: 6,
+                                                        borderRadius: '50%',
+                                                        bgcolor: (theme) => {
+                                                            if (product.stock === 0) return theme.palette.error.main;
+                                                            if (product.stock <= 5) return theme.palette.warning.main;
+                                                            return theme.palette.success.main;
+                                                        }
+                                                    }} />
+                                                    <Typography
+                                                        variant="caption"
+                                                        fontWeight={800}
+                                                        sx={{
+                                                            fontSize: '0.65rem',
+                                                            color: (theme) => {
+                                                                if (product.stock === 0) return theme.palette.error.main;
+                                                                if (product.stock <= 5) return theme.palette.warning.main;
+                                                                return theme.palette.success.main;
+                                                            }
+                                                        }}
+                                                    >
+                                                        {product.stock === 0 ? 'Out' : product.stock} left
+                                                    </Typography>
+                                                </Box>
+                                            </Box>
                                         </CardContent>
                                     </Card>
                                 </motion.div>
@@ -190,7 +327,8 @@ const POSTerminal: React.FC = () => {
             <Paper
                 elevation={3}
                 sx={{
-                    width: 420,
+                    width: { xs: '100%', md: 420 },
+                    flexShrink: 0,
                     display: 'flex',
                     flexDirection: 'column',
                     borderRadius: 4,
@@ -210,46 +348,65 @@ const POSTerminal: React.FC = () => {
                     </IconButton>
                 </Box>
 
-                <Box sx={{ flexGrow: 1, overflowY: 'auto', p: 2, minHeight: 0 }}>
+                <Box sx={{ flexGrow: 1, overflowY: 'auto', p: 0, position: 'relative' }}>
                     {cart.length === 0 ? (
-                        <Box sx={{ textAlign: 'center', mt: 10, opacity: 0.3 }}>
+                        <Box sx={{
+                            position: 'absolute',
+                            top: '40%',
+                            left: '50%',
+                            transform: 'translate(-50%, -50%)',
+                            textAlign: 'center',
+                            opacity: 0.4,
+                            width: '100%',
+                            px: 3
+                        }}>
                             <ShoppingCart size={80} strokeWidth={1} style={{ marginBottom: 16 }} />
-                            <Typography variant="h6" fontWeight={600}>Cart is empty</Typography>
-                            <Typography variant="body2">Select products to start</Typography>
+                            <Typography variant="h6" fontWeight={800}>Cart is empty</Typography>
+                            <Typography variant="body2" fontWeight={600}>Select products to start</Typography>
                         </Box>
                     ) : (
-                        <AnimatePresence>
-                            {cart.map((item) => (
-                                <motion.div
-                                    key={item.id}
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    exit={{ opacity: 0, scale: 0.95 }}
-                                >
-                                    <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
-                                        <Box sx={{ flexGrow: 1 }}>
-                                            <Typography variant="body2" fontWeight={700} noWrap sx={{ maxWidth: 180 }}>{item.name}</Typography>
-                                            <Typography variant="caption" color="text.secondary">${item.price.toFixed(2)} / unit</Typography>
-                                        </Box>
-                                        <Stack direction="row" alignItems="center" spacing={1} sx={{ bgcolor: 'action.hover', borderRadius: 2, p: 0.5 }}>
-                                            <IconButton size="small" onClick={() => dispatch(updateQuantity({ id: item.id, quantity: item.quantity - 1 }))}>
-                                                <Minus size={14} />
-                                            </IconButton>
-                                            <Typography variant="body2" sx={{ fontWeight: 800, minWidth: 20, textAlign: 'center' }}>
-                                                {item.quantity}
+                        <Box sx={{ p: 2 }}>
+                            <AnimatePresence>
+                                {cart.map((item) => (
+                                    <motion.div
+                                        key={item.id}
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, scale: 0.95 }}
+                                    >
+                                        <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+                                            <Box sx={{ flexGrow: 1 }}>
+                                                <Typography variant="body2" fontWeight={700} noWrap sx={{ maxWidth: 180 }}>{item.name}</Typography>
+                                                <Typography variant="caption" color="text.secondary">${item.price.toFixed(2)} / unit</Typography>
+                                            </Box>
+                                            <Stack direction="row" alignItems="center" spacing={1} sx={{ bgcolor: 'action.hover', borderRadius: 2, p: 0.5 }}>
+                                                <IconButton size="small" onClick={() => dispatch(updateQuantity({ id: item.id, quantity: item.quantity - 1 }))}>
+                                                    <Minus size={14} />
+                                                </IconButton>
+                                                <Typography variant="body2" sx={{ fontWeight: 800, minWidth: 20, textAlign: 'center' }}>
+                                                    {item.quantity}
+                                                </Typography>
+                                                <IconButton
+                                                    size="small"
+                                                    onClick={() => {
+                                                        const product = products.find(p => p.id === item.id);
+                                                        if (product && item.quantity < product.stock) {
+                                                            dispatch(updateQuantity({ id: item.id, quantity: item.quantity + 1 }));
+                                                        }
+                                                    }}
+                                                >
+                                                    <Plus size={14} />
+                                                </IconButton>
+                                            </Stack>
+                                            <Typography variant="body2" fontWeight={800} sx={{ minWidth: 70, textAlign: 'right' }}>
+                                                ${(item.price * item.quantity).toFixed(2)}
                                             </Typography>
-                                            <IconButton size="small" onClick={() => dispatch(updateQuantity({ id: item.id, quantity: item.quantity + 1 }))}>
-                                                <Plus size={14} />
-                                            </IconButton>
-                                        </Stack>
-                                        <Typography variant="body2" fontWeight={800} sx={{ minWidth: 70, textAlign: 'right' }}>
-                                            ${(item.price * item.quantity).toFixed(2)}
-                                        </Typography>
-                                    </Box>
-                                    <Divider sx={{ mb: 2, borderStyle: 'dashed' }} />
-                                </motion.div>
-                            ))}
-                        </AnimatePresence>
+                                        </Box>
+                                        <Divider sx={{ mb: 2, borderStyle: 'dashed' }} />
+                                    </motion.div>
+                                ))}
+                            </AnimatePresence>
+                        </Box>
                     )}
                 </Box>
 
@@ -309,7 +466,14 @@ const POSTerminal: React.FC = () => {
                                 startIcon={<Receipt size={24} />}
                                 disabled={cart.length === 0}
                                 onClick={() => handleCheckout('card')}
-                                sx={{ py: 2, mt: 1, borderRadius: 3, fontWeight: 900, fontSize: '1.1rem', boxShadow: '0 8px 16px -4px rgba(99, 102, 241, 0.4)' }}
+                                sx={{
+                                    py: 2,
+                                    mt: 1,
+                                    borderRadius: 3,
+                                    fontWeight: 900,
+                                    fontSize: '1.1rem',
+                                    boxShadow: (theme) => `0 8px 16px -4px ${alpha(theme.palette.primary.main, 0.4)}`
+                                }}
                             >
                                 Pay Now
                             </Button>

@@ -9,6 +9,7 @@ import ProtectedRoute from './components/Auth/ProtectedRoute';
 import getAppTheme from './theme/theme';
 import { useSelector } from 'react-redux';
 import type { RootState } from './store';
+import ScrollToTop from './components/Common/ScrollToTop';
 
 // Lazy load pages for better performance
 import Login from './pages/Auth/Login';
@@ -30,6 +31,7 @@ const AppContent: React.FC = () => {
   return (
     <ThemeProvider theme={theme}>
       <BrowserRouter>
+        <ScrollToTop />
         <React.Suspense fallback={<div>Loading...</div>}>
           <Routes>
             <Route path="/login" element={<Login />} />

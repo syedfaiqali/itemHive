@@ -1,4 +1,4 @@
-import { createTheme, type PaletteMode } from '@mui/material';
+import { createTheme, type PaletteMode, alpha } from '@mui/material';
 
 export const getAppTheme = (mode: PaletteMode) => createTheme({
     palette: {
@@ -87,6 +87,10 @@ export const getAppTheme = (mode: PaletteMode) => createTheme({
             styleOverrides: {
                 root: {
                     backgroundImage: 'none',
+                    borderRadius: 8,
+                    boxShadow: mode === 'light'
+                        ? '0 8px 24px -12px rgba(15, 23, 42, 0.12)'
+                        : '0 12px 24px -16px rgba(0, 0, 0, 0.5)',
                 },
             },
         },
@@ -94,7 +98,7 @@ export const getAppTheme = (mode: PaletteMode) => createTheme({
             styleOverrides: {
                 root: {
                     borderRadius: 6,
-                    backgroundColor: mode === 'light' ? '#f8fafc' : '#0f172a',
+                    backgroundColor: mode === 'light' ? '#f8fafc' : alpha('#1e293b', 0.4),
                 },
             },
         },
@@ -136,14 +140,6 @@ export const getAppTheme = (mode: PaletteMode) => createTheme({
                 root: {
                     fontWeight: 700,
                     borderRadius: 6,
-                },
-            },
-        },
-        MuiPaper: {
-            styleOverrides: {
-                root: {
-                    backgroundImage: 'none',
-                    borderRadius: 8,
                 },
             },
         },

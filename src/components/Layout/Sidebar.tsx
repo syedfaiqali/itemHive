@@ -10,6 +10,9 @@ import {
     Toolbar,
     Typography,
     Divider,
+    alpha,
+    IconButton,
+    useTheme
 } from '@mui/material';
 import {
     LayoutDashboard,
@@ -19,13 +22,17 @@ import {
     Settings,
     PlusCircle,
     Monitor as TerminalIcon,
-    ClipboardList
+    ClipboardList,
+    ChevronLeft,
+    ChevronRight
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
+import { toggleSidebar } from '../../features/theme/themeSlice';
 
 const drawerWidth = 260;
+const collapsedWidth = 80;
 
 interface SidebarProps {
     mobileOpen: boolean;
@@ -33,9 +40,13 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onDrawerToggle }) => {
+    const theme = useTheme();
+    const dispatch = useDispatch();
     const location = useLocation();
     const navigate = useNavigate();
     const { user } = useSelector((state: RootState) => state.auth);
+    const { isSidebarCollapsed } = useSelector((state: RootState) => state.theme);
+    const currentWidth = isSidebarCollapsed ? collapsedWidth : drawerWidth;
 
     const menuItems = [
         { text: 'Dashboard', icon: <LayoutDashboard size={20} />, path: '/', roles: ['admin', 'user'] },
@@ -49,11 +60,73 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onDrawerToggle }) => {
     ];
 
     const drawer = (
-        <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-            <Toolbar />
-            <Box sx={{ p: 3 }}>
-                <Typography variant="overline" color="text.secondary" fontWeight={700}>
-                    Main Menu
+        <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+            <Toolbar sx={{
+                px: isSidebarCollapsed ? 2 : 2.5,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 2,
+                justifyContent: isSidebarCollapsed ? 'center' : 'flex-start',
+                minHeight: '80px !important'
+            }}>
+                <Box
+                    component="img"
+                    src="/favicon.png"
+                    alt="Logo"
+                    sx={{ width: 32, height: 32, flexShrink: 0, filter: 'drop-shadow(0 4px 8px rgba(14, 165, 165, 0.3))' }}
+                />
+                {!isSidebarCollapsed && (
+                    <Typography
+                        variant="h6"
+                        fontWeight={900}
+                        color="primary.main"
+                        noWrap
+                        sx={{
+                            fontSize: '1.4rem',
+                            letterSpacing: -0.5,
+                            background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.primary.light})`,
+                            WebkitBackgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent',
+                        }}
+                    >
+                        ItemHive
+                    </Typography>
+                )}
+            </Toolbar>
+
+            <Box sx={{
+                position: 'absolute',
+                right: -15,
+                top: 75,
+                zIndex: 10,
+                display: { xs: 'none', sm: 'block' }
+            }}>
+                <IconButton
+                    onClick={() => dispatch(toggleSidebar())}
+                    sx={{
+                        width: 30,
+                        height: 30,
+                        bgcolor: 'background.paper',
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        boxShadow: '0 4px 10px rgba(0,0,0,0.1)',
+                        '&:hover': {
+                            bgcolor: 'primary.main',
+                            color: 'white',
+                            transform: 'scale(1.1)',
+                        },
+                        transition: 'all 0.2s',
+                        color: 'text.secondary',
+                        p: 0,
+                    }}
+                >
+                    {isSidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+                </IconButton>
+            </Box>
+
+            <Box sx={{ p: isSidebarCollapsed ? 2 : 3, textAlign: isSidebarCollapsed ? 'center' : 'left' }}>
+                <Typography variant="overline" color="text.secondary" fontWeight={800} sx={{ opacity: isSidebarCollapsed ? 0 : 0.6 }}>
+                    {isSidebarCollapsed ? '' : 'Main Menu'}
                 </Typography>
             </Box>
             <List sx={{ px: 2 }}>
@@ -69,11 +142,13 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onDrawerToggle }) => {
                                         if (mobileOpen) onDrawerToggle();
                                     }}
                                     sx={{
+                                        p: isSidebarCollapsed ? 1.5 : 2,
+                                        justifyContent: isSidebarCollapsed ? 'center' : 'initial',
                                         borderRadius: 2,
                                         backgroundColor: isActive ? 'primary.main' : 'transparent',
                                         color: isActive ? 'primary.contrastText' : 'text.primary',
                                         '&:hover': {
-                                            backgroundColor: isActive ? 'primary.dark' : 'rgba(99, 102, 241, 0.08)',
+                                            backgroundColor: isActive ? 'primary.dark' : (theme) => alpha(theme.palette.primary.main, 0.1),
                                             color: isActive ? 'primary.contrastText' : 'primary.main',
                                             '& .MuiListItemIcon-root': {
                                                 color: isActive ? 'primary.contrastText' : 'primary.main',
@@ -83,7 +158,9 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onDrawerToggle }) => {
                                 >
                                     <ListItemIcon
                                         sx={{
-                                            minWidth: 40,
+                                            minWidth: isSidebarCollapsed ? 0 : 40,
+                                            mr: isSidebarCollapsed ? 0 : 0,
+                                            justifyContent: 'center',
                                             color: isActive ? 'primary.contrastText' : 'text.secondary'
                                         }}
                                     >
@@ -91,9 +168,10 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onDrawerToggle }) => {
                                     </ListItemIcon>
                                     <ListItemText
                                         primary={item.text}
+                                        sx={{ opacity: isSidebarCollapsed ? 0 : 1, width: isSidebarCollapsed ? 0 : 'auto', m: 0 }}
                                         primaryTypographyProps={{
                                             fontSize: '0.9rem',
-                                            fontWeight: isActive ? 600 : 500
+                                            fontWeight: isActive ? 700 : 600
                                         }}
                                     />
                                 </ListItemButton>
@@ -113,7 +191,14 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onDrawerToggle }) => {
     return (
         <Box
             component="nav"
-            sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 } }}
+            sx={{
+                width: { sm: currentWidth },
+                flexShrink: { sm: 0 },
+                transition: (theme) => theme.transitions.create('width', {
+                    easing: theme.transitions.easing.sharp,
+                    duration: theme.transitions.duration.enteringScreen,
+                }),
+            }}
         >
             <Drawer
                 variant="temporary"
@@ -133,9 +218,14 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onDrawerToggle }) => {
                     display: { xs: 'none', sm: 'block' },
                     '& .MuiDrawer-paper': {
                         boxSizing: 'border-box',
-                        width: drawerWidth,
+                        width: currentWidth,
                         borderRight: '1px solid',
                         borderColor: 'divider',
+                        transition: (theme) => theme.transitions.create('width', {
+                            easing: theme.transitions.easing.sharp,
+                            duration: theme.transitions.duration.enteringScreen,
+                        }),
+                        overflow: 'visible'
                     },
                 }}
                 open

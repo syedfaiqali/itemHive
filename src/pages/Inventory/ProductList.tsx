@@ -35,13 +35,16 @@ import {
     Filter,
     Download,
     Eye,
-    Save
+    Save,
+    Package
 } from 'lucide-react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
-import { deleteProduct, updateProduct, type Product, resolveProductImage, placeholderFallback } from '../../features/inventory/inventorySlice';
+import { deleteProduct, updateProduct, type Product, resolveProductImage, placeholderFallback, PRODUCT_CATEGORIES } from '../../features/inventory/inventorySlice';
 import { useNavigate } from 'react-router-dom';
 import { alpha, useTheme } from '@mui/material/styles';
+
+const categories_list = PRODUCT_CATEGORIES;
 
 const ProductList: React.FC = () => {
     const theme = useTheme();
@@ -262,8 +265,8 @@ const ProductList: React.FC = () => {
                         </Box>
                     )}
 
-                    <TableContainer component={Box}>
-                        <Table>
+                    <TableContainer component={Box} sx={{ overflowX: 'auto' }}>
+                        <Table sx={{ minWidth: 800 }}>
                             <TableHead>
                                 <TableRow>
                                     <TableCell sx={{ fontWeight: 700 }}>PRODUCT NAME</TableCell>
@@ -365,10 +368,7 @@ const ProductList: React.FC = () => {
                 <DialogContent dividers>
                     {viewProduct && (
                         <Box sx={{ py: 2 }}>
-                            <Box sx={{ display: 'flex', gap: 3, mb: 4 }}>
-                                <Avatar variant="rounded" sx={{ width: 100, height: 100, fontSize: '3rem', bgcolor: 'primary.light' }}>
-                                    {viewProduct.name.charAt(0)}
-                                </Avatar>
+                            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 4, mb: 4 }}>
                                 <Box
                                     component="img"
                                     src={resolveProductImage(viewProduct)}
@@ -380,24 +380,27 @@ const ProductList: React.FC = () => {
                                         }
                                     }}
                                     sx={{
-                                        width: 120,
-                                        height: 120,
-                                        borderRadius: 2,
+                                        width: { xs: '100%', sm: 160 },
+                                        height: 160,
+                                        borderRadius: 3,
                                         objectFit: 'cover',
                                         border: '1px solid',
                                         borderColor: 'divider',
+                                        boxShadow: (theme) => `0 8px 20px -10px ${alpha(theme.palette.primary.main, 0.3)}`
                                     }}
                                 />
-                                <Box>
-                                    <Typography variant="h5" fontWeight={800}>{viewProduct.name}</Typography>
-                                    <Typography color="text.secondary" gutterBottom>{viewProduct.category}</Typography>
-                                    <Box sx={{ display: 'flex', gap: 1 }}>
+                                <Box sx={{ flexGrow: 1 }}>
+                                    <Typography variant="h5" fontWeight={800} gutterBottom>{viewProduct.name}</Typography>
+                                    <Typography color="text.secondary" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        <Package size={16} /> {viewProduct.category}
+                                    </Typography>
+                                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                                        <Chip label={`SKU: ${viewProduct.sku}`} size="small" variant="filled" color="primary" sx={{ fontWeight: 700 }} />
                                         <Chip label={`ID: ${viewProduct.id}`} size="small" variant="outlined" />
-                                        <Chip label={`SKU: ${viewProduct.sku}`} size="small" color="primary" variant="outlined" />
                                     </Box>
                                 </Box>
                             </Box>
-                            <Grid container spacing={3}>
+                            <Grid container spacing={4}>
                                 <Grid size={6}>
                                     <Typography variant="caption" color="text.secondary" display="block">CURRENT STOCK</Typography>
                                     <Typography variant="h6" fontWeight={700}>{viewProduct.stock} Units</Typography>
@@ -453,7 +456,7 @@ const ProductList: React.FC = () => {
                                         value={editProduct.category}
                                         onChange={(e) => setEditProduct({ ...editProduct, category: e.target.value })}
                                     >
-                                        {['Electronics', 'Clothing', 'Home', 'Food', 'Accessories', 'Beauty'].map((cat) => (
+                                        {categories_list.map((cat) => (
                                             <MenuItem key={cat} value={cat}>{cat}</MenuItem>
                                         ))}
                                     </TextField>

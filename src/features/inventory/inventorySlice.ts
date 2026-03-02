@@ -66,9 +66,19 @@ const parseStockCsv = (csv: string): Product[] => {
     });
 };
 
+export const PRODUCT_CATEGORIES = [
+    'Snacks & Candy',
+    'Gum & Mints',
+    'Health & Personal',
+    'Accessories',
+    'Rolling Supplies',
+    'Groceries',
+    'General'
+];
+
 const inferCategory = (name: string): string => {
     const n = name.toLowerCase();
-    if (/(lays|pringles|chips|snack|bounty|mars|snicker|twix|kit kat|oreo|milka|nutella|haribo|m\&ms|chupa|candy|choco|chocolate|biscuit|cookie|wafer|smarties|dragibus)/.test(n)) {
+    if (/(lays|pringles|chips|snack|bounty|mars|snicker|twix|kit kat|oreo|milka|nutella|haribo|m\&m|chupa|candy|choco|chocolate|biscuit|cookie|wafer|smarties|dragibus)/.test(n)) {
         return 'Snacks & Candy';
     }
     if (/(mentos|freedent|stimorol|hollywood|bubblicious|gum|tictac|tic tac)/.test(n)) {
@@ -153,8 +163,10 @@ const inventorySlice = createSlice({
         },
         reduceStock: (state, action: PayloadAction<{ id: string; amount: number }>) => {
             const product = state.products.find(p => p.id === action.payload.id);
-            if (product && product.stock >= action.payload.amount) {
-                product.stock -= action.payload.amount;
+            if (product) {
+                // Reduce stock but don't go below 0
+                const reduction = Math.min(product.stock, action.payload.amount);
+                product.stock -= reduction;
                 product.lastUpdated = new Date().toISOString();
             }
         },

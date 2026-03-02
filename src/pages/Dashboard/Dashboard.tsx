@@ -20,7 +20,6 @@ import {
     TrendingUp,
     AlertTriangle,
     ArrowRight,
-    ShoppingCart,
     DollarSign,
     Monitor
 } from 'lucide-react';
@@ -204,12 +203,12 @@ const Dashboard: React.FC = () => {
                                     <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
                                         <Avatar
                                             sx={{
-                                                bgcolor: alpha(theme.palette[stat.color].main, 0.12),
-                                                color: theme.palette[stat.color].main,
+                                                bgcolor: alpha((theme.palette as any)[stat.color].main, 0.12),
+                                                color: (theme.palette as any)[stat.color].main,
                                                 width: 48,
                                                 height: 48,
                                                 borderRadius: 2,
-                                                boxShadow: `0 6px 14px -10px ${alpha(theme.palette[stat.color].main, 0.7)}`
+                                                boxShadow: `0 6px 14px -10px ${alpha((theme.palette as any)[stat.color].main, 0.7)}`
                                             }}
                                         >
                                             {stat.icon}
@@ -322,8 +321,8 @@ const Dashboard: React.FC = () => {
                                 </Box>
                             ) : (
                                 <Box>
-                                    <TableContainer>
-                                        <Table size="small">
+                                    <TableContainer sx={{ overflowX: 'auto' }}>
+                                        <Table size="small" sx={{ minWidth: 600 }}>
                                             <TableHead>
                                                 <TableRow>
                                                     <TableCell sx={{ fontWeight: 700 }}>ID</TableCell>

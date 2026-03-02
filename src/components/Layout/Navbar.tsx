@@ -12,6 +12,7 @@ import {
     Badge,
     Button
 } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import {
     Menu as MenuIcon,
     Bell as NotificationsIcon,
@@ -32,11 +33,15 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
     const dispatch = useDispatch();
     const navigate = useNavigate();
     const { user } = useSelector((state: RootState) => state.auth);
-    const { mode } = useSelector((state: RootState) => state.theme);
+    const { mode, isSidebarCollapsed } = useSelector((state: RootState) => state.theme);
     const { transactions } = useSelector((state: RootState) => state.transactions);
     const { orders } = useSelector((state: RootState) => state.orders);
     const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
     const [notifAnchorEl, setNotifAnchorEl] = React.useState<null | HTMLElement>(null);
+
+    const drawerWidth = 260;
+    const collapsedWidth = 80;
+    const currentWidth = isSidebarCollapsed ? collapsedWidth : drawerWidth;
 
     const handleMenu = (event: React.MouseEvent<HTMLElement>) => {
         setAnchorEl(event.currentTarget);
@@ -83,12 +88,18 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
         <AppBar
             position="fixed"
             sx={{
-                zIndex: (theme) => theme.zIndex.drawer + 1,
-                backgroundColor: 'background.paper',
-                color: 'text.primary',
-                boxShadow: 'none',
+                width: { sm: `calc(100% - ${currentWidth}px)` },
+                ml: { sm: `${currentWidth}px` },
+                backgroundColor: (theme) => alpha(theme.palette.background.paper, 0.8),
+                backdropFilter: 'blur(12px)',
+                transition: (theme) => theme.transitions.create(['width', 'margin'], {
+                    easing: theme.transitions.easing.sharp,
+                    duration: theme.transitions.duration.enteringScreen,
+                }),
                 borderBottom: '1px solid',
                 borderColor: 'divider',
+                color: 'text.primary',
+                boxShadow: 'none',
             }}
         >
             <Toolbar>
@@ -103,19 +114,31 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
                 </IconButton>
 
                 <Box sx={{ display: 'flex', alignItems: 'center', flexGrow: 1 }}>
-                    <Typography
-                        variant="h6"
-                        noWrap
-                        component="div"
-                        className="gradient-text"
+                    <Box
                         sx={{
-                            fontWeight: 800,
-                            letterSpacing: -1,
-                            fontSize: '1.5rem'
+                            display: { xs: 'flex', sm: 'none' },
+                            alignItems: 'center',
+                            gap: 1.5
                         }}
                     >
-                        ItemHive
-                    </Typography>
+                        <Box
+                            component="img"
+                            src="/favicon.png"
+                            alt="Logo"
+                            sx={{ width: 28, height: 28 }}
+                        />
+                        <Typography
+                            variant="h6"
+                            className="gradient-text"
+                            sx={{
+                                fontWeight: 800,
+                                letterSpacing: -1,
+                                fontSize: '1.2rem'
+                            }}
+                        >
+                            ItemHive
+                        </Typography>
+                    </Box>
                 </Box>
 
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -125,60 +148,57 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
                             alignItems: 'center',
                             position: 'relative',
                             borderRadius: 999,
-                            p: 0.3,
+                            p: 0.5,
                             bgcolor: 'action.hover',
                             border: '1px solid',
                             borderColor: 'divider',
-                            minWidth: 170,
-                            height: 36,
-                            boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.06)',
+                            minWidth: 72,
+                            height: 38,
+                            boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.06)',
+                            gap: 1
                         }}
                     >
                         <Box
                             sx={{
                                 position: 'absolute',
                                 top: 4,
-                                left: mode === 'light' ? 6 : 'calc(50% + 2px)',
-                                width: 'calc(50% - 8px)',
+                                left: mode === 'light' ? 4 : 'calc(50% + 2px)',
+                                width: 'calc(50% - 6px)',
                                 height: 28,
                                 borderRadius: 999,
                                 bgcolor: 'background.paper',
-                                boxShadow: '0 6px 12px -10px rgba(15, 23, 42, 0.5)',
-                                transition: 'all 0.25s ease',
+                                boxShadow: '0 4px 10px rgba(0,0,0,0.1)',
+                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                                 border: '1px solid',
                                 borderColor: 'divider',
                             }}
                         />
-                        <Button
+                        <IconButton
                             onClick={() => dispatch(setDarkMode('light'))}
-                            startIcon={<Sun size={16} />}
+                            size="small"
                             sx={{
                                 flex: 1,
                                 height: 28,
                                 zIndex: 1,
-                                color: mode === 'light' ? 'text.primary' : 'text.secondary',
-                                fontWeight: 700,
-                                textTransform: 'none',
-                                borderRadius: 999,
+                                color: mode === 'light' ? 'primary.main' : 'text.secondary',
+                                transition: 'color 0.3s',
                             }}
                         >
-                            Light
-                        </Button>
-                        <Button
+                            <Sun size={18} strokeWidth={2.5} />
+                        </IconButton>
+                        <IconButton
                             onClick={() => dispatch(setDarkMode('dark'))}
-                            startIcon={<Moon size={16} />}
+                            size="small"
                             sx={{
                                 flex: 1,
                                 height: 28,
                                 zIndex: 1,
-                                color: mode === 'dark' ? 'text.primary' : 'text.secondary',
-                                fontWeight: 700,
-                                textTransform: 'none',
-                                borderRadius: 999,
+                                color: mode === 'dark' ? 'primary.main' : 'text.secondary',
+                                transition: 'color 0.3s',
                             }}
                         >
-                            Dark
-                        </Button>
+                            <Moon size={18} strokeWidth={2.5} />
+                        </IconButton>
                     </Box>
 
                     <IconButton color="inherit" onClick={handleThemeToggle} sx={{ display: { xs: 'inline-flex', md: 'none' } }}>
