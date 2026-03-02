@@ -4,6 +4,7 @@ interface User {
     id: string;
     username: string;
     role: 'admin' | 'user';
+    photoUrl?: string;
 }
 
 interface AuthState {
@@ -44,8 +45,15 @@ const authSlice = createSlice({
             state.loading = false;
             state.error = null;
         },
+        updateProfile: (state, action: PayloadAction<{ username?: string; photoUrl?: string }>) => {
+            if (!state.user) return;
+            state.user = {
+                ...state.user,
+                ...action.payload,
+            };
+        },
     },
 });
 
-export const { loginStart, loginSuccess, loginFailure, logout } = authSlice.actions;
+export const { loginStart, loginSuccess, loginFailure, logout, updateProfile } = authSlice.actions;
 export default authSlice.reducer;

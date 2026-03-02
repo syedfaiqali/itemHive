@@ -73,13 +73,13 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
         ...orders.slice(0, 2).map((order) => ({
             id: `order-${order.id}`,
             title: `Order ${order.status === 'fulfilled' ? 'fulfilled' : 'rejected'}`,
-            detail: `${order.productName} â€¢ ${order.quantity} units`,
+            detail: `${order.productName} • ${order.quantity} units`,
             time: new Date(order.timestamp).toLocaleString(),
         })),
         ...transactions.slice(0, 2).map((tx) => ({
             id: `tx-${tx.id}`,
             title: tx.type === 'addition' ? 'Stock Added' : 'Stock Reduced',
-            detail: `${tx.productName} â€¢ ${tx.amount} units`,
+            detail: `${tx.productName} • ${tx.amount} units`,
             time: new Date(tx.timestamp).toLocaleString(),
         }))
     ].slice(0, 4);
