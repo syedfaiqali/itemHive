@@ -41,7 +41,7 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { alpha } from '@mui/material/styles';
 import { useTheme } from '@mui/material/styles';
-import heroGraphic from '../../assets/stock-hero.svg';
+import heroGraphic from '../../assets/Modern retail POS system setup.webp';
 
 const Dashboard: React.FC = () => {
     const theme = useTheme();
@@ -173,17 +173,95 @@ const Dashboard: React.FC = () => {
                             </Box>
                         </Grid>
                         <Grid size={{ xs: 12, md: 5 }}>
-                            <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+                            <Box
+                                sx={{
+                                    display: 'flex',
+                                    justifyContent: 'center',
+                                    position: 'relative',
+                                    px: { xs: 0.5, md: 1 },
+                                    py: { xs: 1, md: 0 },
+                                }}
+                            >
+                                <Box
+                                    sx={{
+                                        position: 'absolute',
+                                        inset: { xs: 14, md: 18 },
+                                        borderRadius: 4,
+                                        background: `radial-gradient(circle at 20% 20%, ${alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.26 : 0.2)} 0%, ${alpha(theme.palette.secondary.main, theme.palette.mode === 'dark' ? 0.18 : 0.12)} 35%, transparent 75%)`,
+                                        filter: 'blur(20px)',
+                                        zIndex: 0,
+                                        pointerEvents: 'none',
+                                    }}
+                                />
                                 <Box
                                     component="img"
                                     src={heroGraphic}
                                     alt="Inventory overview"
                                     sx={{
-                                        width: { xs: '100%', md: 360 },
-                                        maxWidth: 420,
-                                        filter: 'drop-shadow(0 18px 30px rgba(15, 23, 42, 0.18))'
+                                        position: 'relative',
+                                        zIndex: 1,
+                                        width: '100%',
+                                        maxWidth: { xs: 460, md: 420 },
+                                        borderRadius: 3,
+                                        border: '1px solid',
+                                        borderColor: alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.35 : 0.2),
+                                        bgcolor: alpha(theme.palette.background.paper, 0.95),
+                                        boxShadow: theme.palette.mode === 'dark'
+                                            ? `0 18px 36px -22px ${alpha('#000', 0.92)}`
+                                            : `0 20px 34px -18px ${alpha(theme.palette.primary.dark, 0.36)}`,
+                                        transform: { xs: 'none', md: 'perspective(1000px) rotateY(-4deg) rotateX(1.2deg)' },
+                                        transition: 'transform 280ms ease, box-shadow 240ms ease',
+                                        '&:hover': {
+                                            transform: { xs: 'none', md: 'perspective(1000px) rotateY(-1.5deg) rotateX(0.4deg) translateY(-4px)' },
+                                            boxShadow: theme.palette.mode === 'dark'
+                                                ? `0 24px 44px -24px ${alpha('#000', 0.96)}`
+                                                : `0 26px 42px -20px ${alpha(theme.palette.primary.dark, 0.42)}`,
+                                        }
                                     }}
                                 />
+                                <Box
+                                    sx={{
+                                        position: 'absolute',
+                                        top: { xs: 14, md: 18 },
+                                        left: { xs: 10, md: 16 },
+                                        zIndex: 2,
+                                        px: 1.2,
+                                        py: 0.55,
+                                        borderRadius: 999,
+                                        bgcolor: alpha(theme.palette.background.paper, theme.palette.mode === 'dark' ? 0.7 : 0.85),
+                                        backdropFilter: 'blur(8px)',
+                                        border: '1px solid',
+                                        borderColor: alpha(theme.palette.primary.main, 0.24),
+                                        boxShadow: `0 8px 18px -12px ${alpha(theme.palette.primary.dark, 0.5)}`,
+                                    }}
+                                >
+                                    <Typography variant="caption" sx={{ fontWeight: 800, color: 'primary.main', letterSpacing: 0.3 }}>
+                                        REALTIME SYNC
+                                    </Typography>
+                                </Box>
+                                <Box
+                                    sx={{
+                                        position: 'absolute',
+                                        bottom: { xs: 16, md: 18 },
+                                        right: { xs: 8, md: 12 },
+                                        zIndex: 2,
+                                        px: 1.5,
+                                        py: 1.05,
+                                        borderRadius: 2,
+                                        bgcolor: alpha(theme.palette.background.paper, theme.palette.mode === 'dark' ? 0.78 : 0.9),
+                                        backdropFilter: 'blur(10px)',
+                                        border: '1px solid',
+                                        borderColor: alpha(theme.palette.success.main, 0.3),
+                                        boxShadow: `0 10px 22px -14px ${alpha(theme.palette.success.dark, 0.55)}`,
+                                    }}
+                                >
+                                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, display: 'block', lineHeight: 1.1 }}>
+                                        Stock Health
+                                    </Typography>
+                                    <Typography variant="body2" sx={{ fontWeight: 900, color: 'success.main', lineHeight: 1.1 }}>
+                                        98.4% Stable
+                                    </Typography>
+                                </Box>
                             </Box>
                         </Grid>
                     </Grid>

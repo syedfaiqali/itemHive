@@ -52,7 +52,6 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onDrawerToggle }) => {
         { text: 'Dashboard', icon: <LayoutDashboard size={20} />, path: '/', roles: ['admin', 'user'] },
         { text: 'POS Terminal', icon: <TerminalIcon size={20} />, path: '/pos', roles: ['admin', 'user'] },
         { text: 'Inventory', icon: <Package size={20} />, path: '/inventory', roles: ['admin', 'user'] },
-        // { text: 'Add Product', icon: <PlusCircle size={20} />, path: '/inventory?add=true', roles: ['admin'] },
         { text: 'Order Desk', icon: <ClipboardList size={20} />, path: '/orders', roles: ['admin', 'user'] },
         { text: 'Transactions', icon: <History size={20} />, path: '/transactions', roles: ['admin', 'user'] },
         { text: 'Reports', icon: <BarChart3 size={20} />, path: '/reports', roles: ['admin'] },
