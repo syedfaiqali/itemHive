@@ -62,13 +62,6 @@ const ProfilePage: React.FC = () => {
 
     return (
         <Box>
-            <Box sx={{ mb: 4 }}>
-                <Typography variant="h4" fontWeight={800}>Profile</Typography>
-                <Typography variant="body2" color="text.secondary">
-                    Manage your name and profile photo.
-                </Typography>
-            </Box>
-
             {saved && (
                 <Alert severity="success" sx={{ mb: 2, borderRadius: 2 }}>
                     Profile updated successfully.
