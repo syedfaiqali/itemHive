@@ -11,14 +11,17 @@ import {
     TextField,
     Button,
     Stack,
-    Alert
+    Alert,
+    Snackbar
 } from '@mui/material';
+import { alpha, useTheme } from '@mui/material/styles';
 import { Camera, Save } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState } from '../../store';
 import { updateProfile } from '../../features/auth/authSlice';
 
 const ProfilePage: React.FC = () => {
+    const theme = useTheme();
     const dispatch = useDispatch();
     const { user } = useSelector((state: RootState) => state.auth);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -31,6 +34,12 @@ const ProfilePage: React.FC = () => {
     if (!user) {
         return null;
     }
+
+    const trimmedName = name.trim();
+    const hasNameChanged = trimmedName !== user.username;
+    const hasPhotoChanged = (photoUrl || '') !== (user.photoUrl || '');
+    const hasChanges = hasNameChanged || hasPhotoChanged;
+    const isSaveDisabled = !hasChanges || !trimmedName;
 
     const handlePickPhoto = () => {
         fileInputRef.current?.click();
@@ -52,8 +61,8 @@ const ProfilePage: React.FC = () => {
     };
 
     const handleSaveProfile = () => {
-        const trimmedName = name.trim();
         if (!trimmedName) return;
+        if (!hasChanges) return;
 
         dispatch(updateProfile({ username: trimmedName, photoUrl }));
         setSaved(true);
@@ -62,11 +71,16 @@ const ProfilePage: React.FC = () => {
 
     return (
         <Box>
-            {saved && (
-                <Alert severity="success" sx={{ mb: 2, borderRadius: 2 }}>
+            <Snackbar
+                open={saved}
+                autoHideDuration={2500}
+                onClose={() => setSaved(false)}
+                anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+            >
+                <Alert onClose={() => setSaved(false)} severity="success" sx={{ width: '100%' }}>
                     Profile updated successfully.
                 </Alert>
-            )}
+            </Snackbar>
 
             <Grid container spacing={3}>
                 <Grid size={{ xs: 12, md: 7 }}>
@@ -99,7 +113,12 @@ const ProfilePage: React.FC = () => {
                                 <Button variant="outlined" startIcon={<Camera size={16} />} onClick={handlePickPhoto}>
                                     Change Photo
                                 </Button>
-                                <Button variant="contained" startIcon={<Save size={16} />} onClick={handleSaveProfile}>
+                                <Button
+                                    variant="contained"
+                                    startIcon={<Save size={16} />}
+                                    onClick={handleSaveProfile}
+                                    disabled={isSaveDisabled}
+                                >
                                     Save Profile
                                 </Button>
                             </Stack>
@@ -108,7 +127,19 @@ const ProfilePage: React.FC = () => {
                                 label="Display Name"
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
-                                sx={{ mb: 2 }}
+                                sx={{
+                                    mb: 2,
+                                    '& .MuiOutlinedInput-notchedOutline': {
+                                        borderColor: alpha(theme.palette.primary.main, 0.25),
+                                    },
+                                    '& .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline': {
+                                        borderColor: alpha(theme.palette.primary.main, 0.55),
+                                    },
+                                    '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                        borderColor: theme.palette.primary.main,
+                                        borderWidth: 2,
+                                    },
+                                }}
                             />
                             <input
                                 ref={fileInputRef}
