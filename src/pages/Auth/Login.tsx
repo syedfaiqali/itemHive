@@ -11,19 +11,47 @@ import {
     Container,
     Paper
 } from '@mui/material';
-import { Mail, Lock, Eye, EyeOff, LogIn } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, LogIn, ArrowRight, ShieldCheck, Sparkles, Smartphone, Tablet, Package, ScanLine, Boxes, ShoppingCart, Barcode } from 'lucide-react';
 import { useDispatch } from 'react-redux';
 import { loginSuccess } from '../../features/auth/authSlice';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { alpha, useTheme } from '@mui/material/styles';
 
 const Login: React.FC = () => {
+    const theme = useTheme();
     const dispatch = useDispatch();
     const navigate = useNavigate();
     const [showPassword, setShowPassword] = useState(false);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
+    const floatingWidgets = [
+        { icon: <Smartphone size={16} />, left: '6%', top: '10%', rotate: -11 },
+        { icon: <Tablet size={16} />, left: '12%', top: '28%', rotate: 7 },
+        { icon: <Package size={16} />, left: '18%', top: '46%', rotate: -6 },
+        { icon: <ScanLine size={16} />, left: '9%', top: '64%', rotate: 8 },
+        { icon: <Boxes size={16} />, left: '14%', top: '82%', rotate: -9 },
+        { icon: <ShoppingCart size={16} />, left: '24%', top: '14%', rotate: 5 },
+        { icon: <Barcode size={16} />, left: '30%', top: '32%', rotate: -4 },
+        { icon: <Package size={16} />, left: '26%', top: '50%', rotate: 10 },
+        { icon: <ScanLine size={16} />, left: '22%', top: '70%', rotate: -7 },
+        { icon: <Smartphone size={16} />, left: '34%', top: '84%', rotate: 6 },
+        { icon: <Boxes size={16} />, left: '42%', top: '12%', rotate: -5 },
+        { icon: <ShoppingCart size={16} />, left: '46%', top: '26%', rotate: 9 },
+        { icon: <Barcode size={16} />, left: '40%', top: '44%', rotate: -8 },
+        { icon: <Tablet size={16} />, left: '48%', top: '62%', rotate: 7 },
+        { icon: <Package size={16} />, left: '44%', top: '80%', rotate: -6 },
+        { icon: <ScanLine size={16} />, left: '58%', top: '16%', rotate: 8 },
+        { icon: <Boxes size={16} />, left: '64%', top: '34%', rotate: -9 },
+        { icon: <ShoppingCart size={16} />, left: '60%', top: '54%', rotate: 6 },
+        { icon: <Barcode size={16} />, left: '68%', top: '72%', rotate: -5 },
+        { icon: <Smartphone size={16} />, left: '74%', top: '86%', rotate: 10 },
+        { icon: <Tablet size={16} />, left: '82%', top: '14%', rotate: -6 },
+        { icon: <Package size={16} />, left: '88%', top: '30%', rotate: 7 },
+        { icon: <ScanLine size={16} />, left: '84%', top: '50%', rotate: -8 },
+        { icon: <Boxes size={16} />, left: '90%', top: '68%', rotate: 9 },
+    ];
 
     const handleLogin = (e: React.FormEvent) => {
         e.preventDefault();
@@ -44,29 +72,68 @@ const Login: React.FC = () => {
     return (
         <Box
             sx={{
-                minHeight: '100vh',
+                position: 'relative',
+                minHeight: '100dvh',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)',
-                p: { xs: 2, sm: 4 }
+                overflow: 'hidden',
+                background: theme.palette.mode === 'light'
+                    ? 'radial-gradient(circle at 15% 10%, rgba(14, 165, 165, 0.2), transparent 45%), radial-gradient(circle at 85% 0%, rgba(37, 99, 235, 0.14), transparent 45%), linear-gradient(180deg, #eef6f7 0%, #e8eff7 100%)'
+                    : 'radial-gradient(circle at 15% 10%, rgba(45, 212, 191, 0.2), transparent 45%), radial-gradient(circle at 85% 0%, rgba(59, 130, 246, 0.18), transparent 45%), linear-gradient(180deg, #0b1220 0%, #0f172a 100%)',
+                p: { xs: 0.75, sm: 1.25 }
             }}
         >
-            <Container maxWidth="md" sx={{ display: 'flex', justifyContent: 'center' }}>
+            {floatingWidgets.map((item, index) => (
+                <motion.div
+                    key={`${item.left}-${item.top}`}
+                    initial={{ y: 0, opacity: 0.45, rotate: item.rotate }}
+                    animate={{ y: [0, -11, 0], rotate: [item.rotate, item.rotate + 3, item.rotate] }}
+                    transition={{ duration: 4 + index * 0.45, repeat: Infinity, ease: 'easeInOut' }}
+                    style={{
+                        position: 'absolute',
+                        left: item.left,
+                        top: item.top,
+                        zIndex: 0,
+                        pointerEvents: 'none',
+                    }}
+                >
+                    <Box
+                        sx={{
+                            display: { xs: 'none', sm: 'flex' },
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: 36,
+                            height: 36,
+                            borderRadius: '50%',
+                            bgcolor: alpha(theme.palette.background.paper, theme.palette.mode === 'light' ? 0.76 : 0.2),
+                            border: '1px solid',
+                            borderColor: alpha(theme.palette.primary.main, 0.34),
+                            color: theme.palette.primary.main,
+                            boxShadow: '0 10px 24px -14px rgba(2, 6, 23, 0.5)',
+                            backdropFilter: 'blur(6px)'
+                        }}
+                    >
+                        {item.icon}
+                    </Box>
+                </motion.div>
+            ))}
+            <Container maxWidth="lg" sx={{ display: 'flex', justifyContent: 'center', position: 'relative', zIndex: 1 }}>
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5 }}
-                    style={{ width: '100%', maxWidth: '850px' }}
+                    style={{ width: '100%', maxWidth: '980px' }}
                 >
                     <Paper
                         elevation={24}
                         sx={{
-                            borderRadius: { xs: 4, md: 6 },
+                            borderRadius: { xs: 4, md: 5 },
                             overflow: 'hidden',
                             display: 'flex',
                             flexDirection: { xs: 'column', md: 'row' },
-                            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+                            border: '1px solid',
+                            borderColor: 'divider',
                             minHeight: { xs: 'auto', md: 500 },
                             maxWidth: '100%',
                             m: 'auto'
@@ -80,51 +147,67 @@ const Login: React.FC = () => {
                                 overflow: 'hidden',
                                 flexDirection: 'column',
                                 justifyContent: 'center',
-                                background: 'linear-gradient(45deg, #4f46e5 30%, #9333ea 90%)',
-                                p: 6,
-                                color: 'white'
+                                background: `linear-gradient(150deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 58%, ${theme.palette.primary.light} 100%)`,
+                                p: { md: 3.5, lg: 4.5 },
+                                color: 'primary.contrastText'
                             }}
                         >
                             <Box sx={{ position: 'relative', zIndex: 1 }}>
-                                <Typography variant="h3" fontWeight={900} gutterBottom sx={{ lineHeight: 1.1 }}>
-                                    Precision Hub.
+                                <Typography variant="h4" fontWeight={800} gutterBottom sx={{ lineHeight: 1.15 }}>
+                                    Inventory intelligence for modern teams.
                                 </Typography>
-                                <Typography variant="h6" sx={{ opacity: 0.9, fontWeight: 400, mb: 4 }}>
-                                    The next generation of inventory & POS management.
+                                <Typography variant="body2" sx={{ opacity: 0.95, fontWeight: 500, mb: 2 }}>
+                                    Manage products, stock movement, POS activity, and reports in one unified workspace.
                                 </Typography>
-                                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                                    <Paper sx={{ px: 2, py: 1, bgcolor: 'rgba(255,255,255,0.1)', color: 'white', backdropFilter: 'blur(10px)', borderRadius: 2 }}>
-                                        Real-time
-                                    </Paper>
-                                    <Paper sx={{ px: 2, py: 1, bgcolor: 'rgba(255,255,255,0.1)', color: 'white', backdropFilter: 'blur(10px)', borderRadius: 2 }}>
-                                        Secure
-                                    </Paper>
-                                    <Paper sx={{ px: 2, py: 1, bgcolor: 'rgba(255,255,255,0.1)', color: 'white', backdropFilter: 'blur(10px)', borderRadius: 2 }}>
-                                        Scalable
-                                    </Paper>
+                                <Box sx={{ display: 'grid', gap: 0.8 }}>
+                                    {[
+                                        { icon: <Sparkles size={16} />, text: 'Real-time inventory visibility' },
+                                        { icon: <ShieldCheck size={16} />, text: 'Role-aware and secure access control' },
+                                        { icon: <ArrowRight size={16} />, text: 'Fast POS and stock workflows' },
+                                    ].map((item) => (
+                                        <Box
+                                            key={item.text}
+                                            sx={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 1,
+                                                px: 1.25,
+                                                py: 0.6,
+                                                width: 'fit-content',
+                                                borderRadius: 99,
+                                                bgcolor: 'rgba(255,255,255,0.16)',
+                                                border: '1px solid rgba(255,255,255,0.24)',
+                                                backdropFilter: 'blur(8px)',
+                                                fontSize: '0.75rem',
+                                                fontWeight: 700
+                                            }}
+                                        >
+                                            {item.icon}
+                                            {item.text}
+                                        </Box>
+                                    ))}
                                 </Box>
                             </Box>
 
-                            {/* Decorative background shapes */}
-                            <Box sx={{ position: 'absolute', top: -100, right: -100, width: 300, height: 300, bgcolor: 'rgba(255,255,255,0.05)', borderRadius: '50%' }} />
-                            <Box sx={{ position: 'absolute', bottom: -50, left: -50, width: 200, height: 200, bgcolor: 'rgba(255,255,255,0.05)', borderRadius: '50%' }} />
+                            <Box sx={{ position: 'absolute', top: -90, right: -90, width: 280, height: 280, bgcolor: 'rgba(255,255,255,0.08)', borderRadius: '50%' }} />
+                            <Box sx={{ position: 'absolute', bottom: -60, left: -40, width: 180, height: 180, bgcolor: 'rgba(255,255,255,0.09)', borderRadius: '50%' }} />
                         </Box>
                         <Box
                             sx={{
                                 flex: 1,
-                                p: { xs: 4, sm: 5, md: 6 },
+                                p: { xs: 1.5, sm: 2.25, md: 2.75 },
                                 bgcolor: 'background.paper',
                                 display: 'flex',
                                 flexDirection: 'column',
                                 justifyContent: 'center'
                             }}
                         >
-                            <Box sx={{ mb: 3, textAlign: { xs: 'center', md: 'left' } }}>
+                            <Box sx={{ mb: 1.5, textAlign: { xs: 'center', md: 'left' } }}>
                                 <Typography variant="h4" fontWeight={800} color="primary.main" gutterBottom>
                                     ItemHive
                                 </Typography>
                                 <Typography variant="body2" color="text.secondary">
-                                    Welcome back! Please enter your details.
+                                    Welcome back. Sign in to continue.
                                 </Typography>
                             </Box>
 
@@ -132,7 +215,7 @@ const Login: React.FC = () => {
                                 <Alert
                                     severity="error"
                                     sx={{
-                                        mb: 3,
+                                        mb: 1.5,
                                         borderRadius: 2,
                                         fontSize: '0.875rem'
                                     }}
@@ -149,6 +232,7 @@ const Login: React.FC = () => {
                                     size="small"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
+                                    required
                                     InputProps={{
                                         startAdornment: (
                                             <InputAdornment position="start">
@@ -156,7 +240,7 @@ const Login: React.FC = () => {
                                             </InputAdornment>
                                         ),
                                     }}
-                                    sx={{ mb: 2 }}
+                                    sx={{ mb: 1.25 }}
                                 />
                                 <TextField
                                     fullWidth
@@ -166,6 +250,7 @@ const Login: React.FC = () => {
                                     size="small"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
+                                    required
                                     InputProps={{
                                         startAdornment: (
                                             <InputAdornment position="start">
@@ -184,7 +269,7 @@ const Login: React.FC = () => {
                                             </InputAdornment>
                                         ),
                                     }}
-                                    sx={{ mb: 3 }}
+                                    sx={{ mb: 1.5 }}
                                 />
 
                                 <Button
@@ -194,11 +279,11 @@ const Login: React.FC = () => {
                                     type="submit"
                                     startIcon={<LogIn size={20} />}
                                     sx={{
-                                        py: 1.2,
+                                        py: 1.15,
                                         borderRadius: 2,
                                         fontSize: '0.95rem',
-                                        fontWeight: 700,
-                                        boxShadow: '0 8px 16px -4px rgba(99, 102, 241, 0.3)',
+                                        fontWeight: 800,
+                                        boxShadow: `0 12px 22px -12px ${alpha(theme.palette.primary.main, 0.8)}`,
                                         textTransform: 'none'
                                     }}
                                 >
@@ -206,22 +291,30 @@ const Login: React.FC = () => {
                                 </Button>
                             </form>
 
-                            <Box sx={{ mt: 3, textAlign: 'center' }}>
+                            <Box sx={{ mt: 1.5, textAlign: 'center' }}>
                                 <Typography variant="body2" color="text.secondary">
-                                    Don't have an account? <Button variant="text" size="small" sx={{ fontWeight: 700, textTransform: 'none' }}>Sign Up</Button>
+                                    Don&apos;t have an account?{' '}
+                                    <Button
+                                        variant="text"
+                                        size="small"
+                                        onClick={() => navigate('/signup')}
+                                        sx={{ fontWeight: 700, textTransform: 'none' }}
+                                    >
+                                        Sign Up
+                                    </Button>
                                 </Typography>
                             </Box>
 
-                            <Divider sx={{ my: 3 }}>
+                            <Divider sx={{ my: 1.5 }}>
                                 <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>DEMO ACCESS</Typography>
                             </Divider>
 
                             <Box
                                 sx={{
-                                    p: 2,
+                                    p: 1.25,
                                     borderRadius: 3,
-                                    bgcolor: 'rgba(99, 102, 241, 0.04)',
-                                    border: '1px dashed rgba(99, 102, 241, 0.2)'
+                                    bgcolor: alpha(theme.palette.primary.main, 0.05),
+                                    border: `1px dashed ${alpha(theme.palette.primary.main, 0.26)}`
                                 }}
                             >
                                 <Typography variant="caption" color="text.secondary" display="block" align="center">
