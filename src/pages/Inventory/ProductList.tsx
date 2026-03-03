@@ -288,7 +288,17 @@ const ProductList: React.FC = () => {
 
     return (
         <Box>
-            <Box className="section-rise" sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Box
+                className="section-rise"
+                sx={{
+                    mb: 4,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: { xs: 'flex-start', sm: 'center' },
+                    flexDirection: { xs: 'column', sm: 'row' },
+                    gap: 1.5
+                }}
+            >
                 <Box>
                     <Typography variant="h4" fontWeight={800}>Inventory Management</Typography>
                     <Typography variant="body2" color="text.secondary">
@@ -309,7 +319,7 @@ const ProductList: React.FC = () => {
 
             <Card className="section-rise-delay" sx={{ borderRadius: 4, overflow: 'hidden' }}>
                 <CardContent sx={{ p: 0 }}>
-                    <Box sx={{ p: 2.5, display: 'flex', gap: 2, alignItems: 'center', borderBottom: '1px solid', borderColor: 'divider' }}>
+                    <Box sx={{ p: 2.5, display: 'flex', gap: 1.2, alignItems: 'center', flexWrap: 'wrap', borderBottom: '1px solid', borderColor: 'divider' }}>
                         <TextField
                             placeholder="Search products..."
                             size="small"
@@ -322,18 +332,18 @@ const ProductList: React.FC = () => {
                                     </InputAdornment>
                                 ),
                             }}
-                            sx={{ flexGrow: 1, maxWidth: 420 }}
+                            sx={{ flexGrow: 1, width: { xs: '100%', sm: 'auto' }, maxWidth: { sm: 420 } }}
                         />
                         <Button
                             variant="outlined"
                             startIcon={<Filter size={18} />}
                             color="inherit"
-                            sx={{ borderColor: 'divider' }}
+                            sx={{ borderColor: 'divider', width: { xs: '100%', sm: 'auto' } }}
                             onClick={() => setShowFilters(!showFilters)}
                         >
                             Filters
                         </Button>
-                        <Button variant="outlined" startIcon={<Download size={18} />} color="inherit" sx={{ borderColor: 'divider' }} onClick={exportToCSV}>
+                        <Button variant="outlined" startIcon={<Download size={18} />} color="inherit" sx={{ borderColor: 'divider', width: { xs: '100%', sm: 'auto' } }} onClick={exportToCSV}>
                             Export CSV
                         </Button>
                     </Box>
@@ -380,7 +390,7 @@ const ProductList: React.FC = () => {
                     )}
 
                     <TableContainer component={Box} sx={{ overflowX: 'auto' }}>
-                        <Table sx={{ minWidth: 800 }}>
+                        <Table sx={{ minWidth: 700 }}>
                             <TableHead>
                                 <TableRow>
                                     <TableCell sx={{ fontWeight: 700 }}>PRODUCT NAME</TableCell>

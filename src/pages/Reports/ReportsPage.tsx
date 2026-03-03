@@ -126,9 +126,19 @@ const ReportsPage: React.FC = () => {
 
     return (
         <Box>
-            <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center', '@media print': { display: 'none' } }}>
+            <Box
+                sx={{
+                    mb: 4,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: { xs: 'flex-start', sm: 'center' },
+                    flexDirection: { xs: 'column', sm: 'row' },
+                    gap: 1.5,
+                    '@media print': { display: 'none' }
+                }}
+            >
                 <Typography variant="h4" fontWeight={800}>Inventory Analytics & Reports</Typography>
-                <Box sx={{ display: 'flex', gap: 2 }}>
+                <Box sx={{ display: 'flex', gap: 1.2, flexWrap: 'wrap', width: { xs: '100%', sm: 'auto' } }}>
                     <Button variant="outlined" startIcon={<Printer size={20} />} onClick={handlePrint}>Print Report</Button>
                     <Button variant="contained" startIcon={<Download size={20} />}>Export Data</Button>
                 </Box>
@@ -140,7 +150,7 @@ const ReportsPage: React.FC = () => {
                     <Card sx={{ borderRadius: 4 }}>
                         <CardContent>
                             <Typography variant="h6" fontWeight={700} gutterBottom>Revenue Trend (Last 7 Days)</Typography>
-                            <Box sx={{ height: 300, mt: 3 }}>
+                            <Box sx={{ height: { xs: 240, sm: 280, md: 300 }, mt: 2.5 }}>
                                 <ResponsiveContainer width="100%" height="100%">
                                     <AreaChart data={last7Days}>
                                         <defs>
@@ -166,7 +176,7 @@ const ReportsPage: React.FC = () => {
                     <Card sx={{ borderRadius: 4 }}>
                         <CardContent>
                             <Typography variant="h6" fontWeight={700} gutterBottom>Sales Volume (Units)</Typography>
-                            <Box sx={{ height: 300, mt: 3 }}>
+                            <Box sx={{ height: { xs: 240, sm: 280, md: 300 }, mt: 2.5 }}>
                                 <ResponsiveContainer width="100%" height="100%">
                                     <BarChart data={last7Days}>
                                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={alpha(theme.palette.text.primary, 0.1)} />
@@ -187,7 +197,7 @@ const ReportsPage: React.FC = () => {
                             <Typography variant="h6" fontWeight={700} gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                 <BarChartIcon size={20} /> Stock Level (Top 10 Critical)
                             </Typography>
-                            <Box sx={{ height: 300, mt: 3 }}>
+                            <Box sx={{ height: { xs: 240, sm: 280, md: 300 }, mt: 2.5 }}>
                                 <ResponsiveContainer width="100%" height="100%">
                                     <BarChart data={stockLevelData} layout="vertical" margin={{ left: 10 }}>
                                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={alpha(theme.palette.text.primary, 0.1)} />
@@ -210,7 +220,7 @@ const ReportsPage: React.FC = () => {
                     <Card sx={{ borderRadius: 4 }}>
                         <CardContent>
                             <Typography variant="h6" fontWeight={700} gutterBottom>Inventory Value by Category</Typography>
-                            <Box sx={{ height: 300, mt: 3 }}>
+                            <Box sx={{ height: { xs: 240, sm: 280, md: 300 }, mt: 2.5 }}>
                                 <ResponsiveContainer width="100%" height="100%">
                                     <PieChart>
                                         <Pie
@@ -239,8 +249,8 @@ const ReportsPage: React.FC = () => {
                     <Card sx={{ borderRadius: 4 }}>
                         <CardContent>
                             <Typography variant="h6" fontWeight={700} gutterBottom>Top Selling Products (Performance)</Typography>
-                            <TableContainer>
-                                <Table>
+                            <TableContainer sx={{ overflowX: 'auto' }}>
+                                <Table sx={{ minWidth: 640 }}>
                                     <TableHead sx={{ bgcolor: 'rgba(0,0,0,0.02)' }}>
                                         <TableRow>
                                             <TableCell sx={{ fontWeight: 700 }}>PRODUCT</TableCell>
@@ -278,3 +288,4 @@ const ReportsPage: React.FC = () => {
 
 
 export default ReportsPage;
+

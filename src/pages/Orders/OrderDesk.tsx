@@ -200,7 +200,7 @@ const OrderDesk: React.FC = () => {
             <Grid container spacing={3} className="section-rise-delay">
                 <Grid size={{ xs: 12, lg: 5 }}>
                     <Card sx={{ borderRadius: 4 }}>
-                        <CardContent sx={{ p: 4 }}>
+                        <CardContent sx={{ p: { xs: 2, sm: 3, md: 4 } }}>
                             <Typography variant="h6" fontWeight={700} gutterBottom>New Order</Typography>
                             <Divider sx={{ mb: 3 }} />
                             <form onSubmit={handlePlaceOrder}>
@@ -304,7 +304,7 @@ const OrderDesk: React.FC = () => {
                     </Card>
 
                     <Card sx={{ borderRadius: 4, mt: 3 }}>
-                        <CardContent sx={{ p: 4 }}>
+                        <CardContent sx={{ p: { xs: 2, sm: 3, md: 4 } }}>
                             <Typography variant="h6" fontWeight={700} gutterBottom>Availability Snapshot</Typography>
                             <Divider sx={{ mb: 3 }} />
                             {!selectedProduct ? (
@@ -448,7 +448,7 @@ const OrderDesk: React.FC = () => {
                                 }}
                                 id="orders-print-area"
                             >
-                                <Table sx={{ minWidth: 860 }}>
+                                <Table sx={{ minWidth: 760 }}>
                                     <TableHead>
                                         <TableRow>
                                             <TableCell sx={{ fontWeight: 700 }}>ORDER ID</TableCell>

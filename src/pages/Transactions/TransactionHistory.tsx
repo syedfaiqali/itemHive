@@ -168,9 +168,18 @@ const TransactionHistory: React.FC = () => {
 
     return (
         <Box>
-            <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Box
+                sx={{
+                    mb: 4,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: { xs: 'flex-start', sm: 'center' },
+                    flexDirection: { xs: 'column', sm: 'row' },
+                    gap: 1.5
+                }}
+            >
                 <Typography variant="h4" fontWeight={800}>Transaction History</Typography>
-                <Box sx={{ display: 'flex', gap: 2 }}>
+                <Box sx={{ display: 'flex', gap: 1.2, flexWrap: 'wrap', width: { xs: '100%', sm: 'auto' } }}>
                     <Button
                         variant="outlined"
                         startIcon={<Calendar size={20} />}
@@ -198,7 +207,7 @@ const TransactionHistory: React.FC = () => {
 
             <Card sx={{ borderRadius: 4, overflow: 'hidden' }}>
                 <CardContent sx={{ p: 0 }}>
-                    <Box sx={{ p: 2, display: 'flex', gap: 2, alignItems: 'center', borderBottom: '1px solid', borderColor: 'divider' }}>
+                    <Box sx={{ p: 2, display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap', borderBottom: '1px solid', borderColor: 'divider' }}>
                         <TextField
                             placeholder="Search by ID, Product or User..."
                             size="small"
@@ -211,15 +220,15 @@ const TransactionHistory: React.FC = () => {
                                     </InputAdornment>
                                 ),
                             }}
-                            sx={{ flexGrow: 1, maxWidth: 500 }}
+                            sx={{ flexGrow: 1, width: { xs: '100%', sm: 'auto' }, maxWidth: { sm: 500 } }}
                         />
-                        <Button variant="outlined" startIcon={<Filter size={18} />} color="inherit" sx={{ borderColor: 'divider' }}>
+                        <Button variant="outlined" startIcon={<Filter size={18} />} color="inherit" sx={{ borderColor: 'divider', width: { xs: '100%', sm: 'auto' } }}>
                             Filter Type
                         </Button>
                     </Box>
 
-                    <TableContainer>
-                        <Table>
+                    <TableContainer sx={{ overflowX: 'auto' }}>
+                        <Table sx={{ minWidth: 760 }}>
                             <TableHead sx={{ bgcolor: 'rgba(0,0,0,0.02)' }}>
                                 <TableRow>
                                     <TableCell sx={{ fontWeight: 700 }}>TX ID</TableCell>
@@ -311,7 +320,7 @@ const TransactionHistory: React.FC = () => {
                         elevation: 12,
                         sx: {
                             mt: 1,
-                            width: 360,
+                            width: { xs: 'calc(100vw - 32px)', sm: 360 },
                             borderRadius: 3,
                             border: '1px solid',
                             borderColor: 'divider',

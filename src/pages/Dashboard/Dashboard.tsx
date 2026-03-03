@@ -404,7 +404,7 @@ const Dashboard: React.FC = () => {
                             ) : (
                                 <Box>
                                     <TableContainer sx={{ overflowX: 'auto' }}>
-                                        <Table size="small" sx={{ minWidth: 600 }}>
+                                        <Table size="small" sx={{ minWidth: 520 }}>
                                             <TableHead>
                                                 <TableRow>
                                                     <TableCell sx={{ fontWeight: 700 }}>ID</TableCell>

@@ -21,6 +21,7 @@ body {
   display: flex;
   min-width: 320px;
   min-height: 100vh;
+  overflow-x: hidden;
 }
 
 #root {
@@ -29,6 +30,12 @@ body {
 
 * {
   box-sizing: border-box;
+}
+
+img,
+svg,
+canvas {
+  max-width: 100%;
 }
 
 /* Custom Scrollbar */
