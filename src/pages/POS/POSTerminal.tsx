@@ -27,7 +27,6 @@ import {
 import {
     Search,
     ShoppingCart,
-    Trash2,
     Plus,
     Minus,
     CreditCard,
@@ -98,17 +97,22 @@ const POSTerminal: React.FC = () => {
     const { products } = useSelector((state: RootState) => state.inventory);
     const { transactions = [] } = useSelector((state: RootState) => state.transactions || { transactions: [] });
     const { cart, taxRate, activeDiscount } = useSelector((state: RootState) => state.pos);
-    const { formatCurrency } = useAppCurrency();
+    const { formatCurrency, currencySymbol } = useAppCurrency();
 
     const [searchTerm, setSearchTerm] = useState('');
     const [activeTab, setActiveTab] = useState(0);
-    const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | null>(null);
+    const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'credit' | null>(null);
     const [orderDone, setOrderDone] = useState(false);
     const [receiptId, setReceiptId] = useState('');
     const [receiptTime, setReceiptTime] = useState('');
     const [stockToast, setStockToast] = useState({ open: false, message: '' });
     const [confirmOpen, setConfirmOpen] = useState(false);
-    const [pendingMethod, setPendingMethod] = useState<'cash' | 'card' | null>(null);
+    const [pendingMethod, setPendingMethod] = useState<'cash' | 'card' | 'credit' | null>(null);
+    const [creditOpen, setCreditOpen] = useState(false);
+    const [creditPaidInput, setCreditPaidInput] = useState('');
+    const [creditPaidVia, setCreditPaidVia] = useState<'cash' | 'card'>('cash');
+    const [creditPaidNow, setCreditPaidNow] = useState(0);
+    const [creditDue, setCreditDue] = useState(0);
 
     const filteredProducts = useMemo(() => {
         return products.filter(p => {
@@ -122,22 +126,26 @@ const POSTerminal: React.FC = () => {
     const subtotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
     const tax = subtotal * taxRate;
     const total = subtotal + tax - activeDiscount;
+    const draftCreditPaid = Math.min(Math.max(Number(creditPaidInput || 0), 0), total);
+    const draftCreditDue = Math.max(total - draftCreditPaid, 0);
 
-    const handleSaveReceiptPdf = (id: string, method: 'cash' | 'card', receiptTimeIso: string) => {
+    const handleSaveReceiptPdf = (id: string, method: 'cash' | 'card' | 'credit', receiptTimeIso: string) => {
         const dateLabel = new Date(receiptTimeIso).toLocaleString();
         const lines = [
             'ItemHive POS Receipt',
             `Order ID: ${id}`,
             `Date: ${dateLabel}`,
             `Cashier: ${user?.username || 'Staff'}`,
-            `Payment: ${method.toUpperCase()}`,
+            `Payment: ${method === 'credit' ? `CREDIT (${creditPaidVia.toUpperCase()} + DUE)` : method.toUpperCase()}`,
             '----------------------------------------',
             ...cart.map((item) => `${item.name} x${item.quantity} @ ${formatCurrency(item.price)} = ${formatCurrency(item.price * item.quantity)}`),
             '----------------------------------------',
             `Subtotal: ${formatCurrency(subtotal)}`,
             `Tax (10%): ${formatCurrency(tax)}`,
             activeDiscount > 0 ? `Discount: -${formatCurrency(activeDiscount)}` : '',
-            `Total Paid: ${formatCurrency(total)}`,
+            method === 'credit' ? `Paid Now: ${formatCurrency(creditPaidNow)}` : '',
+            method === 'credit' ? `Remaining Due: ${formatCurrency(creditDue)}` : '',
+            method === 'credit' ? `Order Total: ${formatCurrency(total)}` : `Total Paid: ${formatCurrency(total)}`,
             '----------------------------------------',
             'Thank you for shopping with us!'
         ].filter(Boolean);
@@ -172,6 +180,25 @@ const POSTerminal: React.FC = () => {
 
     const handleCheckout = (method: 'cash' | 'card') => {
         setPendingMethod(method);
+        setConfirmOpen(true);
+    };
+
+    const handleOpenCredit = () => {
+        const suggestedPaidNow = Math.max(total * 0.8, 0);
+        setCreditPaidInput(suggestedPaidNow.toFixed(2));
+        setCreditPaidVia('cash');
+        setCreditOpen(true);
+    };
+
+    const handleContinueCredit = () => {
+        if (draftCreditDue <= 0) {
+            setStockToast({ open: true, message: 'Use Cash/Card for full payment. Credit requires a due amount.' });
+            return;
+        }
+        setCreditPaidNow(draftCreditPaid);
+        setCreditDue(draftCreditDue);
+        setPendingMethod('credit');
+        setCreditOpen(false);
         setConfirmOpen(true);
     };
 
@@ -213,6 +240,8 @@ const POSTerminal: React.FC = () => {
         dispatch(clearCart());
         setOrderDone(false);
         setPaymentMethod(null);
+        setCreditPaidNow(0);
+        setCreditDue(0);
     };
 
     const handlePrint = () => {
@@ -220,10 +249,19 @@ const POSTerminal: React.FC = () => {
     };
 
     return (
-        <Box sx={{ height: 'calc(100vh - 120px)', display: 'flex', gap: 2, overflow: 'hidden' }}>
+        <Box
+            sx={{
+                display: 'flex',
+                flexDirection: { xs: 'column', lg: 'row' },
+                gap: { xs: 1.5, sm: 2 },
+                height: { xs: 'auto', lg: 'calc(100vh - 120px)' },
+                minHeight: { lg: 'calc(100vh - 120px)' },
+                overflow: { xs: 'visible', lg: 'hidden' }
+            }}
+        >
             {/* Left Side: Product Selection */}
-            <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                <Paper sx={{ p: 2, mb: 2, borderRadius: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
+                <Paper sx={{ p: { xs: 1.5, sm: 2 }, mb: 1.5, borderRadius: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
                     <TextField
                         fullWidth
                         placeholder="Scan Barcode or Search (Name/SKU)..."
@@ -247,23 +285,24 @@ const POSTerminal: React.FC = () => {
                     onChange={(_, v) => setActiveTab(v)}
                     variant="scrollable"
                     scrollButtons="auto"
-                    sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}
+                    sx={{ mb: 1.5, borderBottom: 1, borderColor: 'divider' }}
                 >
                     {categories.map((cat) => (
-                        <Tab key={cat} label={cat} sx={{ fontWeight: 700, px: 3, textTransform: 'none' }} />
+                        <Tab key={cat} label={cat} sx={{ fontWeight: 700, px: { xs: 1.5, sm: 2.5 }, minHeight: 44, textTransform: 'none' }} />
                     ))}
                 </Tabs>
 
-                <Box sx={{ flexGrow: 1, overflowY: 'auto', pr: 1, pt: 1, px: 2 }}>
-                    <Grid container spacing={4}>
+                <Box sx={{ flexGrow: 1, overflowY: 'auto', pr: { xs: 0.5, sm: 1 }, pt: 1.25, pb: 1, px: { xs: 0.5, sm: 1.5 } }}>
+                    <Grid container spacing={{ xs: 2, sm: 2.5, md: 3 }}>
                         {filteredProducts.map((product) => (
                             <Grid
                                 key={product.id}
-                                size={{ xs: 12, sm: 6, md: 4, lg: 3, xl: 3 }}
+                                size={{ xs: 12, sm: 6, md: 6, lg: 4, xl: 3 }}
                             >
                                 <motion.div
-                                    whileHover={{ y: -8, transition: { duration: 0.25 } }}
+                                    whileHover={{ y: -5, transition: { duration: 0.22 } }}
                                     whileTap={{ scale: 0.98 }}
+                                    style={{ height: '100%' }}
                                 >
                                     <Card
                                         onClick={() => handleAddToCart(product)}
@@ -274,27 +313,41 @@ const POSTerminal: React.FC = () => {
                                             flexDirection: 'column',
                                             borderRadius: 4,
                                             border: '1px solid',
-                                            borderColor: 'divider',
+                                            borderColor: alpha(theme.palette.primary.main, 0.14),
                                             bgcolor: 'background.paper',
-                                            boxShadow: '0 4px 10px rgba(0,0,0,0.02)',
+                                            boxShadow: theme.palette.mode === 'dark'
+                                                ? `0 16px 28px -22px ${alpha('#000', 0.9)}`
+                                                : `0 14px 28px -22px ${alpha(theme.palette.primary.dark, 0.38)}`,
                                             overflow: 'hidden',
                                             position: 'relative',
+                                            '&::before': {
+                                                content: '""',
+                                                position: 'absolute',
+                                                top: 0,
+                                                left: 0,
+                                                right: 0,
+                                                height: 3,
+                                                background: `linear-gradient(90deg, ${alpha(theme.palette.primary.main, 0.7)} 0%, ${alpha(theme.palette.primary.light, 0.8)} 100%)`,
+                                                opacity: product.stock > 0 ? 1 : 0.5,
+                                                zIndex: 1
+                                            },
                                             '&:hover': {
                                                 borderColor: product.stock > 0 ? 'primary.main' : 'divider',
                                                 boxShadow: (theme) => product.stock > 0
-                                                    ? `0 25px 50px -12px ${alpha(theme.palette.primary.main, 0.1)}`
-                                                    : '0 4px 10px rgba(0,0,0,0.02)',
-                                                '& .product-img': { transform: product.stock > 0 ? 'scale(1.08)' : 'none' },
+                                                    ? `0 26px 48px -22px ${alpha(theme.palette.primary.main, 0.42)}`
+                                                    : `0 14px 26px -22px ${alpha(theme.palette.error.main, 0.4)}`,
+                                                '& .product-img': { transform: product.stock > 0 ? 'scale(1.05)' : 'none' },
                                                 '& .add-btn': { opacity: product.stock > 0 ? 1 : 0.4, transform: 'translateY(0)' }
                                             },
-                                            opacity: product.stock === 0 ? 0.7 : 1,
+                                            opacity: product.stock === 0 ? 0.78 : 1,
                                             transition: 'all 0.3s'
                                         }}
                                     >
                                         <Box sx={{
                                             position: 'relative',
                                             pt: '90%',
-                                            bgcolor: (theme) => alpha(theme.palette.text.primary, 0.025),
+                                            bgcolor: (theme) => alpha(theme.palette.text.primary, 0.02),
+                                            background: `linear-gradient(165deg, ${alpha(theme.palette.primary.main, 0.06)} 0%, ${alpha(theme.palette.background.paper, 0)} 70%)`,
                                             overflow: 'hidden'
                                         }}>
                                             <Box
@@ -322,9 +375,10 @@ const POSTerminal: React.FC = () => {
                                                         position: 'absolute',
                                                         top: 10,
                                                         left: 10,
-                                                        fontSize: '0.6rem',
+                                                        fontSize: '0.62rem',
                                                         fontWeight: 900,
-                                                        height: 18,
+                                                        height: 22,
+                                                        borderRadius: 1.5,
                                                         textTransform: 'uppercase'
                                                     }}
                                                 />
@@ -385,8 +439,13 @@ const POSTerminal: React.FC = () => {
                                             </Box>
                                         </Box>
 
-                                        <CardContent sx={{ p: 2, flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
-                                            <Typography variant="caption" color="primary.main" fontWeight={900} sx={{ mb: 0.5, letterSpacing: 0.5, opacity: 0.8 }}>
+                                        <CardContent sx={{ p: 2.25, pt: 2, flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
+                                            <Typography
+                                                variant="caption"
+                                                color="primary.main"
+                                                fontWeight={900}
+                                                sx={{ mb: 0.55, letterSpacing: 0.55, opacity: 0.9, lineHeight: 1.15 }}
+                                            >
                                                 {product.category.toUpperCase()}
                                             </Typography>
 
@@ -395,21 +454,22 @@ const POSTerminal: React.FC = () => {
                                                 color="text.primary"
                                                 fontWeight={700}
                                                 sx={{
-                                                    lineHeight: 1.25,
-                                                    mb: 1,
-                                                    fontSize: '0.95rem',
-                                                    height: '2.5em',
+                                                    lineHeight: 1.3,
+                                                    mb: 1.25,
+                                                    fontSize: '1rem',
+                                                    minHeight: '2.6em',
                                                     overflow: 'hidden',
                                                     display: '-webkit-box',
                                                     WebkitLineClamp: 2,
                                                     WebkitBoxOrient: 'vertical',
+                                                    textWrap: 'balance'
                                                 }}
                                             >
                                                 {product.name}
                                             </Typography>
 
-                                            <Box sx={{ mt: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                                <Typography variant="h6" color="primary.main" fontWeight={900}>
+                                            <Box sx={{ mt: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+                                                <Typography variant="h5" color="primary.main" fontWeight={900} sx={{ letterSpacing: -0.4 }}>
                                                     {formatCurrency(product.price)}
                                                 </Typography>
 
@@ -417,13 +477,19 @@ const POSTerminal: React.FC = () => {
                                                     display: 'flex',
                                                     alignItems: 'center',
                                                     gap: 0.5,
-                                                    px: 1,
-                                                    py: 0.3,
-                                                    borderRadius: 1.5,
+                                                    px: 1.1,
+                                                    py: 0.35,
+                                                    borderRadius: 2,
                                                     bgcolor: (theme) => {
                                                         if (product.stock === 0) return alpha(theme.palette.error.main, 0.1);
                                                         if (product.stock <= 5) return alpha(theme.palette.warning.main, 0.1);
                                                         return alpha(theme.palette.success.main, 0.06);
+                                                    },
+                                                    border: '1px solid',
+                                                    borderColor: (theme) => {
+                                                        if (product.stock === 0) return alpha(theme.palette.error.main, 0.24);
+                                                        if (product.stock <= 5) return alpha(theme.palette.warning.main, 0.26);
+                                                        return alpha(theme.palette.success.main, 0.22);
                                                     }
                                                 }}>
                                                     <Box sx={{
@@ -465,7 +531,7 @@ const POSTerminal: React.FC = () => {
             <Paper
                 elevation={3}
                 sx={{
-                    width: { xs: '100%', md: 420 },
+                    width: { xs: '100%', lg: 420 },
                     flexShrink: 0,
                     display: 'flex',
                     flexDirection: 'column',
@@ -473,7 +539,9 @@ const POSTerminal: React.FC = () => {
                     overflow: 'hidden',
                     bgcolor: 'background.paper',
                     border: '1px solid',
-                    borderColor: 'divider'
+                    borderColor: 'divider',
+                    minHeight: { xs: 360, sm: 420, lg: 0 },
+                    height: { lg: '100%' }
                 }}
             >
                 <Box sx={{ p: 2.5, bgcolor: 'primary.main', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -481,29 +549,33 @@ const POSTerminal: React.FC = () => {
                         <ShoppingCart size={22} />
                         <Typography variant="h6" fontWeight={800}>Current Order</Typography>
                     </Box>
-                    <IconButton size="small" color="inherit" onClick={() => dispatch(clearCart())}>
-                        <Trash2 size={20} />
-                    </IconButton>
                 </Box>
 
-                <Box sx={{ flexGrow: 1, overflowY: 'auto', p: 0, position: 'relative' }}>
+                <Box
+                    sx={{
+                        p: 0,
+                        flexGrow: 1,
+                        minHeight: 0,
+                        overflowY: cart.length === 0 ? 'hidden' : 'auto',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: cart.length === 0 ? 'center' : 'flex-start'
+                    }}
+                >
                     {cart.length === 0 ? (
                         <Box sx={{
-                            position: 'absolute',
-                            top: '40%',
-                            left: '50%',
-                            transform: 'translate(-50%, -50%)',
                             textAlign: 'center',
                             opacity: 0.4,
                             width: '100%',
-                            px: 3
+                            px: 3,
+                            py: 2
                         }}>
-                            <ShoppingCart size={80} strokeWidth={1} style={{ marginBottom: 16 }} />
+                            <ShoppingCart size={56} strokeWidth={1} style={{ marginBottom: 12 }} />
                             <Typography variant="h6" fontWeight={800}>Cart is empty</Typography>
                             <Typography variant="body2" fontWeight={600}>Select products to start</Typography>
                         </Box>
                     ) : (
-                        <Box sx={{ p: 2 }}>
+                        <Box sx={{ p: 2, pb: 1 }}>
                             <AnimatePresence>
                                 {cart.map((item) => (
                                     <motion.div
@@ -512,9 +584,9 @@ const POSTerminal: React.FC = () => {
                                         animate={{ opacity: 1, y: 0 }}
                                         exit={{ opacity: 0, scale: 0.95 }}
                                     >
-                                        <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
-                                            <Box sx={{ flexGrow: 1 }}>
-                                                <Typography variant="body2" fontWeight={700} noWrap sx={{ maxWidth: 180 }}>{item.name}</Typography>
+                                        <Box sx={{ mb: 1.25, display: 'flex', alignItems: { xs: 'flex-start', sm: 'center' }, gap: { xs: 1, sm: 2 }, flexWrap: 'wrap' }}>
+                                            <Box sx={{ flexGrow: 1, minWidth: { xs: '100%', sm: 160 } }}>
+                                                <Typography variant="body2" fontWeight={700} noWrap={false} sx={{ wordBreak: 'break-word' }}>{item.name}</Typography>
                                                 <Typography variant="caption" color="text.secondary">{formatCurrency(item.price)} / unit</Typography>
                                             </Box>
                                             <Stack direction="row" alignItems="center" spacing={1} sx={{ bgcolor: 'action.hover', borderRadius: 2, p: 0.5 }}>
@@ -536,11 +608,11 @@ const POSTerminal: React.FC = () => {
                                                     <Plus size={14} />
                                                 </IconButton>
                                             </Stack>
-                                            <Typography variant="body2" fontWeight={800} sx={{ minWidth: 70, textAlign: 'right' }}>
+                                            <Typography variant="body2" fontWeight={800} sx={{ minWidth: { xs: '100%', sm: 70 }, textAlign: { xs: 'left', sm: 'right' } }}>
                                                 {formatCurrency(item.price * item.quantity)}
                                             </Typography>
                                         </Box>
-                                        <Divider sx={{ mb: 2, borderStyle: 'dashed' }} />
+                                        <Divider sx={{ mb: 1.25, borderStyle: 'dashed' }} />
                                     </motion.div>
                                 ))}
                             </AnimatePresence>
@@ -548,8 +620,19 @@ const POSTerminal: React.FC = () => {
                     )}
                 </Box>
 
-                <Box sx={{ p: 3, bgcolor: 'action.hover', borderTop: '1px solid', borderColor: 'divider' }}>
-                    <Stack spacing={1} sx={{ mb: 3 }}>
+                <Box
+                    sx={{
+                        p: { xs: 1.5, sm: 2 },
+                        bgcolor: 'background.paper',
+                        borderTop: '1px solid',
+                        borderColor: 'divider',
+                        boxShadow: (theme) => `0 -10px 20px -16px ${alpha(theme.palette.text.primary, 0.35)}`,
+                        position: 'relative',
+                        zIndex: 2,
+                        flexShrink: 0
+                    }}
+                >
+                    <Stack spacing={0.75} sx={{ mb: 1.5 }}>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                             <Typography variant="body2" color="text.secondary">Subtotal</Typography>
                             <Typography variant="body2" fontWeight={700}>{formatCurrency(subtotal)}</Typography>
@@ -571,32 +654,61 @@ const POSTerminal: React.FC = () => {
                         </Box>
                     </Stack>
 
-                    <Grid container spacing={2}>
-                        <Grid size={{ xs: 6 }}>
+                    <Grid container spacing={1}>
+                        <Grid size={{ xs: 4 }}>
                             <Button
                                 fullWidth
                                 variant="outlined"
                                 startIcon={<Banknote size={20} />}
                                 disabled={cart.length === 0}
                                 onClick={() => handleCheckout('cash')}
-                                sx={{ py: 1.5, borderRadius: 2, fontWeight: 700 }}
+                                sx={{ py: 1, borderRadius: 2, fontWeight: 700 }}
                             >
                                 Cash
                             </Button>
                         </Grid>
-                        <Grid size={{ xs: 6 }}>
+                        <Grid size={{ xs: 4 }}>
                             <Button
                                 fullWidth
                                 variant="outlined"
                                 startIcon={<CreditCard size={20} />}
                                 disabled={cart.length === 0}
                                 onClick={() => handleCheckout('card')}
-                                sx={{ py: 1.5, borderRadius: 2, fontWeight: 700 }}
+                                sx={{ py: 1, borderRadius: 2, fontWeight: 700 }}
                             >
                                 Card
                             </Button>
                         </Grid>
-                        <Grid size={{ xs: 12 }}>
+                        <Grid size={{ xs: 4 }}>
+                            <Button
+                                fullWidth
+                                variant="outlined"
+                                startIcon={<Receipt size={20} />}
+                                disabled={cart.length === 0}
+                                onClick={handleOpenCredit}
+                                sx={{ py: 1, borderRadius: 2, fontWeight: 700 }}
+                            >
+                                Credit
+                            </Button>
+                        </Grid>
+                        <Grid size={{ xs: 6 }}>
+                            <Button
+                                fullWidth
+                                variant="outlined"
+                                size="large"
+                                disabled={cart.length === 0}
+                                onClick={() => dispatch(clearCart())}
+                                sx={{
+                                    py: 1.3,
+                                    mt: 0.5,
+                                    borderRadius: 3,
+                                    fontWeight: 800
+                                }}
+                            >
+                                Clear
+                            </Button>
+                        </Grid>
+                        <Grid size={{ xs: 6 }}>
                             <Button
                                 fullWidth
                                 variant="contained"
@@ -605,11 +717,11 @@ const POSTerminal: React.FC = () => {
                                 disabled={cart.length === 0}
                                 onClick={() => handleCheckout('card')}
                                 sx={{
-                                    py: 2,
-                                    mt: 1,
+                                    py: 1.3,
+                                    mt: 0.5,
                                     borderRadius: 3,
                                     fontWeight: 900,
-                                    fontSize: '1.1rem',
+                                    fontSize: '1rem',
                                     boxShadow: (theme) => `0 8px 16px -4px ${alpha(theme.palette.primary.main, 0.4)}`
                                 }}
                             >
@@ -619,6 +731,59 @@ const POSTerminal: React.FC = () => {
                     </Grid>
                 </Box>
             </Paper>
+
+            <Dialog
+                open={creditOpen}
+                onClose={() => setCreditOpen(false)}
+                maxWidth="xs"
+                fullWidth
+                PaperProps={{ sx: { borderRadius: 3 } }}
+            >
+                <DialogTitle sx={{ fontWeight: 800 }}>Credit Payment</DialogTitle>
+                <DialogContent>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        Record partial payment now and keep the remaining amount due.
+                    </Typography>
+                    <TextField
+                        fullWidth
+                        type="number"
+                        label="Paid Now"
+                        value={creditPaidInput}
+                        onChange={(e) => setCreditPaidInput(e.target.value)}
+                        InputProps={{ startAdornment: <InputAdornment position="start">{currencySymbol}</InputAdornment> }}
+                        sx={{ mb: 2 }}
+                    />
+                    <Grid container spacing={1} sx={{ mb: 2 }}>
+                        <Grid size={{ xs: 6 }}>
+                            <Button
+                                fullWidth
+                                variant={creditPaidVia === 'cash' ? 'contained' : 'outlined'}
+                                onClick={() => setCreditPaidVia('cash')}
+                            >
+                                Paid via Cash
+                            </Button>
+                        </Grid>
+                        <Grid size={{ xs: 6 }}>
+                            <Button
+                                fullWidth
+                                variant={creditPaidVia === 'card' ? 'contained' : 'outlined'}
+                                onClick={() => setCreditPaidVia('card')}
+                            >
+                                Paid via Card
+                            </Button>
+                        </Grid>
+                    </Grid>
+                    <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'action.hover', border: '1px solid', borderColor: 'divider' }}>
+                        <Typography variant="body2" fontWeight={700}>Order Total: {formatCurrency(total)}</Typography>
+                        <Typography variant="body2" fontWeight={700}>Paid Now: {formatCurrency(draftCreditPaid)}</Typography>
+                        <Typography variant="body2" fontWeight={900} color="warning.main">Remaining Due: {formatCurrency(draftCreditDue)}</Typography>
+                    </Box>
+                </DialogContent>
+                <DialogActions sx={{ p: 2 }}>
+                    <Button variant="outlined" onClick={() => setCreditOpen(false)}>Cancel</Button>
+                    <Button variant="contained" onClick={handleContinueCredit}>Continue</Button>
+                </DialogActions>
+            </Dialog>
 
             <Dialog
                 open={confirmOpen}
@@ -636,6 +801,12 @@ const POSTerminal: React.FC = () => {
                         <Typography variant="body2" fontWeight={700}>
                             Method: {(pendingMethod || '').toUpperCase()}
                         </Typography>
+                        {pendingMethod === 'credit' && (
+                            <Box sx={{ mt: 1 }}>
+                                <Typography variant="body2" fontWeight={700}>Paid via {creditPaidVia.toUpperCase()}: {formatCurrency(creditPaidNow)}</Typography>
+                                <Typography variant="body2" fontWeight={900} color="warning.main">Due Later: {formatCurrency(creditDue)}</Typography>
+                            </Box>
+                        )}
                         <Typography variant="h6" fontWeight={900} color="primary.main" sx={{ mt: 0.5 }}>
                             Total: {formatCurrency(total)}
                         </Typography>
@@ -700,9 +871,21 @@ const POSTerminal: React.FC = () => {
                                 <Typography variant="caption" fontWeight={700}>{formatCurrency(tax)}</Typography>
                             </Box>
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
-                                <Typography variant="body1" fontWeight={900}>Total Paid</Typography>
+                                <Typography variant="body1" fontWeight={900}>{paymentMethod === 'credit' ? 'Order Total' : 'Total Paid'}</Typography>
                                 <Typography variant="body1" fontWeight={900} color="primary.main">{formatCurrency(total)}</Typography>
                             </Box>
+                            {paymentMethod === 'credit' && (
+                                <>
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                        <Typography variant="caption">Paid Now ({creditPaidVia.toUpperCase()})</Typography>
+                                        <Typography variant="caption" fontWeight={700}>{formatCurrency(creditPaidNow)}</Typography>
+                                    </Box>
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                        <Typography variant="caption" color="warning.main">Due Later</Typography>
+                                        <Typography variant="caption" fontWeight={800} color="warning.main">{formatCurrency(creditDue)}</Typography>
+                                    </Box>
+                                </>
+                            )}
                         </Stack>
 
                         <Box sx={{ mt: 3, textAlign: 'center', opacity: 0.6 }}>
