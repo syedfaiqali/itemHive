@@ -5,8 +5,11 @@ interface NotificationSettings {
     lowStockAlerts: boolean;
 }
 
+export type CurrencyCode = 'USD' | 'EUR' | 'GBP' | 'PKR' | 'INR' | 'AED';
+
 interface SettingsState {
     notifications: NotificationSettings;
+    currency: CurrencyCode;
 }
 
 const initialState: SettingsState = {
@@ -14,6 +17,7 @@ const initialState: SettingsState = {
         orderUpdates: true,
         lowStockAlerts: true,
     },
+    currency: 'USD',
 };
 
 const settingsSlice = createSlice({
@@ -26,8 +30,11 @@ const settingsSlice = createSlice({
         setLowStockAlertsEnabled: (state, action: PayloadAction<boolean>) => {
             state.notifications.lowStockAlerts = action.payload;
         },
+        setCurrency: (state, action: PayloadAction<CurrencyCode>) => {
+            state.currency = action.payload;
+        },
     },
 });
 
-export const { setOrderUpdatesEnabled, setLowStockAlertsEnabled } = settingsSlice.actions;
+export const { setOrderUpdatesEnabled, setLowStockAlertsEnabled, setCurrency } = settingsSlice.actions;
 export default settingsSlice.reducer;

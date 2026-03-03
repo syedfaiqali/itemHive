@@ -19,7 +19,6 @@ import {
     Package,
     History,
     BarChart3,
-    Settings,
     Monitor as TerminalIcon,
     ClipboardList,
     ChevronLeft,
@@ -54,7 +53,6 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onDrawerToggle }) => {
         { text: 'Order Desk', icon: <ClipboardList size={20} />, path: '/orders', roles: ['admin', 'user'] },
         { text: 'Transactions', icon: <History size={20} />, path: '/transactions', roles: ['admin', 'user'] },
         { text: 'Reports', icon: <BarChart3 size={20} />, path: '/reports', roles: ['admin'] },
-        { text: 'Settings', icon: <Settings size={20} />, path: '/settings', roles: ['admin', 'user'] },
     ];
 
     const drawer = (

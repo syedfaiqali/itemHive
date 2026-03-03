@@ -7,17 +7,33 @@ import {
     Grid,
     Divider,
     Switch,
-    FormControlLabel
+    FormControlLabel,
+    FormControl,
+    InputLabel,
+    Select,
+    MenuItem,
+    alpha,
+    useTheme
 } from '@mui/material';
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState } from '../../store';
 import { setDarkMode } from '../../features/theme/themeSlice';
-import { setLowStockAlertsEnabled, setOrderUpdatesEnabled } from '../../features/settings/settingsSlice';
+import { setCurrency, setLowStockAlertsEnabled, setOrderUpdatesEnabled, type CurrencyCode } from '../../features/settings/settingsSlice';
+
+const currencyOptions: Array<{ value: CurrencyCode; label: string }> = [
+    { value: 'USD', label: 'USD - US Dollar' },
+    { value: 'EUR', label: 'EUR - Euro' },
+    { value: 'GBP', label: 'GBP - British Pound' },
+    { value: 'PKR', label: 'PKR - Pakistani Rupee' },
+    { value: 'INR', label: 'INR - Indian Rupee' },
+    { value: 'AED', label: 'AED - UAE Dirham' },
+];
 
 const SettingsPage: React.FC = () => {
+    const theme = useTheme();
     const dispatch = useDispatch();
     const { mode } = useSelector((state: RootState) => state.theme);
-    const { notifications } = useSelector((state: RootState) => state.settings);
+    const { notifications, currency } = useSelector((state: RootState) => state.settings);
 
     return (
         <Box>
@@ -29,6 +45,77 @@ const SettingsPage: React.FC = () => {
             </Box>
 
             <Grid container spacing={3}>
+                <Grid size={{ xs: 12, md: 6 }}>
+                    <Card>
+                        <CardContent>
+                            <Typography variant="h6" fontWeight={700} gutterBottom>Regional</Typography>
+                            <Divider sx={{ mb: 2 }} />
+                            <FormControl fullWidth size="small">
+                                <InputLabel
+                                    id="currency-select-label"
+                                    sx={{
+                                        fontWeight: 600,
+                                        '&.Mui-focused': { color: 'primary.main' },
+                                    }}
+                                >
+                                    Currency
+                                </InputLabel>
+                                <Select
+                                    labelId="currency-select-label"
+                                    value={currency}
+                                    label="Currency"
+                                    onChange={(e) => dispatch(setCurrency(e.target.value as CurrencyCode))}
+                                    sx={{
+                                        fontWeight: 600,
+                                        '& .MuiOutlinedInput-notchedOutline': {
+                                            borderColor: alpha(theme.palette.primary.main, 0.25),
+                                        },
+                                        '&:hover .MuiOutlinedInput-notchedOutline': {
+                                            borderColor: alpha(theme.palette.primary.main, 0.5),
+                                        },
+                                        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                            borderColor: 'primary.main',
+                                            borderWidth: 2,
+                                        },
+                                    }}
+                                    MenuProps={{
+                                        PaperProps: {
+                                            sx: {
+                                                mt: 0.5,
+                                                border: '1px solid',
+                                                borderColor: 'divider',
+                                                bgcolor: 'background.paper',
+                                            },
+                                        },
+                                    }}
+                                >
+                                    {currencyOptions.map((option) => (
+                                        <MenuItem
+                                            key={option.value}
+                                            value={option.value}
+                                            sx={{
+                                                fontWeight: option.value === currency ? 700 : 500,
+                                                '&:hover': {
+                                                    backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                                                    color: 'primary.main',
+                                                },
+                                                '&.Mui-selected': {
+                                                    backgroundColor: alpha(theme.palette.primary.main, 0.14),
+                                                    color: 'primary.main',
+                                                },
+                                                '&.Mui-selected:hover': {
+                                                    backgroundColor: alpha(theme.palette.primary.main, 0.2),
+                                                },
+                                            }}
+                                        >
+                                            {option.label}
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        </CardContent>
+                    </Card>
+                </Grid>
                 <Grid size={{ xs: 12, md: 6 }}>
                     <Card>
                         <CardContent>
