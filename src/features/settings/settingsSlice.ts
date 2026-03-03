@@ -5,7 +5,7 @@ interface NotificationSettings {
     lowStockAlerts: boolean;
 }
 
-export type CurrencyCode = 'USD' | 'EUR' | 'GBP' | 'PKR' | 'INR' | 'AED';
+export type CurrencyCode = 'USD' | 'EUR' | 'GBP' | 'CHF' | 'CDF' | 'XAF' | 'PKR' | 'INR' | 'AED';
 
 interface SettingsState {
     notifications: NotificationSettings;
