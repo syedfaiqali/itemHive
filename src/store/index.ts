@@ -30,15 +30,15 @@ const rootReducer = combineReducers({
 
 const persistConfig = {
     key: 'root',
-    version: 4,
+    version: 5,
     storage,
     whitelist: ['auth', 'inventory', 'transactions', 'theme', 'orders', 'settings'], // Persist these slices
-    migrate: (state: unknown) => {
+    migrate: (state: any) => {
         if (!state) return Promise.resolve(state);
-        const nextState = { ...(state as Record<string, unknown>) } as Record<string, unknown>;
+        const nextState = { ...state };
         if (nextState.inventory) {
             nextState.inventory = {
-                ...(nextState.inventory as Record<string, unknown>),
+                ...nextState.inventory,
                 products: initialProductsFromCsv,
                 loading: false,
                 error: null,

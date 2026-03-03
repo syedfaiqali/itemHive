@@ -20,7 +20,6 @@ import {
     History,
     BarChart3,
     Settings,
-    PlusCircle,
     Monitor as TerminalIcon,
     ClipboardList,
     ChevronLeft,
