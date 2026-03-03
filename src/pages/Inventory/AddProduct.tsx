@@ -25,6 +25,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { addProduct, type Product, PRODUCT_CATEGORIES } from '../../features/inventory/inventorySlice';
 import type { RootState } from '../../store';
 import { motion } from 'framer-motion';
+import useAppCurrency from '../../hooks/useAppCurrency';
 
 const categories = PRODUCT_CATEGORIES;
 
@@ -32,6 +33,7 @@ const AddProduct: React.FC = () => {
     const navigate = useNavigate();
     const dispatch = useDispatch();
     const [success, setSuccess] = useState(false);
+    const { currency, currencySymbol } = useAppCurrency();
 
     const { products } = useSelector((state: RootState) => state.inventory);
     const [formData, setFormData] = useState({
@@ -173,14 +175,14 @@ const AddProduct: React.FC = () => {
                                 <Grid size={{ xs: 12, md: 4 }}>
                                     <TextField
                                         fullWidth
-                                        label="Price ($)"
+                                        label={`Price (${currency})`}
                                         name="price"
                                         type="number"
                                         required
                                         value={formData.price}
                                         onChange={handleChange}
                                         InputProps={{
-                                            startAdornment: <InputAdornment position="start">$</InputAdornment>,
+                                            startAdornment: <InputAdornment position="start">{currencySymbol}</InputAdornment>,
                                         }}
                                     />
                                 </Grid>

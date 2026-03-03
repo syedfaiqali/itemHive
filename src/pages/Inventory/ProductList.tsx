@@ -52,6 +52,7 @@ import { deleteProduct, updateProduct, addProduct, type Product, resolveProductI
 import { useNavigate, useLocation } from 'react-router-dom';
 import { alpha, useTheme, styled } from '@mui/material/styles';
 import { motion } from 'framer-motion';
+import useAppCurrency from '../../hooks/useAppCurrency';
 
 const IconContainer = styled(Box)(({ theme, color }: { theme?: any, color?: string }) => ({
     width: 44,
@@ -103,6 +104,7 @@ const ProductList: React.FC = () => {
     const theme = useTheme();
     const dispatch = useDispatch();
     const navigate = useNavigate();
+    const { currency, currencySymbol, formatCurrency } = useAppCurrency();
     const { products } = useSelector((state: RootState) => state.inventory);
     const { user } = useSelector((state: RootState) => state.auth);
     const [searchTerm, setSearchTerm] = useState('');
@@ -434,7 +436,7 @@ const ProductList: React.FC = () => {
                                             <Typography variant="body2" fontWeight={600}>{product.stock} Units</Typography>
                                         </TableCell>
                                         <TableCell>
-                                            <Typography variant="body2" fontWeight={700}>${product.price}</Typography>
+                                            <Typography variant="body2" fontWeight={700}>{formatCurrency(product.price)}</Typography>
                                         </TableCell>
                                         <TableCell>
                                             {product.stock <= 0 ? (
@@ -558,7 +560,7 @@ const ProductList: React.FC = () => {
 
                             <Grid container spacing={2}>
                                 {[
-                                    { label: 'PRICE', value: `$${viewProduct.price}`, icon: <DollarSign size={18} />, color: '#10b981' },
+                                    { label: 'PRICE', value: formatCurrency(viewProduct.price), icon: <DollarSign size={18} />, color: '#10b981' },
                                     { label: 'STOCK', value: `${viewProduct.stock} Units`, icon: <TrendingUp size={18} />, color: '#6366f1' },
                                     { label: 'MIN STOCK', value: `${viewProduct.minStock} Units`, icon: <ShieldCheck size={18} />, color: '#f59e0b' },
                                     { label: 'LAST UPDATE', value: new Date(viewProduct.lastUpdated).toLocaleDateString(), icon: <History size={18} />, color: '#64748b' },
@@ -646,7 +648,7 @@ const ProductList: React.FC = () => {
                                 <Grid size={{ xs: 12, md: 4 }}>
                                     <TextField
                                         fullWidth
-                                        label="Price ($)"
+                                        label={`Price (${currency})`}
                                         type="number"
                                         required
                                         value={editProduct.price}
@@ -812,7 +814,7 @@ const ProductList: React.FC = () => {
                                 <Stack spacing={3}>
                                     <TextField
                                         fullWidth
-                                        label="Price ($)"
+                                        label={`Price (${currency})`}
                                         name="price"
                                         type="number"
                                         required
@@ -820,7 +822,7 @@ const ProductList: React.FC = () => {
                                         onChange={handleAddChange}
                                         InputProps={{
                                             sx: { borderRadius: 3, bgcolor: 'background.paper' },
-                                            startAdornment: <InputAdornment position="start">$</InputAdornment>,
+                                            startAdornment: <InputAdornment position="start">{currencySymbol}</InputAdornment>,
                                         }}
                                     />
                                     <TextField

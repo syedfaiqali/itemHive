@@ -45,6 +45,7 @@ import { reduceStock, resolveProductImage, PRODUCT_CATEGORIES } from '../../feat
 import { addTransaction } from '../../features/transactions/transactionSlice';
 import type { Product } from '../../features/inventory/inventorySlice';
 import { motion, AnimatePresence } from 'framer-motion';
+import useAppCurrency from '../../hooks/useAppCurrency';
 
 const categories = ['All', ...PRODUCT_CATEGORIES];
 
@@ -97,6 +98,7 @@ const POSTerminal: React.FC = () => {
     const { products } = useSelector((state: RootState) => state.inventory);
     const { transactions = [] } = useSelector((state: RootState) => state.transactions || { transactions: [] });
     const { cart, taxRate, activeDiscount } = useSelector((state: RootState) => state.pos);
+    const { formatCurrency } = useAppCurrency();
 
     const [searchTerm, setSearchTerm] = useState('');
     const [activeTab, setActiveTab] = useState(0);
@@ -130,12 +132,12 @@ const POSTerminal: React.FC = () => {
             `Cashier: ${user?.username || 'Staff'}`,
             `Payment: ${method.toUpperCase()}`,
             '----------------------------------------',
-            ...cart.map((item) => `${item.name} x${item.quantity} @ $${item.price.toFixed(2)} = $${(item.price * item.quantity).toFixed(2)}`),
+            ...cart.map((item) => `${item.name} x${item.quantity} @ ${formatCurrency(item.price)} = ${formatCurrency(item.price * item.quantity)}`),
             '----------------------------------------',
-            `Subtotal: $${subtotal.toFixed(2)}`,
-            `Tax (10%): $${tax.toFixed(2)}`,
-            activeDiscount > 0 ? `Discount: -$${activeDiscount.toFixed(2)}` : '',
-            `Total Paid: $${total.toFixed(2)}`,
+            `Subtotal: ${formatCurrency(subtotal)}`,
+            `Tax (10%): ${formatCurrency(tax)}`,
+            activeDiscount > 0 ? `Discount: -${formatCurrency(activeDiscount)}` : '',
+            `Total Paid: ${formatCurrency(total)}`,
             '----------------------------------------',
             'Thank you for shopping with us!'
         ].filter(Boolean);
@@ -408,7 +410,7 @@ const POSTerminal: React.FC = () => {
 
                                             <Box sx={{ mt: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                                 <Typography variant="h6" color="primary.main" fontWeight={900}>
-                                                    ${product.price.toFixed(2)}
+                                                    {formatCurrency(product.price)}
                                                 </Typography>
 
                                                 <Box sx={{
@@ -513,7 +515,7 @@ const POSTerminal: React.FC = () => {
                                         <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
                                             <Box sx={{ flexGrow: 1 }}>
                                                 <Typography variant="body2" fontWeight={700} noWrap sx={{ maxWidth: 180 }}>{item.name}</Typography>
-                                                <Typography variant="caption" color="text.secondary">${item.price.toFixed(2)} / unit</Typography>
+                                                <Typography variant="caption" color="text.secondary">{formatCurrency(item.price)} / unit</Typography>
                                             </Box>
                                             <Stack direction="row" alignItems="center" spacing={1} sx={{ bgcolor: 'action.hover', borderRadius: 2, p: 0.5 }}>
                                                 <IconButton size="small" onClick={() => dispatch(updateQuantity({ id: item.id, quantity: item.quantity - 1 }))}>
@@ -535,7 +537,7 @@ const POSTerminal: React.FC = () => {
                                                 </IconButton>
                                             </Stack>
                                             <Typography variant="body2" fontWeight={800} sx={{ minWidth: 70, textAlign: 'right' }}>
-                                                ${(item.price * item.quantity).toFixed(2)}
+                                                {formatCurrency(item.price * item.quantity)}
                                             </Typography>
                                         </Box>
                                         <Divider sx={{ mb: 2, borderStyle: 'dashed' }} />
@@ -550,22 +552,22 @@ const POSTerminal: React.FC = () => {
                     <Stack spacing={1} sx={{ mb: 3 }}>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                             <Typography variant="body2" color="text.secondary">Subtotal</Typography>
-                            <Typography variant="body2" fontWeight={700}>${subtotal.toFixed(2)}</Typography>
+                            <Typography variant="body2" fontWeight={700}>{formatCurrency(subtotal)}</Typography>
                         </Box>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                             <Typography variant="body2" color="text.secondary">Tax (10%)</Typography>
-                            <Typography variant="body2" fontWeight={700}>${tax.toFixed(2)}</Typography>
+                            <Typography variant="body2" fontWeight={700}>{formatCurrency(tax)}</Typography>
                         </Box>
                         {activeDiscount > 0 && (
                             <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                                 <Typography variant="body2" color="error.main">Discount</Typography>
-                                <Typography variant="body2" fontWeight={700} color="error.main">-${activeDiscount.toFixed(2)}</Typography>
+                                <Typography variant="body2" fontWeight={700} color="error.main">-{formatCurrency(activeDiscount)}</Typography>
                             </Box>
                         )}
                         <Divider sx={{ my: 1 }} />
                         <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                             <Typography variant="h5" fontWeight={900}>Total Payable</Typography>
-                            <Typography variant="h5" fontWeight={900} color="primary.main">${total.toFixed(2)}</Typography>
+                            <Typography variant="h5" fontWeight={900} color="primary.main">{formatCurrency(total)}</Typography>
                         </Box>
                     </Stack>
 
@@ -635,7 +637,7 @@ const POSTerminal: React.FC = () => {
                             Method: {(pendingMethod || '').toUpperCase()}
                         </Typography>
                         <Typography variant="h6" fontWeight={900} color="primary.main" sx={{ mt: 0.5 }}>
-                            Total: ${total.toFixed(2)}
+                            Total: {formatCurrency(total)}
                         </Typography>
                     </Box>
                 </DialogContent>
@@ -679,9 +681,9 @@ const POSTerminal: React.FC = () => {
                                 <Box key={item.id} sx={{ display: 'flex', justifyContent: 'space-between' }}>
                                     <Box>
                                         <Typography variant="body2" fontWeight={700}>{item.name}</Typography>
-                                        <Typography variant="caption" color="text.secondary">{item.quantity} x ${item.price.toFixed(2)}</Typography>
+                                        <Typography variant="caption" color="text.secondary">{item.quantity} x {formatCurrency(item.price)}</Typography>
                                     </Box>
-                                    <Typography variant="body2" fontWeight={700}>${(item.price * item.quantity).toFixed(2)}</Typography>
+                                    <Typography variant="body2" fontWeight={700}>{formatCurrency(item.price * item.quantity)}</Typography>
                                 </Box>
                             ))}
                         </Stack>
@@ -691,15 +693,15 @@ const POSTerminal: React.FC = () => {
                         <Stack spacing={0.5}>
                             <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                                 <Typography variant="caption">Subtotal</Typography>
-                                <Typography variant="caption" fontWeight={700}>${subtotal.toFixed(2)}</Typography>
+                                <Typography variant="caption" fontWeight={700}>{formatCurrency(subtotal)}</Typography>
                             </Box>
                             <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                                 <Typography variant="caption">Tax (10%)</Typography>
-                                <Typography variant="caption" fontWeight={700}>${tax.toFixed(2)}</Typography>
+                                <Typography variant="caption" fontWeight={700}>{formatCurrency(tax)}</Typography>
                             </Box>
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
                                 <Typography variant="body1" fontWeight={900}>Total Paid</Typography>
-                                <Typography variant="body1" fontWeight={900} color="primary.main">${total.toFixed(2)}</Typography>
+                                <Typography variant="body1" fontWeight={900} color="primary.main">{formatCurrency(total)}</Typography>
                             </Box>
                         </Stack>
 

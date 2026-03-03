@@ -36,12 +36,14 @@ import {
     AreaChart,
     Area
 } from 'recharts';
+import useAppCurrency from '../../hooks/useAppCurrency';
 
 const COLORS = ['#6366f1', '#f43f5e', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4'];
 
 const ReportsPage: React.FC = () => {
     const { products } = useSelector((state: RootState) => state.inventory);
     const { transactions } = useSelector((state: RootState) => state.transactions);
+    const { currency, formatCurrency } = useAppCurrency();
 
     // Filter transactions for last 7 days for trend
     const last7Days = [...Array(7)].map((_, i) => {
@@ -109,8 +111,8 @@ const ReportsPage: React.FC = () => {
                                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
                                         <XAxis dataKey="name" axisLine={false} tickLine={false} />
                                         <YAxis axisLine={false} tickLine={false} />
-                                        <Tooltip />
-                                        <Area type="monotone" dataKey="revenue" stroke="#6366f1" strokeWidth={3} fillOpacity={1} fill="url(#colorRevenue)" name="Revenue ($)" />
+                                        <Tooltip formatter={(value: number | string | undefined) => [formatCurrency(Number(value || 0)), `Revenue (${currency})`]} />
+                                        <Area type="monotone" dataKey="revenue" stroke="#6366f1" strokeWidth={3} fillOpacity={1} fill="url(#colorRevenue)" name={`Revenue (${currency})`} />
                                     </AreaChart>
                                 </ResponsiveContainer>
                             </Box>
@@ -221,7 +223,9 @@ const ReportsPage: React.FC = () => {
                                                             {totalReduced} Units
                                                         </Box>
                                                     </TableCell>
-                                                    <TableCell sx={{ fontWeight: 700 }}>${revenue.toLocaleString()}</TableCell>
+                                                    <TableCell sx={{ fontWeight: 700 }}>
+                                                        {formatCurrency(revenue, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                                    </TableCell>
                                                     <TableCell>{product.stock} Units</TableCell>
                                                 </TableRow>
                                             );

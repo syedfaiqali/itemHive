@@ -42,6 +42,7 @@ import { useNavigate } from 'react-router-dom';
 import { alpha } from '@mui/material/styles';
 import { useTheme } from '@mui/material/styles';
 import heroGraphic from '../../assets/Modern retail POS system setup.webp';
+import useAppCurrency from '../../hooks/useAppCurrency';
 
 const Dashboard: React.FC = () => {
     const theme = useTheme();
@@ -49,6 +50,7 @@ const Dashboard: React.FC = () => {
     const { products } = useSelector((state: RootState) => state.inventory);
     const { transactions = [] } = useSelector((state: RootState) => state.transactions || { transactions: [] });
     const { user } = useSelector((state: RootState) => state.auth);
+    const { currency, formatCurrency } = useAppCurrency();
 
     const totalStock = products.reduce((acc, p) => acc + p.stock, 0);
     const lowStockItems = products.filter(p => p.stock <= p.minStock);
@@ -115,7 +117,7 @@ const Dashboard: React.FC = () => {
         },
         {
             title: 'Inventory Value',
-            value: `$${totalValue.toLocaleString()}`,
+            value: formatCurrency(totalValue, { minimumFractionDigits: 0, maximumFractionDigits: 0 }),
             icon: <DollarSign size={24} />,
             color: 'warning',
             trend: 'Calculated current valuation'
@@ -337,7 +339,7 @@ const Dashboard: React.FC = () => {
                                             strokeWidth={3}
                                             fillOpacity={1}
                                             fill="url(#colorSales)"
-                                            name="Revenue ($)"
+                                            name={`Revenue (${currency})`}
                                         />
                                     </AreaChart>
                                 </ResponsiveContainer>
@@ -359,7 +361,7 @@ const Dashboard: React.FC = () => {
                                         <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fill: theme.palette.text.secondary, fontSize: 12, fontWeight: 600 }} width={80} />
                                         <Tooltip
                                             cursor={{ fill: 'transparent' }}
-                                            formatter={(value: any) => [`$${(value || 0).toLocaleString()}`, 'Value']}
+                                            formatter={(value: any) => [formatCurrency(value || 0, { minimumFractionDigits: 0, maximumFractionDigits: 0 }), 'Value']}
                                         />
                                         <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={25}>
                                             {dynamicCategoryData.map((entry, index) => (
@@ -376,7 +378,9 @@ const Dashboard: React.FC = () => {
                                             <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: item.color }} />
                                             {item.name}
                                         </Typography>
-                                        <Typography variant="body2" fontWeight={700}>${item.value.toLocaleString()}</Typography>
+                                        <Typography variant="body2" fontWeight={700}>
+                                            {formatCurrency(item.value, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                        </Typography>
                                     </Box>
                                 ))}
                             </Box>
@@ -425,7 +429,9 @@ const Dashboard: React.FC = () => {
                                                             />
                                                         </TableCell>
                                                         <TableCell sx={{ fontWeight: 600 }}>{tx.amount}</TableCell>
-                                                        <TableCell sx={{ fontWeight: 700 }}>${tx.totalPrice?.toLocaleString() || '0'}</TableCell>
+                                                        <TableCell sx={{ fontWeight: 700 }}>
+                                                            {formatCurrency(tx.totalPrice || 0, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                                        </TableCell>
                                                     </TableRow>
                                                 ))}
                                             </TableBody>

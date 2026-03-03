@@ -58,10 +58,12 @@ import {
     subMonths,
     addMonths
 } from 'date-fns';
+import useAppCurrency from '../../hooks/useAppCurrency';
 
 const TransactionHistory: React.FC = () => {
     const theme = useTheme();
     const { transactions } = useSelector((state: RootState) => state.transactions || { transactions: [] });
+    const { formatCurrency } = useAppCurrency();
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
     const [datePickerAnchorEl, setDatePickerAnchorEl] = useState<HTMLElement | null>(null);
@@ -282,7 +284,7 @@ const TransactionHistory: React.FC = () => {
                                                 {tx.type === 'addition' ? '+' : '-'}{tx.amount}
                                             </TableCell>
                                             <TableCell sx={{ fontWeight: 800 }}>
-                                                ${tx.totalPrice?.toLocaleString() || '-'}
+                                                {tx.totalPrice != null ? formatCurrency(tx.totalPrice, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : '-'}
                                             </TableCell>
                                             <TableCell align="right">
                                                 <IconButton size="small" onClick={() => setSelectedTx(tx)}>
@@ -493,7 +495,7 @@ const TransactionHistory: React.FC = () => {
                                 <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                                     <Typography variant="h6" fontWeight={800}>Total Value:</Typography>
                                     <Typography variant="h6" fontWeight={900} color="primary.main">
-                                        ${selectedTx.totalPrice?.toLocaleString() || '0.00'}
+                                        {formatCurrency(selectedTx.totalPrice || 0, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                                     </Typography>
                                 </Box>
                             </Box>

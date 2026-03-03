@@ -33,11 +33,13 @@ import { reduceStock } from '../../features/inventory/inventorySlice';
 import { addTransaction } from '../../features/transactions/transactionSlice';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
+import useAppCurrency from '../../hooks/useAppCurrency';
 
 const ReduceStock: React.FC = () => {
     const dispatch = useDispatch();
     const { products } = useSelector((state: RootState) => state.inventory);
     const { user } = useSelector((state: RootState) => state.auth);
+    const { formatCurrency } = useAppCurrency();
 
     const [selectedProduct, setSelectedProduct] = useState<any>(null);
     const [reduceAmount, setReduceAmount] = useState<number | string>(1);
@@ -217,13 +219,13 @@ const ReduceStock: React.FC = () => {
                                         </Box>
                                         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                                             <Typography variant="body2">Unit Price:</Typography>
-                                            <Typography variant="body2" fontWeight={700}>${selectedProduct.price}</Typography>
+                                            <Typography variant="body2" fontWeight={700}>{formatCurrency(selectedProduct.price)}</Typography>
                                         </Box>
                                         <Divider sx={{ my: 2, borderColor: 'rgba(255,255,255,0.2)' }} />
                                         <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                                             <Typography variant="h6">Total Value:</Typography>
                                             <Typography variant="h6" fontWeight={800}>
-                                                ${(parseInt(reduceAmount.toString() || '0') * selectedProduct.price).toLocaleString()}
+                                                {formatCurrency(parseInt(reduceAmount.toString() || '0') * selectedProduct.price, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                                             </Typography>
                                         </Box>
                                     </CardContent>
@@ -295,7 +297,7 @@ const ReduceStock: React.FC = () => {
                                 </Box>
                                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                                     <Typography fontWeight={700}>Unit Price:</Typography>
-                                    <Typography>${(lastTx.totalPrice / lastTx.amount).toLocaleString()}</Typography>
+                                    <Typography>{formatCurrency((lastTx.totalPrice / lastTx.amount), { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</Typography>
                                 </Box>
                             </Box>
 
@@ -303,7 +305,7 @@ const ReduceStock: React.FC = () => {
                                 <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                                     <Typography variant="h6" fontWeight={800}>Total Amount:</Typography>
                                     <Typography variant="h6" fontWeight={900} color="primary.main">
-                                        ${lastTx.totalPrice?.toLocaleString() || '0.00'}
+                                        {formatCurrency(lastTx.totalPrice || 0, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                                     </Typography>
                                 </Box>
                             </Box>
