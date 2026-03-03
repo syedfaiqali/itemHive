@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
     Box,
     Typography,
@@ -13,6 +13,7 @@ import {
     TableHead,
     TableRow,
 } from '@mui/material';
+import { alpha, useTheme } from '@mui/material/styles';
 import {
     Download,
     Printer,
@@ -38,46 +39,86 @@ import {
 } from 'recharts';
 import useAppCurrency from '../../hooks/useAppCurrency';
 
-const COLORS = ['#6366f1', '#f43f5e', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4'];
-
 const ReportsPage: React.FC = () => {
+    const theme = useTheme();
     const { products } = useSelector((state: RootState) => state.inventory);
     const { transactions } = useSelector((state: RootState) => state.transactions);
     const { currency, formatCurrency } = useAppCurrency();
 
-    // Filter transactions for last 7 days for trend
-    const last7Days = [...Array(7)].map((_, i) => {
-        const d = new Date();
-        d.setDate(d.getDate() - (6 - i));
-        const dateStr = d.toISOString().split('T')[0];
-        const dayLabel = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const reportPalette = useMemo(
+        () => [
+            theme.palette.primary.main,
+            theme.palette.secondary.main,
+            theme.palette.success.main,
+            theme.palette.warning.main,
+            '#0ea5e9',
+            '#a855f7',
+        ],
+        [theme.palette]
+    );
 
-        const dayRevenue = transactions
-            .filter(t => t.timestamp.startsWith(dateStr) && t.type === 'reduction')
-            .reduce((sum, t) => sum + (t.totalPrice || 0), 0);
+    const last7Days = useMemo(
+        () => [...Array(7)].map((_, i) => {
+            const d = new Date();
+            d.setDate(d.getDate() - (6 - i));
+            const dateStr = d.toISOString().split('T')[0];
+            const dayLabel = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
-        const daySales = transactions
-            .filter(t => t.timestamp.startsWith(dateStr) && t.type === 'reduction')
-            .reduce((sum, t) => sum + t.amount, 0);
+            const dayRevenue = transactions
+                .filter(t => t.timestamp.startsWith(dateStr) && t.type === 'reduction')
+                .reduce((sum, t) => sum + (t.totalPrice || 0), 0);
 
-        return { name: dayLabel, revenue: dayRevenue, sales: daySales };
-    });
+            const daySales = transactions
+                .filter(t => t.timestamp.startsWith(dateStr) && t.type === 'reduction')
+                .reduce((sum, t) => sum + t.amount, 0);
 
-    const categorySummary = products.reduce((acc: any, p) => {
-        acc[p.category] = (acc[p.category] || 0) + (p.stock * p.price);
-        return acc;
-    }, {});
+            return { name: dayLabel, revenue: dayRevenue, sales: daySales };
+        }),
+        [transactions]
+    );
 
-    const pieData = Object.keys(categorySummary).map(cat => ({
-        name: cat,
-        value: categorySummary[cat]
-    }));
+    const pieData = useMemo(() => {
+        const categorySummary = products.reduce<Record<string, number>>((acc, p) => {
+            acc[p.category] = (acc[p.category] || 0) + (p.stock * p.price);
+            return acc;
+        }, {});
 
-    const stockLevelData = products.map(p => ({
-        name: p.name.length > 10 ? p.name.substring(0, 10) + '...' : p.name,
-        stock: p.stock,
-        min: p.minStock
-    }));
+        return Object.keys(categorySummary)
+            .map(cat => ({
+                name: cat,
+                value: categorySummary[cat]
+            }))
+            .sort((a, b) => b.value - a.value);
+    }, [products]);
+
+    const stockLevelData = useMemo(
+        () => [...products]
+            .map(p => ({
+                name: p.name.length > 13 ? `${p.name.substring(0, 13)}...` : p.name,
+                stock: p.stock,
+                min: p.minStock,
+                gap: p.stock - p.minStock,
+            }))
+            .sort((a, b) => a.gap - b.gap)
+            .slice(0, 10),
+        [products]
+    );
+
+    const topSellingRows = useMemo(
+        () => products
+            .map((product) => {
+                const totalReduced = transactions
+                    .filter(t => t.productId === product.id && t.type === 'reduction')
+                    .reduce((sum, t) => sum + t.amount, 0);
+                return {
+                    product,
+                    totalReduced,
+                    revenue: totalReduced * product.price,
+                };
+            })
+            .sort((a, b) => b.totalReduced - a.totalReduced),
+        [products, transactions]
+    );
 
     const handlePrint = () => {
         window.print();
@@ -104,15 +145,15 @@ const ReportsPage: React.FC = () => {
                                     <AreaChart data={last7Days}>
                                         <defs>
                                             <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="5%" stopColor="#6366f1" stopOpacity={0.1} />
-                                                <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                                                <stop offset="5%" stopColor={theme.palette.primary.main} stopOpacity={0.22} />
+                                                <stop offset="95%" stopColor={theme.palette.primary.main} stopOpacity={0} />
                                             </linearGradient>
                                         </defs>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={alpha(theme.palette.text.primary, 0.1)} />
                                         <XAxis dataKey="name" axisLine={false} tickLine={false} />
                                         <YAxis axisLine={false} tickLine={false} />
                                         <Tooltip formatter={(value: number | string | undefined) => [formatCurrency(Number(value || 0)), `Revenue (${currency})`]} />
-                                        <Area type="monotone" dataKey="revenue" stroke="#6366f1" strokeWidth={3} fillOpacity={1} fill="url(#colorRevenue)" name={`Revenue (${currency})`} />
+                                        <Area type="monotone" dataKey="revenue" stroke={theme.palette.primary.main} strokeWidth={3} fillOpacity={1} fill="url(#colorRevenue)" name={`Revenue (${currency})`} />
                                     </AreaChart>
                                 </ResponsiveContainer>
                             </Box>
@@ -128,11 +169,11 @@ const ReportsPage: React.FC = () => {
                             <Box sx={{ height: 300, mt: 3 }}>
                                 <ResponsiveContainer width="100%" height="100%">
                                     <BarChart data={last7Days}>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={alpha(theme.palette.text.primary, 0.1)} />
                                         <XAxis dataKey="name" axisLine={false} tickLine={false} />
                                         <YAxis axisLine={false} tickLine={false} />
-                                        <Tooltip />
-                                        <Bar dataKey="sales" fill="#10b981" radius={[4, 4, 0, 0]} name="Units Sold" />
+                                        <Tooltip formatter={(value: number | string | undefined) => [Number(value || 0), 'Units Sold']} />
+                                        <Bar dataKey="sales" fill={theme.palette.success.main} radius={[4, 4, 0, 0]} name="Units Sold" />
                                     </BarChart>
                                 </ResponsiveContainer>
                             </Box>
@@ -144,18 +185,20 @@ const ReportsPage: React.FC = () => {
                     <Card sx={{ borderRadius: 4 }}>
                         <CardContent>
                             <Typography variant="h6" fontWeight={700} gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                <BarChartIcon size={20} /> Stock Level Comparison
+                                <BarChartIcon size={20} /> Stock Level (Top 10 Critical)
                             </Typography>
                             <Box sx={{ height: 300, mt: 3 }}>
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={stockLevelData}>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                                        <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                                        <YAxis axisLine={false} tickLine={false} />
-                                        <Tooltip />
+                                    <BarChart data={stockLevelData} layout="vertical" margin={{ left: 10 }}>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={alpha(theme.palette.text.primary, 0.1)} />
+                                        <XAxis type="number" axisLine={false} tickLine={false} />
+                                        <YAxis type="category" dataKey="name" width={90} axisLine={false} tickLine={false} />
+                                        <Tooltip
+                                            formatter={(value: number | string | undefined, name) => [Number(value || 0), name === 'stock' ? 'Current Stock' : 'Min Threshold']}
+                                        />
                                         <Legend />
-                                        <Bar dataKey="stock" fill="#6366f1" radius={[4, 4, 0, 0]} name="Current Stock" />
-                                        <Bar dataKey="min" fill="#f43f5e" radius={[4, 4, 0, 0]} name="Min Threshold" />
+                                        <Bar dataKey="stock" fill={theme.palette.primary.main} radius={[0, 4, 4, 0]} name="Current Stock" />
+                                        <Bar dataKey="min" fill={theme.palette.error.main} radius={[0, 4, 4, 0]} name="Min Threshold" />
                                     </BarChart>
                                 </ResponsiveContainer>
                             </Box>
@@ -180,10 +223,10 @@ const ReportsPage: React.FC = () => {
                                             dataKey="value"
                                         >
                                             {pieData.map((_, index) => (
-                                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                                <Cell key={`cell-${index}`} fill={reportPalette[index % reportPalette.length]} />
                                             ))}
                                         </Pie>
-                                        <Tooltip />
+                                        <Tooltip formatter={(value: number | string | undefined) => [formatCurrency(Number(value || 0), { minimumFractionDigits: 0, maximumFractionDigits: 0 }), `Value (${currency})`]} />
                                         <Legend />
                                     </PieChart>
                                 </ResponsiveContainer>
@@ -207,29 +250,21 @@ const ReportsPage: React.FC = () => {
                                         </TableRow>
                                     </TableHead>
                                     <TableBody>
-                                        {products.map((product) => {
-                                            const totalReduced = transactions
-                                                .filter(t => t.productId === product.id && t.type === 'reduction')
-                                                .reduce((sum, t) => sum + t.amount, 0);
-
-                                            const revenue = totalReduced * product.price;
-
-                                            return (
-                                                <TableRow key={product.id}>
-                                                    <TableCell sx={{ fontWeight: 600 }}>{product.name}</TableCell>
-                                                    <TableCell>
-                                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                            <TrendingDown size={14} color="#f43f5e" />
-                                                            {totalReduced} Units
-                                                        </Box>
-                                                    </TableCell>
-                                                    <TableCell sx={{ fontWeight: 700 }}>
-                                                        {formatCurrency(revenue, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                                                    </TableCell>
-                                                    <TableCell>{product.stock} Units</TableCell>
-                                                </TableRow>
-                                            );
-                                        })}
+                                        {topSellingRows.map(({ product, totalReduced, revenue }) => (
+                                            <TableRow key={product.id}>
+                                                <TableCell sx={{ fontWeight: 600 }}>{product.name}</TableCell>
+                                                <TableCell>
+                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                        <TrendingDown size={14} color={theme.palette.error.main} />
+                                                        {totalReduced} Units
+                                                    </Box>
+                                                </TableCell>
+                                                <TableCell sx={{ fontWeight: 700 }}>
+                                                    {formatCurrency(revenue, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                                </TableCell>
+                                                <TableCell>{product.stock} Units</TableCell>
+                                            </TableRow>
+                                        ))}
                                     </TableBody>
                                 </Table>
                             </TableContainer>
