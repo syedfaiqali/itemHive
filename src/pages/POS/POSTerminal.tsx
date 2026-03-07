@@ -40,9 +40,9 @@ import {
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
 import { addToCart, updateQuantity, clearCart } from '../../features/pos/posSlice';
-import { reduceStock, resolveProductImage, PRODUCT_CATEGORIES } from '../../features/inventory/inventorySlice';
-import { addTransaction } from '../../features/transactions/transactionSlice';
+import { reduceStockApi, resolveProductImage, PRODUCT_CATEGORIES, fetchProducts } from '../../features/inventory/inventorySlice';
 import type { Product } from '../../features/inventory/inventorySlice';
+import type { AppDispatch } from '../../store';
 import { motion, AnimatePresence } from 'framer-motion';
 import useAppCurrency from '../../hooks/useAppCurrency';
 
@@ -91,8 +91,13 @@ const buildSimplePdf = (lines: string[]) => {
 };
 
 const POSTerminal: React.FC = () => {
-    const dispatch = useDispatch();
+    const dispatch = useDispatch<AppDispatch>();
     const theme = useTheme();
+
+    React.useEffect(() => {
+        dispatch(fetchProducts());
+    }, [dispatch]);
+
     const { user } = useSelector((state: RootState) => state.auth);
     const { products } = useSelector((state: RootState) => state.inventory);
     const { transactions = [] } = useSelector((state: RootState) => state.transactions || { transactions: [] });
@@ -135,7 +140,7 @@ const POSTerminal: React.FC = () => {
             'ItemHive POS Receipt',
             `Order ID: ${id}`,
             `Date: ${dateLabel}`,
-            `Cashier: ${user?.username || 'Staff'}`,
+            `Cashier: ${user?.name || 'Staff'}`,
             `Payment: ${method === 'credit' ? `CREDIT (${creditPaidVia.toUpperCase()} + DUE)` : method.toUpperCase()}`,
             '----------------------------------------',
             ...cart.map((item) => `${item.name} x${item.quantity} @ ${formatCurrency(item.price)} = ${formatCurrency(item.price * item.quantity)}`),
@@ -213,17 +218,17 @@ const POSTerminal: React.FC = () => {
 
         // Process all items in cart
         cart.forEach(item => {
-            dispatch(reduceStock({ id: item.id, amount: item.quantity }));
-            dispatch(addTransaction({
+            const tx = {
                 id: `${id}-${item.id.substr(0, 3)}`,
                 productId: item.id,
                 productName: item.name,
-                type: 'reduction',
+                type: 'reduction' as const,
                 amount: item.quantity,
-                userName: user?.username || 'Staff',
+                userName: user?.name || 'Staff',
                 timestamp: receiptTimeIso,
                 totalPrice: item.price * item.quantity
-            }));
+            };
+            dispatch(reduceStockApi({ id: item.id, amount: item.quantity, transaction: tx }));
         });
 
         setOrderDone(true);
@@ -798,6 +803,9 @@ const POSTerminal: React.FC = () => {
                         Confirm this payment to finalize sale and update stock.
                     </Typography>
                     <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'action.hover', border: '1px solid', borderColor: 'divider' }}>
+                        <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                            Cashier: <strong>{user?.name || 'Staff'}</strong>
+                        </Typography>
                         <Typography variant="body2" fontWeight={700}>
                             Method: {(pendingMethod || '').toUpperCase()}
                         </Typography>
@@ -843,7 +851,7 @@ const POSTerminal: React.FC = () => {
                     <Box id="pos-receipt" sx={{ mt: 3, p: 3, bgcolor: 'action.hover', borderRadius: 3, border: '1px dashed', borderColor: 'divider' }}>
                         <Box sx={{ textAlign: 'center', mb: 3 }}>
                             <Typography variant="h6" fontWeight={800} className="gradient-text">ItemHive POS</Typography>
-                            <Typography variant="caption" color="text.secondary" display="block">Terminal #01 - {user?.username || 'Staff'}</Typography>
+                            <Typography variant="caption" color="text.secondary" display="block">Terminal #01 - {user?.name || 'Staff'}</Typography>
                             <Typography variant="caption" color="text.secondary">{new Date().toLocaleString()}</Typography>
                         </Box>
 

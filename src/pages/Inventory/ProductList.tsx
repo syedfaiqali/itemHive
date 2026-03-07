@@ -47,8 +47,8 @@ import {
     History
 } from 'lucide-react';
 import { useSelector, useDispatch } from 'react-redux';
-import type { RootState } from '../../store';
-import { deleteProduct, updateProduct, addProduct, type Product, resolveProductImage, placeholderFallback, PRODUCT_CATEGORIES } from '../../features/inventory/inventorySlice';
+import type { RootState, AppDispatch } from '../../store';
+import { deleteProductApi, updateProductApi, addProductApi, fetchProducts, type Product, resolveProductImage, placeholderFallback, PRODUCT_CATEGORIES } from '../../features/inventory/inventorySlice';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { alpha, useTheme, styled } from '@mui/material/styles';
 import { motion } from 'framer-motion';
@@ -102,7 +102,7 @@ const categories_list = PRODUCT_CATEGORIES;
 
 const ProductList: React.FC = () => {
     const theme = useTheme();
-    const dispatch = useDispatch();
+    const dispatch = useDispatch<AppDispatch>();
     const navigate = useNavigate();
     const { currency, currencySymbol, formatCurrency } = useAppCurrency();
     const { products } = useSelector((state: RootState) => state.inventory);
@@ -130,16 +130,22 @@ const ProductList: React.FC = () => {
         price: '',
         stock: '',
         minStock: '',
-        description: ''
+        description: '',
+        batchNumber: '',
+        expiryDate: '',
+        supplier: ''
     });
 
     const location = useLocation();
 
     React.useEffect(() => {
+        dispatch(fetchProducts());
+    }, [dispatch]);
+
+    React.useEffect(() => {
         const queryParams = new URLSearchParams(location.search);
         if (queryParams.get('add') === 'true') {
             setShowAddModal(true);
-            // Optional: clear the query param after opening if desired
             navigate('/inventory', { replace: true });
         }
     }, [location.search, navigate]);
@@ -188,7 +194,7 @@ const ProductList: React.FC = () => {
 
     const confirmDelete = () => {
         if (deleteId) {
-            dispatch(deleteProduct(deleteId));
+            dispatch(deleteProductApi(deleteId));
             setDeleteId(null);
             showSnack('Product deleted successfully', 'success');
         }
@@ -197,7 +203,7 @@ const ProductList: React.FC = () => {
     const handleUpdateSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (editProduct) {
-            dispatch(updateProduct(editProduct));
+            dispatch(updateProductApi(editProduct));
             setEditProduct(null);
             showSnack('Product updated successfully', 'success');
         }
@@ -216,7 +222,7 @@ const ProductList: React.FC = () => {
             return;
         }
 
-        dispatch(addProduct({
+        dispatch(addProductApi({
             id: Math.random().toString(36).substr(2, 9),
             sku: addFormData.sku.toUpperCase(),
             name: addFormData.name,
@@ -225,7 +231,10 @@ const ProductList: React.FC = () => {
             stock: parseInt(addFormData.stock),
             minStock: parseInt(addFormData.minStock),
             description: addFormData.description,
-            lastUpdated: new Date().toISOString()
+            lastUpdated: new Date().toISOString(),
+            batchNumber: addFormData.batchNumber || `B-${Math.floor(Math.random() * 9000) + 1000}`,
+            expiryDate: addFormData.expiryDate || new Date(Date.now() + 31536000000).toISOString().split('T')[0],
+            supplier: addFormData.supplier || 'General Supplier'
         }));
 
         setShowAddModal(false);
@@ -236,7 +245,10 @@ const ProductList: React.FC = () => {
             price: '',
             stock: '',
             minStock: '',
-            description: ''
+            description: '',
+            batchNumber: '',
+            expiryDate: '',
+            supplier: ''
         });
         showSnack('Product added successfully', 'success');
     };
@@ -573,7 +585,10 @@ const ProductList: React.FC = () => {
                                     { label: 'PRICE', value: formatCurrency(viewProduct.price), icon: <DollarSign size={18} />, color: '#10b981' },
                                     { label: 'STOCK', value: `${viewProduct.stock} Units`, icon: <TrendingUp size={18} />, color: '#6366f1' },
                                     { label: 'MIN STOCK', value: `${viewProduct.minStock} Units`, icon: <ShieldCheck size={18} />, color: '#f59e0b' },
-                                    { label: 'LAST UPDATE', value: new Date(viewProduct.lastUpdated).toLocaleDateString(), icon: <History size={18} />, color: '#64748b' },
+                                    { label: 'BATCH', value: viewProduct.batchNumber || 'N/A', icon: <Layers size={18} />, color: '#a855f7' },
+                                    { label: 'EXPIRY', value: viewProduct.expiryDate || 'N/A', icon: <History size={18} />, color: '#ef4444' },
+                                    { label: 'SUPPLIER', value: viewProduct.supplier || 'N/A', icon: <ShieldCheck size={18} />, color: '#0ea5e9' },
+                                    { label: 'UPDATED', value: new Date(viewProduct.lastUpdated).toLocaleDateString(), icon: <History size={18} />, color: '#64748b' },
                                 ].map((item, idx) => (
                                     <Grid size={{ xs: 6, sm: 3 }} key={item.label}>
                                         <motion.div
@@ -689,10 +704,36 @@ const ProductList: React.FC = () => {
                                     <TextField
                                         fullWidth
                                         multiline
-                                        rows={3}
+                                        rows={2}
                                         label="Description"
                                         value={editProduct.description}
                                         onChange={(e) => setEditProduct({ ...editProduct, description: e.target.value })}
+                                    />
+                                </Grid>
+                                <Grid size={{ xs: 12, md: 4 }}>
+                                    <TextField
+                                        fullWidth
+                                        label="Batch Number"
+                                        value={editProduct.batchNumber || ''}
+                                        onChange={(e) => setEditProduct({ ...editProduct, batchNumber: e.target.value })}
+                                    />
+                                </Grid>
+                                <Grid size={{ xs: 12, md: 4 }}>
+                                    <TextField
+                                        fullWidth
+                                        label="Expiry Date"
+                                        type="date"
+                                        InputLabelProps={{ shrink: true }}
+                                        value={editProduct.expiryDate || ''}
+                                        onChange={(e) => setEditProduct({ ...editProduct, expiryDate: e.target.value })}
+                                    />
+                                </Grid>
+                                <Grid size={{ xs: 12, md: 4 }}>
+                                    <TextField
+                                        fullWidth
+                                        label="Supplier"
+                                        value={editProduct.supplier || ''}
+                                        onChange={(e) => setEditProduct({ ...editProduct, supplier: e.target.value })}
                                     />
                                 </Grid>
                             </Grid>
@@ -809,6 +850,40 @@ const ProductList: React.FC = () => {
                                             value={addFormData.description}
                                             onChange={handleAddChange}
                                             placeholder="Write something..."
+                                            InputProps={{ sx: { borderRadius: 3 } }}
+                                        />
+                                    </Grid>
+                                    <Grid size={{ xs: 12, md: 6 }}>
+                                        <TextField
+                                            fullWidth
+                                            label="Batch Number"
+                                            name="batchNumber"
+                                            value={addFormData.batchNumber}
+                                            onChange={handleAddChange}
+                                            placeholder="e.g. B-90210"
+                                            InputProps={{ sx: { borderRadius: 3 } }}
+                                        />
+                                    </Grid>
+                                    <Grid size={{ xs: 12, md: 6 }}>
+                                        <TextField
+                                            fullWidth
+                                            label="Supplier Name"
+                                            name="supplier"
+                                            value={addFormData.supplier}
+                                            onChange={handleAddChange}
+                                            placeholder="e.g. Acme Corp"
+                                            InputProps={{ sx: { borderRadius: 3 } }}
+                                        />
+                                    </Grid>
+                                    <Grid size={12}>
+                                        <TextField
+                                            fullWidth
+                                            label="Expiry Date"
+                                            name="expiryDate"
+                                            type="date"
+                                            InputLabelProps={{ shrink: true }}
+                                            value={addFormData.expiryDate}
+                                            onChange={handleAddChange}
                                             InputProps={{ sx: { borderRadius: 3 } }}
                                         />
                                     </Grid>

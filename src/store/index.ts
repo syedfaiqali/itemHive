@@ -11,7 +11,7 @@ import {
 } from 'redux-persist';
 import storage from 'redux-persist/lib/storage';
 import authReducer from '../features/auth/authSlice';
-import inventoryReducer, { initialProductsFromCsv } from '../features/inventory/inventorySlice';
+import inventoryReducer from '../features/inventory/inventorySlice';
 import transactionReducer from '../features/transactions/transactionSlice';
 import themeReducer from '../features/theme/themeSlice';
 import posReducer from '../features/pos/posSlice';
@@ -30,22 +30,9 @@ const rootReducer = combineReducers({
 
 const persistConfig = {
     key: 'root',
-    version: 5,
+    version: 6,
     storage,
-    whitelist: ['auth', 'inventory', 'transactions', 'theme', 'orders', 'settings'], // Persist these slices
-    migrate: (state: any) => {
-        if (!state) return Promise.resolve(state);
-        const nextState = { ...state };
-        if (nextState.inventory) {
-            nextState.inventory = {
-                ...nextState.inventory,
-                products: initialProductsFromCsv,
-                loading: false,
-                error: null,
-            };
-        }
-        return Promise.resolve(nextState);
-    },
+    whitelist: ['auth', 'theme', 'orders', 'settings'], // Only persist non-API-driven state
 };
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);

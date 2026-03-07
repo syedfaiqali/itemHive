@@ -151,7 +151,7 @@ const Dashboard: React.FC = () => {
                                 }}
                             />
                             <Typography variant="h4" fontWeight={800} gutterBottom>
-                                Welcome back, {user?.username?.split(' ')[0] || 'User'}!
+                                Welcome back, {user?.name?.split(' ')[0] || 'User'}!
                             </Typography>
                             <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
                                 Here's what's happening with your POS system today.

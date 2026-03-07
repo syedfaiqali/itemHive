@@ -26,15 +26,14 @@ import {
 import { Package, Search, CheckCircle2, XCircle, ClipboardList, Download, FileDown } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState } from '../../store';
-import { reduceStock } from '../../features/inventory/inventorySlice';
-import { addTransaction } from '../../features/transactions/transactionSlice';
 import { addOrder, type OrderStatus, type Order } from '../../features/orders/ordersSlice';
-import { resolveProductImage, placeholderFallback, type Product } from '../../features/inventory/inventorySlice';
+import { reduceStockApi, resolveProductImage, placeholderFallback, type Product } from '../../features/inventory/inventorySlice';
 import { alpha, useTheme } from '@mui/material/styles';
+import type { AppDispatch } from '../../store';
 
 const OrderDesk: React.FC = () => {
     const theme = useTheme();
-    const dispatch = useDispatch();
+    const dispatch = useDispatch<AppDispatch>();
     const { products } = useSelector((state: RootState) => state.inventory);
     const { user } = useSelector((state: RootState) => state.auth);
     const { orders } = useSelector((state: RootState) => state.orders);
@@ -70,7 +69,7 @@ const OrderDesk: React.FC = () => {
         if (!enoughStock) {
             const orderId = Math.random().toString(36).slice(2, 9).toUpperCase();
             const timestamp = new Date().toISOString();
-            const requestedBy = user?.username || 'Admin';
+            const requestedBy = user?.name || 'Admin';
 
             dispatch(addOrder({
                 id: orderId,
@@ -92,7 +91,7 @@ const OrderDesk: React.FC = () => {
 
         const orderId = Math.random().toString(36).slice(2, 9).toUpperCase();
         const timestamp = new Date().toISOString();
-        const requestedBy = user?.username || 'Admin';
+        const requestedBy = user?.name || 'Admin';
 
         dispatch(addOrder({
             id: orderId,
@@ -105,17 +104,17 @@ const OrderDesk: React.FC = () => {
             notes: note.trim() || undefined
         }));
 
-        dispatch(reduceStock({ id: selectedProduct.id, amount: requestedQty }));
-        dispatch(addTransaction({
+        const orderTx = {
             id: `ORD-${orderId}`,
             productId: selectedProduct.id,
             productName: selectedProduct.name,
-            type: 'reduction',
+            type: 'reduction' as const,
             amount: requestedQty,
             userName: requestedBy,
             timestamp,
             totalPrice: requestedQty * selectedProduct.price
-        }));
+        };
+        dispatch(reduceStockApi({ id: selectedProduct.id, amount: requestedQty, transaction: orderTx }));
 
         setFeedback({ type: 'success', message: `Order ${orderId} placed and stock updated.` });
         setSelectedProduct(null);

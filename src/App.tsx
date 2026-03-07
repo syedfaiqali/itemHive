@@ -45,29 +45,29 @@ const AppContent: React.FC = () => {
               <Route index element={<Dashboard />} />
               <Route path="inventory" element={<ProductList />} />
               <Route path="inventory/reduce" element={
-                <ProtectedRoute allowedRoles={['user', 'admin']}>
+                <ProtectedRoute allowedRoles={['cashier', 'admin']}>
                   <ReduceStock />
                 </ProtectedRoute>
               } />
               <Route path="pos" element={
-                <ProtectedRoute allowedRoles={['user', 'admin']}>
+                <ProtectedRoute allowedRoles={['cashier', 'admin']}>
                   <POSTerminal />
                 </ProtectedRoute>
               } />
               <Route path="orders" element={
-                <ProtectedRoute allowedRoles={['user', 'admin']}>
+                <ProtectedRoute allowedRoles={['cashier', 'admin']}>
                   <OrderDesk />
                 </ProtectedRoute>
               } />
               <Route path="transactions" element={<TransactionHistory />} />
               <Route path="reports" element={<ReportsPage />} />
               <Route path="settings" element={
-                <ProtectedRoute allowedRoles={['admin', 'user']}>
+                <ProtectedRoute allowedRoles={['admin', 'cashier']}>
                   <SettingsPage />
                 </ProtectedRoute>
               } />
               <Route path="profile" element={
-                <ProtectedRoute allowedRoles={['admin', 'user']}>
+                <ProtectedRoute allowedRoles={['admin', 'cashier']}>
                   <ProfilePage />
                 </ProtectedRoute>
               } />

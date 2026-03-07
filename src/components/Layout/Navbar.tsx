@@ -292,7 +292,7 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
                         <IconButton onClick={handleMenu} sx={{ p: 0.5, ml: 1 }}>
                             <Avatar
                                 src={user?.photoUrl}
-                                alt={user?.username}
+                                alt={user?.name}
                                 sx={{
                                     width: 35,
                                     height: 35,
@@ -301,7 +301,7 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
                                     fontWeight: 600
                                 }}
                             >
-                                {user?.username?.charAt(0).toUpperCase()}
+                                {user?.name?.charAt(0).toUpperCase()}
                             </Avatar>
                         </IconButton>
                     </Tooltip>
@@ -360,7 +360,7 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
                                 <Sparkles size={16} color={theme.palette.primary.main} />
                                 <Box>
                                     <Typography variant="subtitle2" sx={{ fontWeight: 800, lineHeight: 1.25 }}>
-                                        {user?.username}
+                                        {user?.name}
                                     </Typography>
                                     <Typography variant="caption" color="text.secondary" sx={{ letterSpacing: 0.2 }}>
                                         {user?.role === 'admin' ? 'Administrator' : 'Staff Member'}

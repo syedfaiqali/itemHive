@@ -29,14 +29,14 @@ import {
 } from 'lucide-react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
-import { reduceStock } from '../../features/inventory/inventorySlice';
-import { addTransaction } from '../../features/transactions/transactionSlice';
+import { reduceStockApi } from '../../features/inventory/inventorySlice';
+import type { AppDispatch } from '../../store';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import useAppCurrency from '../../hooks/useAppCurrency';
 
 const ReduceStock: React.FC = () => {
-    const dispatch = useDispatch();
+    const dispatch = useDispatch<AppDispatch>();
     const { products } = useSelector((state: RootState) => state.inventory);
     const { user } = useSelector((state: RootState) => state.auth);
     const { formatCurrency } = useAppCurrency();
@@ -64,13 +64,12 @@ const ReduceStock: React.FC = () => {
             productName: selectedProduct.name,
             type: 'reduction' as const,
             amount,
-            userName: user?.username || 'Unknown',
+            userName: user?.name || 'Unknown',
             timestamp: new Date().toISOString(),
             totalPrice: amount * selectedProduct.price
         };
 
-        dispatch(reduceStock({ id: selectedProduct.id, amount }));
-        dispatch(addTransaction(newTx));
+        dispatch(reduceStockApi({ id: selectedProduct.id, amount, transaction: newTx }));
 
         setLastTx(newTx);
         setSuccess(true);

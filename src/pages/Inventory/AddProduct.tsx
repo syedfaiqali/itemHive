@@ -22,7 +22,8 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { addProduct, type Product, PRODUCT_CATEGORIES } from '../../features/inventory/inventorySlice';
+import { addProductApi, type Product, PRODUCT_CATEGORIES } from '../../features/inventory/inventorySlice';
+import type { AppDispatch } from '../../store';
 import type { RootState } from '../../store';
 import { motion } from 'framer-motion';
 import useAppCurrency from '../../hooks/useAppCurrency';
@@ -31,7 +32,7 @@ const categories = PRODUCT_CATEGORIES;
 
 const AddProduct: React.FC = () => {
     const navigate = useNavigate();
-    const dispatch = useDispatch();
+    const dispatch = useDispatch<AppDispatch>();
     const [success, setSuccess] = useState(false);
     const { currency, currencySymbol } = useAppCurrency();
 
@@ -59,7 +60,7 @@ const AddProduct: React.FC = () => {
             return;
         }
 
-        dispatch(addProduct({
+        dispatch(addProductApi({
             id: Math.random().toString(36).substr(2, 9),
             sku: formData.sku.toUpperCase(),
             name: formData.name,

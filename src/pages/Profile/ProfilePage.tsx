@@ -16,16 +16,14 @@ import {
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import { Camera, Save } from 'lucide-react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector } from 'react-redux';
 import type { RootState } from '../../store';
-import { updateProfile } from '../../features/auth/authSlice';
 
 const ProfilePage: React.FC = () => {
     const theme = useTheme();
-    const dispatch = useDispatch();
     const { user } = useSelector((state: RootState) => state.auth);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
-    const [name, setName] = useState(user?.username || '');
+    const [name, setName] = useState(user?.name || '');
     const [photoUrl, setPhotoUrl] = useState(user?.photoUrl || '');
     const [saved, setSaved] = useState(false);
 
@@ -36,7 +34,7 @@ const ProfilePage: React.FC = () => {
     }
 
     const trimmedName = name.trim();
-    const hasNameChanged = trimmedName !== user.username;
+    const hasNameChanged = trimmedName !== user.name;
     const hasPhotoChanged = (photoUrl || '') !== (user.photoUrl || '');
     const hasChanges = hasNameChanged || hasPhotoChanged;
     const isSaveDisabled = !hasChanges || !trimmedName;
@@ -63,8 +61,7 @@ const ProfilePage: React.FC = () => {
     const handleSaveProfile = () => {
         if (!trimmedName) return;
         if (!hasChanges) return;
-
-        dispatch(updateProfile({ username: trimmedName, photoUrl }));
+        // Profile updates will go to backend once the User Settings API endpoint is established
         setSaved(true);
         setTimeout(() => setSaved(false), 2500);
     };
@@ -97,10 +94,10 @@ const ProfilePage: React.FC = () => {
                                         fontWeight: 700
                                     }}
                                 >
-                                    {(name || user.username)?.charAt(0).toUpperCase()}
+                                    {(name || user.name)?.charAt(0).toUpperCase()}
                                 </Avatar>
                                 <Box>
-                                    <Typography variant="h5" fontWeight={800}>{name || user.username}</Typography>
+                                    <Typography variant="h5" fontWeight={800}>{name || user.name}</Typography>
                                     <Chip
                                         label={roleLabel}
                                         size="small"
@@ -155,8 +152,8 @@ const ProfilePage: React.FC = () => {
                                     <Typography variant="body1" fontWeight={700}>{user.id}</Typography>
                                 </Grid>
                                 <Grid size={{ xs: 12, sm: 6 }}>
-                                    <Typography variant="caption" color="text.secondary">USER NAME</Typography>
-                                    <Typography variant="body1" fontWeight={700}>{name || user.username}</Typography>
+                                    <Typography variant="caption" color="text.secondary">EMAIL</Typography>
+                                    <Typography variant="body1" fontWeight={700}>{user.email}</Typography>
                                 </Grid>
                                 <Grid size={{ xs: 12, sm: 6 }}>
                                     <Typography variant="caption" color="text.secondary">ROLE</Typography>

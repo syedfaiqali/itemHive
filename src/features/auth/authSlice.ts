@@ -1,14 +1,17 @@
-import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk, type PayloadAction } from '@reduxjs/toolkit';
+import api from '../../api/axios';
 
-interface User {
+export interface User {
     id: string;
-    username: string;
-    role: 'admin' | 'user';
+    name: string;
+    email: string;
+    role: 'admin' | 'cashier';
     photoUrl?: string;
 }
 
 interface AuthState {
     user: User | null;
+    token: string | null;
     isAuthenticated: boolean;
     loading: boolean;
     error: string | null;
@@ -16,44 +19,57 @@ interface AuthState {
 
 const initialState: AuthState = {
     user: null,
-    isAuthenticated: false,
+    token: localStorage.getItem('token'),
+    isAuthenticated: !!localStorage.getItem('token'),
     loading: false,
     error: null,
 };
+
+export const loginUser = createAsyncThunk(
+    'auth/login',
+    async (credentials: { email: string; password: string }, { rejectWithValue }) => {
+        try {
+            const response = await api.post('/auth/login', credentials);
+            localStorage.setItem('token', response.data.token);
+            return response.data;
+        } catch (error: any) {
+            return rejectWithValue(error.response?.data?.message || 'Login failed');
+        }
+    }
+);
 
 const authSlice = createSlice({
     name: 'auth',
     initialState,
     reducers: {
-        loginStart: (state) => {
-            state.loading = true;
-            state.error = null;
-        },
-        loginSuccess: (state, action: PayloadAction<User>) => {
-            state.user = action.payload;
-            state.isAuthenticated = true;
-            state.loading = false;
-            state.error = null;
-        },
-        loginFailure: (state, action: PayloadAction<string>) => {
-            state.loading = false;
-            state.error = action.payload;
-        },
         logout: (state) => {
             state.user = null;
+            state.token = null;
             state.isAuthenticated = false;
-            state.loading = false;
+            localStorage.removeItem('token');
+        },
+        clearError: (state) => {
             state.error = null;
-        },
-        updateProfile: (state, action: PayloadAction<{ username?: string; photoUrl?: string }>) => {
-            if (!state.user) return;
-            state.user = {
-                ...state.user,
-                ...action.payload,
-            };
-        },
+        }
     },
+    extraReducers: (builder) => {
+        builder
+            .addCase(loginUser.pending, (state) => {
+                state.loading = true;
+                state.error = null;
+            })
+            .addCase(loginUser.fulfilled, (state, action: PayloadAction<{ token: string; user: User }>) => {
+                state.loading = false;
+                state.isAuthenticated = true;
+                state.user = action.payload.user;
+                state.token = action.payload.token;
+            })
+            .addCase(loginUser.rejected, (state, action: PayloadAction<any>) => {
+                state.loading = false;
+                state.error = action.payload;
+            });
+    }
 });
 
-export const { loginStart, loginSuccess, loginFailure, logout, updateProfile } = authSlice.actions;
+export const { logout, clearError } = authSlice.actions;
 export default authSlice.reducer;

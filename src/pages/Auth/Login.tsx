@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Box,
     Typography,
@@ -9,23 +9,26 @@ import {
     Alert,
     Divider,
     Container,
-    Paper
+    Paper,
+    CircularProgress
 } from '@mui/material';
 import { Mail, Lock, Eye, EyeOff, LogIn, ArrowRight, ShieldCheck, Sparkles, Smartphone, Tablet, Package, ScanLine, Boxes, ShoppingCart, Barcode } from 'lucide-react';
-import { useDispatch } from 'react-redux';
-import { loginSuccess } from '../../features/auth/authSlice';
+import { useDispatch, useSelector } from 'react-redux';
+import { loginUser, clearError } from '../../features/auth/authSlice';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { alpha, useTheme } from '@mui/material/styles';
+import type { AppDispatch, RootState } from '../../store';
 
 const Login: React.FC = () => {
     const theme = useTheme();
-    const dispatch = useDispatch();
+    const dispatch = useDispatch<AppDispatch>();
     const navigate = useNavigate();
+    const { loading, error, isAuthenticated } = useSelector((state: RootState) => state.auth);
     const [showPassword, setShowPassword] = useState(false);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [error, setError] = useState('');
+
     const floatingWidgets = [
         { icon: <Smartphone size={16} />, left: '6%', top: '10%', rotate: -11 },
         { icon: <Tablet size={16} />, left: '12%', top: '28%', rotate: 7 },
@@ -53,20 +56,18 @@ const Login: React.FC = () => {
         { icon: <Boxes size={16} />, left: '90%', top: '68%', rotate: 9 },
     ];
 
+    useEffect(() => {
+        if (isAuthenticated) {
+            navigate('/');
+        }
+        return () => {
+            dispatch(clearError());
+        };
+    }, [isAuthenticated, navigate, dispatch]);
+
     const handleLogin = (e: React.FormEvent) => {
         e.preventDefault();
-        setError('');
-
-        // Mock Login Logic
-        if (email === 'admin@itemhive.com' && password === 'admin123') {
-            dispatch(loginSuccess({ id: '1', username: 'System Admin', role: 'admin' }));
-            navigate('/');
-        } else if (email === 'user@itemhive.com' && password === 'user123') {
-            dispatch(loginSuccess({ id: '2', username: 'Staff User', role: 'user' }));
-            navigate('/');
-        } else {
-            setError('Invalid email or password. Use admin@itemhive.com / admin123 or user@itemhive.com / user123');
-        }
+        dispatch(loginUser({ email, password }));
     };
 
     return (
@@ -233,6 +234,7 @@ const Login: React.FC = () => {
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                     required
+                                    disabled={loading}
                                     InputProps={{
                                         startAdornment: (
                                             <InputAdornment position="start">
@@ -251,6 +253,7 @@ const Login: React.FC = () => {
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     required
+                                    disabled={loading}
                                     InputProps={{
                                         startAdornment: (
                                             <InputAdornment position="start">
@@ -263,6 +266,7 @@ const Login: React.FC = () => {
                                                     onClick={() => setShowPassword(!showPassword)}
                                                     edge="end"
                                                     size="small"
+                                                    disabled={loading}
                                                 >
                                                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                                                 </IconButton>
@@ -277,17 +281,18 @@ const Login: React.FC = () => {
                                     variant="contained"
                                     size="large"
                                     type="submit"
-                                    startIcon={<LogIn size={20} />}
+                                    disabled={loading}
+                                    startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <LogIn size={20} />}
                                     sx={{
                                         py: 1.15,
                                         borderRadius: 2,
                                         fontSize: '0.95rem',
                                         fontWeight: 800,
-                                        boxShadow: `0 12px 22px -12px ${alpha(theme.palette.primary.main, 0.8)}`,
+                                        boxShadow: loading ? 'none' : `0 12px 22px -12px ${alpha(theme.palette.primary.main, 0.8)}`,
                                         textTransform: 'none'
                                     }}
                                 >
-                                    Sign In
+                                    {loading ? 'Signing In...' : 'Sign In'}
                                 </Button>
                             </form>
 
@@ -318,10 +323,10 @@ const Login: React.FC = () => {
                                 }}
                             >
                                 <Typography variant="caption" color="text.secondary" display="block" align="center">
-                                    <strong>Admin:</strong> admin@itemhive.com / admin123
+                                    <strong>Admin:</strong> admin@itemhive.pro / admin123
                                 </Typography>
                                 <Typography variant="caption" color="text.secondary" display="block" align="center">
-                                    <strong>Staff:</strong> user@itemhive.com / user123
+                                    <strong>Staff:</strong> cashier@itemhive.pro / cashier123
                                 </Typography>
                             </Box>
                         </Box>
