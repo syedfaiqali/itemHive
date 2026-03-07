@@ -5,7 +5,6 @@ import {
     Grid,
     Card,
     CardContent,
-    Button,
     Table,
     TableBody,
     TableCell,
@@ -15,8 +14,6 @@ import {
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import {
-    Download,
-    Printer,
     TrendingDown,
     BarChart as BarChartIcon
 } from 'lucide-react';
@@ -120,10 +117,6 @@ const ReportsPage: React.FC = () => {
         [products, transactions]
     );
 
-    const handlePrint = () => {
-        window.print();
-    };
-
     return (
         <Box>
             <Box
@@ -138,10 +131,6 @@ const ReportsPage: React.FC = () => {
                 }}
             >
                 <Typography variant="h4" fontWeight={800}>Inventory Analytics & Reports</Typography>
-                <Box sx={{ display: 'flex', gap: 1.2, flexWrap: 'wrap', width: { xs: '100%', sm: 'auto' } }}>
-                    <Button variant="outlined" startIcon={<Printer size={20} />} onClick={handlePrint}>Print Report</Button>
-                    <Button variant="contained" startIcon={<Download size={20} />}>Export Data</Button>
-                </Box>
             </Box>
 
             <Grid container spacing={3}>

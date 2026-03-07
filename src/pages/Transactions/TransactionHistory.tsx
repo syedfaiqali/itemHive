@@ -198,7 +198,7 @@ const TransactionHistory: React.FC = () => {
                             opacity: exportingCsv ? 0.9 : 1
                         }}
                         onClick={exportToCSV}
-                        disabled={exportingCsv}
+                        disabled={filteredTransactions.length === 0 || exportingCsv}
                     >
                         Export CSV
                     </Button>
