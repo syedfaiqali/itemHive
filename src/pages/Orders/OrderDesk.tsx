@@ -247,7 +247,7 @@ const OrderDesk: React.FC = () => {
                                         label="Order Quantity"
                                         type="number"
                                         required
-                                        value={quantity}
+                                        value={Number(quantity) < 0 ? '0' : quantity}
                                         onChange={(e) => setQuantity(e.target.value)}
                                         InputProps={{
                                             startAdornment: (
@@ -420,21 +420,22 @@ const OrderDesk: React.FC = () => {
                                     <MenuItem value="pending">Pending</MenuItem>
                                 </TextField>
                                 <Button
-                                    variant="outlined"
+                                    variant="contained"
                                     startIcon={<Download size={18} />}
-                                    color="inherit"
                                     onClick={exportOrdersToCSV}
+                                    disabled={filteredOrders.length === 0}
                                     sx={{ borderColor: 'divider', whiteSpace: 'nowrap', ml: { xs: 0, sm: 'auto' } }}
                                 >
                                     Export CSV
                                 </Button>
                                 <Button
                                     variant="contained"
+                                    disabled={filteredOrders.length === 0}
                                     startIcon={<FileDown size={18} />}
                                     onClick={handleDownloadPDF}
                                     sx={{ whiteSpace: 'nowrap' }}
                                 >
-                                    Download PDF
+                                    Print PDF
                                 </Button>
                             </Box>
                             <TableContainer
