@@ -17,7 +17,34 @@ export const createTransaction = async (req: Request, res: Response) => {
     session.startTransaction();
 
     try {
-        const { id, productId, type, amount, totalPrice, userName, productName } = req.body;
+        const {
+            id,
+            productId,
+            type,
+            amount,
+            totalPrice,
+            userName,
+            productName,
+            paymentMethod,
+            paidVia,
+            paidNow,
+            dueAmount,
+            customerName,
+            customerCnic,
+            unitPrice,
+        } = req.body;
+
+        const product = await Product.findOne({ id: productId }).session(session);
+        if (!product) {
+            throw new Error('Product not found');
+        }
+
+        const resolvedUnitCost = product.purchasePrice ?? 0;
+        const resolvedUnitPrice = unitPrice ?? product.salePrice ?? product.price ?? 0;
+        const resolvedTotalPrice = totalPrice ?? (resolvedUnitPrice * amount);
+        const resolvedGrossProfit = type === 'reduction'
+            ? (resolvedUnitPrice - resolvedUnitCost) * amount
+            : 0;
 
         // 1. Record the transaction
         const transaction = new Transaction({
@@ -25,17 +52,20 @@ export const createTransaction = async (req: Request, res: Response) => {
             productId,
             type,
             amount,
-            totalPrice,
+            totalPrice: resolvedTotalPrice,
             userName,
-            productName
+            productName,
+            paymentMethod: paymentMethod || 'cash',
+            paidVia,
+            paidNow: paidNow || 0,
+            dueAmount: dueAmount || 0,
+            customerName,
+            customerCnic,
+            unitCost: resolvedUnitCost,
+            unitPrice: resolvedUnitPrice,
+            grossProfit: resolvedGrossProfit,
         });
         await transaction.save({ session });
-
-        // 2. Adjust product stock
-        const product = await Product.findOne({ id: productId }).session(session);
-        if (!product) {
-            throw new Error('Product not found');
-        }
 
         if (type === 'reduction') {
             if (product.stock < amount) {

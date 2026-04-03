@@ -140,7 +140,8 @@ const ProductList: React.FC = () => {
         sku: '',
         name: '',
         category: '',
-        price: '',
+        purchasePrice: '',
+        salePrice: '',
         stock: '',
         minStock: '',
         description: '',
@@ -240,7 +241,9 @@ const ProductList: React.FC = () => {
             sku: addFormData.sku.toUpperCase(),
             name: addFormData.name,
             category: addFormData.category || 'Uncategorized',
-            price: parseFloat(addFormData.price),
+            purchasePrice: parseFloat(addFormData.purchasePrice),
+            salePrice: parseFloat(addFormData.salePrice),
+            price: parseFloat(addFormData.salePrice),
             stock: parseInt(addFormData.stock),
             minStock: parseInt(addFormData.minStock),
             description: addFormData.description,
@@ -254,7 +257,8 @@ const ProductList: React.FC = () => {
             sku: '',
             name: '',
             category: '',
-            price: '',
+            purchasePrice: '',
+            salePrice: '',
             stock: '',
             minStock: '',
             description: '',
@@ -266,12 +270,13 @@ const ProductList: React.FC = () => {
     };
 
     const exportToCSV = () => {
-        const headers = ['ID', 'Name', 'Category', 'Price', 'Stock', 'Min Stock', 'Last Updated'];
+        const headers = ['ID', 'Name', 'Category', 'Purchase Price', 'Sale Price', 'Stock', 'Min Stock', 'Last Updated'];
         const rows = products.map(p => [
             p.id,
             p.name,
             p.category,
-            p.price,
+            p.purchasePrice,
+            p.salePrice,
             p.stock,
             p.minStock,
             p.lastUpdated
@@ -594,9 +599,10 @@ const ProductList: React.FC = () => {
 
                             <Grid container spacing={2}>
                                 {[
-                                    { label: 'PRICE', value: formatCurrency(viewProduct.price), icon: <DollarSign size={18} />, color: '#10b981' },
+                                    { label: 'BUY', value: formatCurrency(viewProduct.purchasePrice), icon: <DollarSign size={18} />, color: '#f59e0b' },
+                                    { label: 'SELL', value: formatCurrency(viewProduct.salePrice), icon: <DollarSign size={18} />, color: '#10b981' },
                                     { label: 'STOCK', value: `${viewProduct.stock} Units`, icon: <TrendingUp size={18} />, color: '#6366f1' },
-                                    { label: 'MIN STOCK', value: `${viewProduct.minStock} Units`, icon: <ShieldCheck size={18} />, color: '#f59e0b' },
+                                    { label: 'MIN STOCK', value: `${viewProduct.minStock} Units`, icon: <ShieldCheck size={18} />, color: '#0ea5e9' },
                                     { label: 'BATCH', value: viewProduct.batchNumber || 'N/A', icon: <Layers size={18} />, color: '#a855f7' },
                                     { label: 'EXPIRY', value: viewProduct.expiryDate || 'N/A', icon: <History size={18} />, color: '#ef4444' },
                                     { label: 'SUPPLIER', value: viewProduct.supplier || 'N/A', icon: <ShieldCheck size={18} />, color: '#0ea5e9' },
@@ -685,11 +691,21 @@ const ProductList: React.FC = () => {
                                 <Grid size={{ xs: 12, md: 4 }}>
                                     <TextField
                                         fullWidth
-                                        label={`Price (${currency})`}
+                                        label={`Upload Price (${currency})`}
                                         type="number"
                                         required
-                                        value={editProduct.price}
-                                        onChange={(e) => setEditProduct({ ...editProduct, price: parseFloat(e.target.value) })}
+                                        value={editProduct.purchasePrice}
+                                        onChange={(e) => setEditProduct({ ...editProduct, purchasePrice: parseFloat(e.target.value) })}
+                                    />
+                                </Grid>
+                                <Grid size={{ xs: 12, md: 4 }}>
+                                    <TextField
+                                        fullWidth
+                                        label={`Sell Price (${currency})`}
+                                        type="number"
+                                        required
+                                        value={editProduct.salePrice}
+                                        onChange={(e) => setEditProduct({ ...editProduct, salePrice: parseFloat(e.target.value), price: parseFloat(e.target.value) })}
                                     />
                                 </Grid>
                                 <Grid size={{ xs: 12, md: 4 }}>
@@ -902,11 +918,24 @@ const ProductList: React.FC = () => {
                                 <Stack spacing={3}>
                                     <TextField
                                         fullWidth
-                                        label={`Price (${currency})`}
-                                        name="price"
+                                        label={`Upload Price (${currency})`}
+                                        name="purchasePrice"
                                         type="number"
                                         required
-                                        value={addFormData.price}
+                                        value={addFormData.purchasePrice}
+                                        onChange={handleAddChange}
+                                        InputProps={{
+                                            sx: { borderRadius: 3, bgcolor: 'background.paper' },
+                                            startAdornment: <InputAdornment position="start">{currencySymbol}</InputAdornment>,
+                                        }}
+                                    />
+                                    <TextField
+                                        fullWidth
+                                        label={`Sell Price (${currency})`}
+                                        name="salePrice"
+                                        type="number"
+                                        required
+                                        value={addFormData.salePrice}
                                         onChange={handleAddChange}
                                         InputProps={{
                                             sx: { borderRadius: 3, bgcolor: 'background.paper' },

@@ -41,7 +41,8 @@ const AddProduct: React.FC = () => {
         sku: '',
         name: '',
         category: '',
-        price: '',
+        purchasePrice: '',
+        salePrice: '',
         stock: '',
         minStock: '',
         description: ''
@@ -65,11 +66,12 @@ const AddProduct: React.FC = () => {
             sku: formData.sku.toUpperCase(),
             name: formData.name,
             category: formData.category || 'Uncategorized',
-            price: parseFloat(formData.price),
+            purchasePrice: parseFloat(formData.purchasePrice),
+            salePrice: parseFloat(formData.salePrice),
+            price: parseFloat(formData.salePrice),
             stock: parseInt(formData.stock),
             minStock: parseInt(formData.minStock),
-            description: formData.description,
-            lastUpdated: new Date().toISOString()
+            description: formData.description
         }));
 
         setSuccess(true);
@@ -176,11 +178,26 @@ const AddProduct: React.FC = () => {
                                 <Grid size={{ xs: 12, md: 4 }}>
                                     <TextField
                                         fullWidth
-                                        label={`Price (${currency})`}
-                                        name="price"
+                                        label={`Upload Price (${currency})`}
+                                        name="purchasePrice"
                                         type="number"
                                         required
-                                        value={formData.price}
+                                        value={formData.purchasePrice}
+                                        onChange={handleChange}
+                                        InputProps={{
+                                            startAdornment: <InputAdornment position="start">{currencySymbol}</InputAdornment>,
+                                        }}
+                                    />
+                                </Grid>
+
+                                <Grid size={{ xs: 12, md: 4 }}>
+                                    <TextField
+                                        fullWidth
+                                        label={`Sell Price (${currency})`}
+                                        name="salePrice"
+                                        type="number"
+                                        required
+                                        value={formData.salePrice}
                                         onChange={handleChange}
                                         InputProps={{
                                             startAdornment: <InputAdornment position="start">{currencySymbol}</InputAdornment>,

@@ -11,6 +11,15 @@ export interface Transaction {
     userName: string;
     timestamp: string;
     totalPrice: number;
+    paymentMethod?: 'cash' | 'card' | 'credit';
+    paidVia?: 'cash' | 'card';
+    paidNow?: number;
+    dueAmount?: number;
+    customerName?: string;
+    customerCnic?: string;
+    unitCost?: number;
+    unitPrice?: number;
+    grossProfit?: number;
 }
 
 interface TransactionState {

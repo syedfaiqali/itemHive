@@ -5,6 +5,7 @@ export interface SalesTrendPoint {
     _id: string;
     revenue: number;
     sales: number;
+    profit?: number;
 }
 
 export interface CategoryValuationPoint {
@@ -17,6 +18,7 @@ export interface TopSellingProduct {
     name: string;
     totalReduced: number;
     revenue: number;
+    profit?: number;
 }
 
 interface ReportsState {

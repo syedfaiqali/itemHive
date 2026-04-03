@@ -102,6 +102,11 @@ const ReportsPage: React.FC = () => {
         [topSelling, products]
     );
 
+    const totalProfit = useMemo(
+        () => salesTrend.reduce((sum, point) => sum + (point.profit || 0), 0),
+        [salesTrend]
+    );
+
     return (
         <Box>
             <Box
@@ -123,6 +128,10 @@ const ReportsPage: React.FC = () => {
                     {error}
                 </Alert>
             )}
+
+            <Alert severity={totalProfit >= 0 ? 'success' : 'warning'} sx={{ mb: 3 }}>
+                Total profit/loss for the last 7 days: {formatCurrency(totalProfit, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+            </Alert>
 
             <Grid container spacing={3}>
                 {/* Revenue Trend Line Chart */}
@@ -236,11 +245,12 @@ const ReportsPage: React.FC = () => {
                                             <TableCell sx={{ fontWeight: 700 }}>PRODUCT</TableCell>
                                             <TableCell sx={{ fontWeight: 700 }}>TOTAL REDUCED</TableCell>
                                             <TableCell sx={{ fontWeight: 700 }}>REVENUE GENERATED</TableCell>
+                                            <TableCell sx={{ fontWeight: 700 }}>PROFIT / LOSS</TableCell>
                                             <TableCell sx={{ fontWeight: 700 }}>CURRENT STOCK</TableCell>
                                         </TableRow>
                                     </TableHead>
                                     <TableBody>
-                                        {topSellingRows.map(({ product, _id, name, totalReduced, revenue }) => (
+                                        {topSellingRows.map(({ product, _id, name, totalReduced, revenue, profit }) => (
                                             <TableRow key={_id}>
                                                 <TableCell sx={{ fontWeight: 600 }}>{name}</TableCell>
                                                 <TableCell>
@@ -251,6 +261,9 @@ const ReportsPage: React.FC = () => {
                                                 </TableCell>
                                                 <TableCell sx={{ fontWeight: 700 }}>
                                                     {formatCurrency(revenue, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                                </TableCell>
+                                                <TableCell sx={{ fontWeight: 700, color: (profit || 0) >= 0 ? 'success.main' : 'error.main' }}>
+                                                    {formatCurrency(profit || 0, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                                                 </TableCell>
                                                 <TableCell>{product?.stock ?? 0} Units</TableCell>
                                             </TableRow>

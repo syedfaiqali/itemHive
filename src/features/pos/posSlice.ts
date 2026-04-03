@@ -30,6 +30,12 @@ const posSlice = createSlice({
                 state.cart.push({ ...action.payload, quantity: 1 });
             }
         },
+        updateCartItemPrice: (state, action: PayloadAction<{ id: string; price: number }>) => {
+            const item = state.cart.find(cartItem => cartItem.id === action.payload.id);
+            if (item) {
+                item.price = Math.max(0, action.payload.price);
+            }
+        },
         removeFromCart: (state, action: PayloadAction<string>) => {
             state.cart = state.cart.filter(item => item.id !== action.payload);
         },
@@ -52,5 +58,5 @@ const posSlice = createSlice({
     },
 });
 
-export const { addToCart, removeFromCart, updateQuantity, clearCart, setCartDiscount } = posSlice.actions;
+export const { addToCart, updateCartItemPrice, removeFromCart, updateQuantity, clearCart, setCartDiscount } = posSlice.actions;
 export default posSlice.reducer;

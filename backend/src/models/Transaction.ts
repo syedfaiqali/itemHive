@@ -9,6 +9,15 @@ export interface ITransaction extends Document {
     type: 'addition' | 'reduction';
     amount: number;
     totalPrice: number;
+    paymentMethod?: 'cash' | 'card' | 'credit';
+    paidVia?: 'cash' | 'card';
+    paidNow?: number;
+    dueAmount?: number;
+    customerName?: string;
+    customerCnic?: string;
+    unitCost?: number;
+    unitPrice?: number;
+    grossProfit?: number;
 }
 
 const TransactionSchema: Schema = new Schema({
@@ -19,7 +28,16 @@ const TransactionSchema: Schema = new Schema({
     userName: { type: String, required: true },
     type: { type: String, enum: ['addition', 'reduction'], required: true, index: true },
     amount: { type: Number, required: true },
-    totalPrice: { type: Number, required: true }
+    totalPrice: { type: Number, required: true },
+    paymentMethod: { type: String, enum: ['cash', 'card', 'credit'], default: 'cash' },
+    paidVia: { type: String, enum: ['cash', 'card'], default: undefined },
+    paidNow: { type: Number, default: 0 },
+    dueAmount: { type: Number, default: 0 },
+    customerName: { type: String, default: '' },
+    customerCnic: { type: String, default: '' },
+    unitCost: { type: Number, default: 0 },
+    unitPrice: { type: Number, default: 0 },
+    grossProfit: { type: Number, default: 0 }
 }, { timestamps: true });
 
 export default mongoose.model<ITransaction>('Transaction', TransactionSchema);

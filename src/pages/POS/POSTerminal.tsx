@@ -39,8 +39,9 @@ import {
 } from 'lucide-react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
-import { addToCart, updateQuantity, clearCart } from '../../features/pos/posSlice';
+import { addToCart, updateCartItemPrice, updateQuantity, clearCart } from '../../features/pos/posSlice';
 import { reduceStockApi, resolveProductImage, PRODUCT_CATEGORIES, fetchProducts } from '../../features/inventory/inventorySlice';
+import { fetchTransactions } from '../../features/transactions/transactionSlice';
 import type { Product } from '../../features/inventory/inventorySlice';
 import type { AppDispatch } from '../../store';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -100,7 +101,6 @@ const POSTerminal: React.FC = () => {
 
     const { user } = useSelector((state: RootState) => state.auth);
     const { products } = useSelector((state: RootState) => state.inventory);
-    const { transactions = [] } = useSelector((state: RootState) => state.transactions || { transactions: [] });
     const { cart, taxRate, activeDiscount } = useSelector((state: RootState) => state.pos);
     const { formatCurrency, currencySymbol } = useAppCurrency();
 
@@ -118,6 +118,8 @@ const POSTerminal: React.FC = () => {
     const [creditPaidVia, setCreditPaidVia] = useState<'cash' | 'card'>('cash');
     const [creditPaidNow, setCreditPaidNow] = useState(0);
     const [creditDue, setCreditDue] = useState(0);
+    const [creditCustomerName, setCreditCustomerName] = useState('');
+    const [creditCustomerCnic, setCreditCustomerCnic] = useState('');
 
     const filteredProducts = useMemo(() => {
         return products.filter(p => {
@@ -129,6 +131,7 @@ const POSTerminal: React.FC = () => {
     }, [products, searchTerm, activeTab]);
 
     const subtotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+    const projectedProfit = cart.reduce((acc, item) => acc + ((item.price - item.purchasePrice) * item.quantity), 0);
     const tax = subtotal * taxRate;
     const total = subtotal + tax - activeDiscount;
     const draftCreditPaid = Math.min(Math.max(Number(creditPaidInput || 0), 0), total);
@@ -142,12 +145,15 @@ const POSTerminal: React.FC = () => {
             `Date: ${dateLabel}`,
             `Cashier: ${user?.name || 'Staff'}`,
             `Payment: ${method === 'credit' ? `CREDIT (${creditPaidVia.toUpperCase()} + DUE)` : method.toUpperCase()}`,
+            method === 'credit' ? `Customer: ${creditCustomerName}` : '',
+            method === 'credit' ? `CNIC: ${creditCustomerCnic}` : '',
             '----------------------------------------',
             ...cart.map((item) => `${item.name} x${item.quantity} @ ${formatCurrency(item.price)} = ${formatCurrency(item.price * item.quantity)}`),
             '----------------------------------------',
             `Subtotal: ${formatCurrency(subtotal)}`,
             `Tax (10%): ${formatCurrency(tax)}`,
             activeDiscount > 0 ? `Discount: -${formatCurrency(activeDiscount)}` : '',
+            `Profit/Loss: ${formatCurrency(projectedProfit)}`,
             method === 'credit' ? `Paid Now: ${formatCurrency(creditPaidNow)}` : '',
             method === 'credit' ? `Remaining Due: ${formatCurrency(creditDue)}` : '',
             method === 'credit' ? `Order Total: ${formatCurrency(total)}` : `Total Paid: ${formatCurrency(total)}`,
@@ -192,10 +198,16 @@ const POSTerminal: React.FC = () => {
         const suggestedPaidNow = Math.max(total * 0.8, 0);
         setCreditPaidInput(suggestedPaidNow.toFixed(2));
         setCreditPaidVia('cash');
+        setCreditCustomerName('');
+        setCreditCustomerCnic('');
         setCreditOpen(true);
     };
 
     const handleContinueCredit = () => {
+        if (!creditCustomerName.trim() || !creditCustomerCnic.trim()) {
+            setStockToast({ open: true, message: 'Customer name and CNIC are required for credit sales.' });
+            return;
+        }
         if (draftCreditDue <= 0) {
             setStockToast({ open: true, message: 'Use Cash/Card for full payment. Credit requires a due amount.' });
             return;
@@ -207,17 +219,14 @@ const POSTerminal: React.FC = () => {
         setConfirmOpen(true);
     };
 
-    const handleConfirmCheckout = () => {
+    const handleConfirmCheckout = async () => {
         if (!pendingMethod) return;
 
-        const id = `R${String(transactions.length + 1).padStart(6, '0')}`;
+        const id = `R${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 10)}`;
         const receiptTimeIso = new Date().toISOString();
-        setReceiptId(id);
-        setReceiptTime(receiptTimeIso);
-        setPaymentMethod(pendingMethod);
+        const currentMethod = pendingMethod;
 
-        // Process all items in cart
-        cart.forEach(item => {
+        const results = await Promise.all(cart.map((item) => {
             const tx = {
                 id: `${id}-${item.id.substr(0, 3)}`,
                 productId: item.id,
@@ -226,11 +235,35 @@ const POSTerminal: React.FC = () => {
                 amount: item.quantity,
                 userName: user?.name || 'Staff',
                 timestamp: receiptTimeIso,
-                totalPrice: item.price * item.quantity
+                totalPrice: item.price * item.quantity,
+                paymentMethod: pendingMethod,
+                paidVia: pendingMethod === 'credit' ? creditPaidVia : undefined,
+                paidNow: pendingMethod === 'credit' ? creditPaidNow : total,
+                dueAmount: pendingMethod === 'credit' ? creditDue : 0,
+                customerName: pendingMethod === 'credit' ? creditCustomerName.trim() : undefined,
+                customerCnic: pendingMethod === 'credit' ? creditCustomerCnic.trim() : undefined,
+                unitPrice: item.price,
             };
-            dispatch(reduceStockApi({ id: item.id, amount: item.quantity, transaction: tx }));
-        });
+            return dispatch(reduceStockApi({ id: item.id, amount: item.quantity, transaction: tx }));
+        }));
 
+        const failedResult = results.find((result) => reduceStockApi.rejected.match(result));
+        if (failedResult && reduceStockApi.rejected.match(failedResult)) {
+            setStockToast({
+                open: true,
+                message: typeof failedResult.payload === 'string' ? failedResult.payload : 'Credit sale could not be saved.',
+            });
+            return;
+        }
+
+        await Promise.all([
+            dispatch(fetchProducts()),
+            dispatch(fetchTransactions()),
+        ]);
+
+        setReceiptId(id);
+        setReceiptTime(receiptTimeIso);
+        setPaymentMethod(currentMethod);
         setOrderDone(true);
         setConfirmOpen(false);
         setPendingMethod(null);
@@ -247,6 +280,8 @@ const POSTerminal: React.FC = () => {
         setPaymentMethod(null);
         setCreditPaidNow(0);
         setCreditDue(0);
+        setCreditCustomerName('');
+        setCreditCustomerCnic('');
     };
 
     const handlePrint = () => {
@@ -592,7 +627,22 @@ const POSTerminal: React.FC = () => {
                                         <Box sx={{ mb: 1.25, display: 'flex', alignItems: { xs: 'flex-start', sm: 'center' }, gap: { xs: 1, sm: 2 }, flexWrap: 'wrap' }}>
                                             <Box sx={{ flexGrow: 1, minWidth: { xs: '100%', sm: 160 } }}>
                                                 <Typography variant="body2" fontWeight={700} noWrap={false} sx={{ wordBreak: 'break-word' }}>{item.name}</Typography>
-                                                <Typography variant="caption" color="text.secondary">{formatCurrency(item.price)} / unit</Typography>
+                                                <Typography variant="caption" color="text.secondary" display="block">
+                                                    Cost: {formatCurrency(item.purchasePrice)} | Default sell: {formatCurrency(item.salePrice)}
+                                                </Typography>
+                                                <TextField
+                                                    size="small"
+                                                    type="number"
+                                                    label="Sell Price"
+                                                    value={item.price}
+                                                    onChange={(e) => dispatch(updateCartItemPrice({ id: item.id, price: Number(e.target.value || 0) }))}
+                                                    sx={{ mt: 1, maxWidth: 150 }}
+                                                    InputProps={{
+                                                        startAdornment: (
+                                                            <InputAdornment position="start">{currencySymbol}</InputAdornment>
+                                                        ),
+                                                    }}
+                                                />
                                             </Box>
                                             <Stack direction="row" alignItems="center" spacing={1} sx={{ bgcolor: 'action.hover', borderRadius: 2, p: 0.5 }}>
                                                 <IconButton size="small" onClick={() => dispatch(updateQuantity({ id: item.id, quantity: item.quantity - 1 }))}>
@@ -656,6 +706,14 @@ const POSTerminal: React.FC = () => {
                         <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                             <Typography variant="h5" fontWeight={900}>Total Payable</Typography>
                             <Typography variant="h5" fontWeight={900} color="primary.main">{formatCurrency(total)}</Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <Typography variant="body2" color={projectedProfit >= 0 ? 'success.main' : 'error.main'}>
+                                Profit / Loss
+                            </Typography>
+                            <Typography variant="body2" fontWeight={800} color={projectedProfit >= 0 ? 'success.main' : 'error.main'}>
+                                {formatCurrency(projectedProfit)}
+                            </Typography>
                         </Box>
                     </Stack>
 
@@ -758,6 +816,21 @@ const POSTerminal: React.FC = () => {
                         InputProps={{ startAdornment: <InputAdornment position="start">{currencySymbol}</InputAdornment> }}
                         sx={{ mb: 2 }}
                     />
+                    <TextField
+                        fullWidth
+                        label="Customer Name"
+                        value={creditCustomerName}
+                        onChange={(e) => setCreditCustomerName(e.target.value)}
+                        sx={{ mb: 2 }}
+                    />
+                    <TextField
+                        fullWidth
+                        label="Customer CNIC"
+                        value={creditCustomerCnic}
+                        onChange={(e) => setCreditCustomerCnic(e.target.value)}
+                        placeholder="35202-1234567-1"
+                        sx={{ mb: 2 }}
+                    />
                     <Grid container spacing={1} sx={{ mb: 2 }}>
                         <Grid size={{ xs: 6 }}>
                             <Button
@@ -782,6 +855,9 @@ const POSTerminal: React.FC = () => {
                         <Typography variant="body2" fontWeight={700}>Order Total: {formatCurrency(total)}</Typography>
                         <Typography variant="body2" fontWeight={700}>Paid Now: {formatCurrency(draftCreditPaid)}</Typography>
                         <Typography variant="body2" fontWeight={900} color="warning.main">Remaining Due: {formatCurrency(draftCreditDue)}</Typography>
+                        <Typography variant="body2" fontWeight={700} color={projectedProfit >= 0 ? 'success.main' : 'error.main'}>
+                            Profit / Loss: {formatCurrency(projectedProfit)}
+                        </Typography>
                     </Box>
                 </DialogContent>
                 <DialogActions sx={{ p: 2 }}>
@@ -811,12 +887,17 @@ const POSTerminal: React.FC = () => {
                         </Typography>
                         {pendingMethod === 'credit' && (
                             <Box sx={{ mt: 1 }}>
+                                <Typography variant="body2">Customer: <strong>{creditCustomerName}</strong></Typography>
+                                <Typography variant="body2">CNIC: <strong>{creditCustomerCnic}</strong></Typography>
                                 <Typography variant="body2" fontWeight={700}>Paid via {creditPaidVia.toUpperCase()}: {formatCurrency(creditPaidNow)}</Typography>
                                 <Typography variant="body2" fontWeight={900} color="warning.main">Due Later: {formatCurrency(creditDue)}</Typography>
                             </Box>
                         )}
                         <Typography variant="h6" fontWeight={900} color="primary.main" sx={{ mt: 0.5 }}>
                             Total: {formatCurrency(total)}
+                        </Typography>
+                        <Typography variant="body2" fontWeight={800} color={projectedProfit >= 0 ? 'success.main' : 'error.main'}>
+                            Profit / Loss: {formatCurrency(projectedProfit)}
                         </Typography>
                     </Box>
                 </DialogContent>
@@ -853,6 +934,11 @@ const POSTerminal: React.FC = () => {
                             <Typography variant="h6" fontWeight={800} className="gradient-text">ItemHive POS</Typography>
                             <Typography variant="caption" color="text.secondary" display="block">Terminal #01 - {user?.name || 'Staff'}</Typography>
                             <Typography variant="caption" color="text.secondary">{new Date().toLocaleString()}</Typography>
+                            {paymentMethod === 'credit' && (
+                                <Typography variant="caption" color="text.secondary" display="block">
+                                    Customer: {creditCustomerName} | CNIC: {creditCustomerCnic}
+                                </Typography>
+                            )}
                         </Box>
 
                         <Stack spacing={1.5}>
@@ -894,6 +980,14 @@ const POSTerminal: React.FC = () => {
                                     </Box>
                                 </>
                             )}
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <Typography variant="caption" color={projectedProfit >= 0 ? 'success.main' : 'error.main'}>
+                                    Profit / Loss
+                                </Typography>
+                                <Typography variant="caption" fontWeight={800} color={projectedProfit >= 0 ? 'success.main' : 'error.main'}>
+                                    {formatCurrency(projectedProfit)}
+                                </Typography>
+                            </Box>
                         </Stack>
 
                         <Box sx={{ mt: 3, textAlign: 'center', opacity: 0.6 }}>

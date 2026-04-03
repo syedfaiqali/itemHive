@@ -19,7 +19,8 @@ export const getSalesTrend = async (req: Request, res: Response) => {
                 $group: {
                     _id: { $dateToString: { format: '%Y-%m-%d', date: '$timestamp' } },
                     revenue: { $sum: '$totalPrice' },
-                    sales: { $sum: '$amount' }
+                    sales: { $sum: '$amount' },
+                    profit: { $sum: '$grossProfit' }
                 }
             },
             { $sort: { _id: 1 } }
@@ -58,7 +59,8 @@ export const getTopSellingProducts = async (req: Request, res: Response) => {
                     _id: '$productId',
                     name: { $first: '$productName' },
                     totalReduced: { $sum: '$amount' },
-                    revenue: { $sum: '$totalPrice' }
+                    revenue: { $sum: '$totalPrice' },
+                    profit: { $sum: '$grossProfit' }
                 }
             },
             { $sort: { totalReduced: -1 } },

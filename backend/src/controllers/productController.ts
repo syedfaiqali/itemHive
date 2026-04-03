@@ -22,7 +22,10 @@ export const getProductById = async (req: Request, res: Response) => {
 
 export const createProduct = async (req: Request, res: Response) => {
     try {
-        const product = new Product(req.body);
+        const product = new Product({
+            ...req.body,
+            price: req.body.salePrice ?? req.body.price,
+        });
         const savedProduct = await product.save();
         res.status(201).json(savedProduct);
     } catch (error: any) {
@@ -34,7 +37,10 @@ export const updateProduct = async (req: Request, res: Response) => {
     try {
         const updatedProduct = await Product.findOneAndUpdate(
             { id: req.params.id },
-            req.body,
+            {
+                ...req.body,
+                price: req.body.salePrice ?? req.body.price,
+            },
             { new: true, runValidators: true }
         );
         if (!updatedProduct) return res.status(404).json({ message: 'Product not found' });

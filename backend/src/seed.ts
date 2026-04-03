@@ -50,6 +50,8 @@ const seedData = async () => {
                     sku: slugToSku(article) || `SKU-${index + 1}`,
                     name: article,
                     category: 'Snacks & Candy', // Default category
+                    purchasePrice: normalizeNumber(price),
+                    salePrice: normalizeNumber(price),
                     price: normalizeNumber(price),
                     stock: normalizeNumber(qty),
                     minStock: 5,

@@ -7,6 +7,8 @@ export interface Product {
     sku: string;
     name: string;
     category: string;
+    purchasePrice: number;
+    salePrice: number;
     price: number;
     stock: number;
     minStock: number;
@@ -30,13 +32,25 @@ const initialState: InventoryState = {
     error: null,
 };
 
+const normalizeProduct = (product: any): Product => {
+    const salePrice = Number(product.salePrice ?? product.price ?? 0);
+    const purchasePrice = Number(product.purchasePrice ?? product.price ?? 0);
+
+    return {
+        ...product,
+        purchasePrice,
+        salePrice,
+        price: salePrice,
+    };
+};
+
 // Async Thunks
 export const fetchProducts = createAsyncThunk(
     'inventory/fetchProducts',
     async (_, { rejectWithValue }) => {
         try {
             const response = await api.get('/products');
-            return response.data;
+            return response.data.map(normalizeProduct);
         } catch (error: any) {
             return rejectWithValue(error.response?.data?.message || 'Failed to fetch products');
         }
@@ -48,7 +62,7 @@ export const addProductApi = createAsyncThunk(
     async (product: Product, { rejectWithValue }) => {
         try {
             const response = await api.post('/products', product);
-            return response.data;
+            return normalizeProduct(response.data);
         } catch (error: any) {
             return rejectWithValue(error.response?.data?.message || 'Failed to add product');
         }
@@ -60,7 +74,7 @@ export const updateProductApi = createAsyncThunk(
     async (product: Product, { rejectWithValue }) => {
         try {
             const response = await api.put(`/products/${product.id}`, product);
-            return response.data;
+            return normalizeProduct(response.data);
         } catch (error: any) {
             return rejectWithValue(error.response?.data?.message || 'Failed to update product');
         }
