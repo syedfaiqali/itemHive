@@ -33,7 +33,22 @@ export const loginUser = createAsyncThunk(
             localStorage.setItem('token', response.data.token);
             return response.data;
         } catch (error: any) {
-            return rejectWithValue(error.response?.data?.message || 'Login failed');
+            return rejectWithValue(error.response?.data?.details || error.response?.data?.message || 'Login failed');
+        }
+    }
+);
+
+export const registerUser = createAsyncThunk(
+    'auth/register',
+    async (
+        payload: { name: string; email: string; password: string; role: 'admin' | 'cashier' },
+        { rejectWithValue }
+    ) => {
+        try {
+            const response = await api.post('/auth/register', payload);
+            return response.data;
+        } catch (error: any) {
+            return rejectWithValue(error.response?.data?.details || error.response?.data?.message || 'Registration failed');
         }
     }
 );
@@ -65,6 +80,17 @@ const authSlice = createSlice({
                 state.token = action.payload.token;
             })
             .addCase(loginUser.rejected, (state, action: PayloadAction<any>) => {
+                state.loading = false;
+                state.error = action.payload;
+            })
+            .addCase(registerUser.pending, (state) => {
+                state.loading = true;
+                state.error = null;
+            })
+            .addCase(registerUser.fulfilled, (state) => {
+                state.loading = false;
+            })
+            .addCase(registerUser.rejected, (state, action: PayloadAction<any>) => {
                 state.loading = false;
                 state.error = action.payload;
             });

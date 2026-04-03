@@ -70,8 +70,17 @@ const transactionSlice = createSlice({
                 state.loading = false;
                 state.error = action.payload;
             })
+            .addCase(addTransactionApi.pending, (state) => {
+                state.loading = true;
+                state.error = null;
+            })
             .addCase(addTransactionApi.fulfilled, (state, action: PayloadAction<Transaction>) => {
+                state.loading = false;
                 state.transactions.unshift(action.payload);
+            })
+            .addCase(addTransactionApi.rejected, (state, action: PayloadAction<any>) => {
+                state.loading = false;
+                state.error = action.payload;
             });
     }
 });

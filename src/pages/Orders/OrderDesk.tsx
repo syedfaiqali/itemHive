@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
     Box,
     Typography,
@@ -27,7 +27,8 @@ import { Package, Search, CheckCircle2, XCircle, ClipboardList, Download, FileDo
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState } from '../../store';
 import { addOrder, type OrderStatus, type Order } from '../../features/orders/ordersSlice';
-import { reduceStockApi, resolveProductImage, placeholderFallback, type Product } from '../../features/inventory/inventorySlice';
+import { fetchProducts, resolveProductImage, placeholderFallback, type Product } from '../../features/inventory/inventorySlice';
+import { addTransactionApi, fetchTransactions } from '../../features/transactions/transactionSlice';
 import { alpha, useTheme } from '@mui/material/styles';
 import type { AppDispatch } from '../../store';
 
@@ -37,6 +38,7 @@ const OrderDesk: React.FC = () => {
     const { products } = useSelector((state: RootState) => state.inventory);
     const { user } = useSelector((state: RootState) => state.auth);
     const { orders } = useSelector((state: RootState) => state.orders);
+    const { transactions, loading: transactionLoading } = useSelector((state: RootState) => state.transactions);
 
     const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
     const [quantity, setQuantity] = useState<number | string>(1);
@@ -44,6 +46,11 @@ const OrderDesk: React.FC = () => {
     const [feedback, setFeedback] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
     const [filterText, setFilterText] = useState('');
     const [statusFilter, setStatusFilter] = useState<'all' | OrderStatus>('all');
+
+    useEffect(() => {
+        dispatch(fetchProducts());
+        dispatch(fetchTransactions());
+    }, [dispatch]);
 
     const availableStock = selectedProduct?.stock ?? 0;
     const requestedQty = Math.max(0, parseInt(quantity.toString() || '0'));
@@ -62,7 +69,7 @@ const OrderDesk: React.FC = () => {
             ? 'fulfilled'
             : 'rejected';
 
-    const handlePlaceOrder = (e: React.FormEvent) => {
+    const handlePlaceOrder = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!selectedProduct) return;
 
@@ -93,17 +100,6 @@ const OrderDesk: React.FC = () => {
         const timestamp = new Date().toISOString();
         const requestedBy = user?.name || 'Admin';
 
-        dispatch(addOrder({
-            id: orderId,
-            productId: selectedProduct.id,
-            productName: selectedProduct.name,
-            quantity: requestedQty,
-            requestedBy,
-            status: 'fulfilled',
-            timestamp,
-            notes: note.trim() || undefined
-        }));
-
         const orderTx = {
             id: `ORD-${orderId}`,
             productId: selectedProduct.id,
@@ -114,17 +110,56 @@ const OrderDesk: React.FC = () => {
             timestamp,
             totalPrice: requestedQty * selectedProduct.price
         };
-        dispatch(reduceStockApi({ id: selectedProduct.id, amount: requestedQty, transaction: orderTx }));
 
-        setFeedback({ type: 'success', message: `Order ${orderId} placed and stock updated.` });
-        setSelectedProduct(null);
-        setQuantity(1);
-        setNote('');
+        const result = await dispatch(addTransactionApi(orderTx));
+        if (addTransactionApi.fulfilled.match(result)) {
+            dispatch(addOrder({
+                id: orderId,
+                productId: selectedProduct.id,
+                productName: selectedProduct.name,
+                quantity: requestedQty,
+                requestedBy,
+                status: 'fulfilled',
+                timestamp,
+                notes: note.trim() || undefined
+            }));
+            dispatch(fetchProducts());
+            dispatch(fetchTransactions());
+            setFeedback({ type: 'success', message: `Order ${orderId} placed and stock updated.` });
+            setSelectedProduct(null);
+            setQuantity(1);
+            setNote('');
+            return;
+        }
+
+        setFeedback({
+            type: 'error',
+            message: typeof result.payload === 'string' ? result.payload : `Order ${orderId} could not be placed.`
+        });
     };
 
+    const fulfilledOrdersFromTransactions: Order[] = useMemo(() => (
+        transactions
+            .filter((tx) => tx.type === 'reduction')
+            .map((tx) => ({
+                id: tx.id.startsWith('ORD-') ? tx.id.replace(/^ORD-/, '') : tx.id,
+                productId: tx.productId,
+                productName: tx.productName,
+                quantity: tx.amount,
+                requestedBy: tx.userName,
+                status: 'fulfilled' as const,
+                timestamp: tx.timestamp,
+                notes: undefined,
+            }))
+    ), [transactions]);
+
     const filteredOrders = useMemo(() => {
+        const combinedOrders = [
+            ...orders.filter((order) => order.status !== 'fulfilled'),
+            ...fulfilledOrdersFromTransactions,
+        ];
         const text = filterText.trim().toLowerCase();
-        return orders.filter(order => {
+        return combinedOrders.filter(order => {
             const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
             if (!matchesStatus) return false;
             if (!text) return true;
@@ -134,7 +169,7 @@ const OrderDesk: React.FC = () => {
                 order.requestedBy.toLowerCase().includes(text)
             );
         });
-    }, [orders, filterText, statusFilter]);
+    }, [orders, fulfilledOrdersFromTransactions, filterText, statusFilter]);
 
     const exportOrdersToCSV = () => {
         const headers = ['Order ID', 'Product', 'Quantity', 'Status', 'Reason', 'Requested By', 'Time'];
@@ -293,10 +328,10 @@ const OrderDesk: React.FC = () => {
                                     variant="contained"
                                     size="large"
                                     type="submit"
-                                    disabled={!selectedProduct || !enoughStock}
+                                    disabled={!selectedProduct || !enoughStock || transactionLoading}
                                     sx={{ py: 1.6, borderRadius: 2, fontWeight: 800 }}
                                 >
-                                    Place Order & Deduct Stock
+                                    {transactionLoading ? 'Placing Order...' : 'Place Order & Deduct Stock'}
                                 </Button>
                             </form>
                         </CardContent>

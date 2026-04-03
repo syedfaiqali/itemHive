@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import {
     Box,
     Typography,
@@ -11,14 +11,15 @@ import {
     TableContainer,
     TableHead,
     TableRow,
+    Alert,
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import {
     TrendingDown,
     BarChart as BarChartIcon
 } from 'lucide-react';
-import { useSelector } from 'react-redux';
-import type { RootState } from '../../store';
+import { useDispatch, useSelector } from 'react-redux';
+import type { AppDispatch, RootState } from '../../store';
 import {
     BarChart,
     Bar,
@@ -35,12 +36,22 @@ import {
     Area
 } from 'recharts';
 import useAppCurrency from '../../hooks/useAppCurrency';
+import { fetchProducts } from '../../features/inventory/inventorySlice';
+import { fetchCategoryValuation, fetchSalesTrend, fetchTopSellingProducts } from '../../features/reports/reportSlice';
 
 const ReportsPage: React.FC = () => {
     const theme = useTheme();
+    const dispatch = useDispatch<AppDispatch>();
     const { products } = useSelector((state: RootState) => state.inventory);
-    const { transactions } = useSelector((state: RootState) => state.transactions);
+    const { salesTrend, categoryValuation, topSelling, error } = useSelector((state: RootState) => state.reports);
     const { currency, formatCurrency } = useAppCurrency();
+
+    useEffect(() => {
+        dispatch(fetchProducts());
+        dispatch(fetchSalesTrend(7));
+        dispatch(fetchCategoryValuation());
+        dispatch(fetchTopSellingProducts());
+    }, [dispatch]);
 
     const reportPalette = useMemo(
         () => [
@@ -61,32 +72,14 @@ const ReportsPage: React.FC = () => {
             const dateStr = d.toISOString().split('T')[0];
             const dayLabel = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
-            const dayRevenue = transactions
-                .filter(t => t.timestamp.startsWith(dateStr) && t.type === 'reduction')
-                .reduce((sum, t) => sum + (t.totalPrice || 0), 0);
+            const point = salesTrend.find((entry) => entry._id === dateStr);
 
-            const daySales = transactions
-                .filter(t => t.timestamp.startsWith(dateStr) && t.type === 'reduction')
-                .reduce((sum, t) => sum + t.amount, 0);
-
-            return { name: dayLabel, revenue: dayRevenue, sales: daySales };
+            return { name: dayLabel, revenue: point?.revenue || 0, sales: point?.sales || 0 };
         }),
-        [transactions]
+        [salesTrend]
     );
 
-    const pieData = useMemo(() => {
-        const categorySummary = products.reduce<Record<string, number>>((acc, p) => {
-            acc[p.category] = (acc[p.category] || 0) + (p.stock * p.price);
-            return acc;
-        }, {});
-
-        return Object.keys(categorySummary)
-            .map(cat => ({
-                name: cat,
-                value: categorySummary[cat]
-            }))
-            .sort((a, b) => b.value - a.value);
-    }, [products]);
+    const pieData = useMemo(() => categoryValuation, [categoryValuation]);
 
     const stockLevelData = useMemo(
         () => [...products]
@@ -102,19 +95,11 @@ const ReportsPage: React.FC = () => {
     );
 
     const topSellingRows = useMemo(
-        () => products
-            .map((product) => {
-                const totalReduced = transactions
-                    .filter(t => t.productId === product.id && t.type === 'reduction')
-                    .reduce((sum, t) => sum + t.amount, 0);
-                return {
-                    product,
-                    totalReduced,
-                    revenue: totalReduced * product.price,
-                };
-            })
-            .sort((a, b) => b.totalReduced - a.totalReduced),
-        [products, transactions]
+        () => topSelling.map((row) => ({
+            ...row,
+            product: products.find((product) => product.id === row._id),
+        })),
+        [topSelling, products]
     );
 
     return (
@@ -132,6 +117,12 @@ const ReportsPage: React.FC = () => {
             >
                 <Typography variant="h4" fontWeight={800}>Inventory Analytics & Reports</Typography>
             </Box>
+
+            {error && (
+                <Alert severity="error" sx={{ mb: 3 }}>
+                    {error}
+                </Alert>
+            )}
 
             <Grid container spacing={3}>
                 {/* Revenue Trend Line Chart */}
@@ -249,9 +240,9 @@ const ReportsPage: React.FC = () => {
                                         </TableRow>
                                     </TableHead>
                                     <TableBody>
-                                        {topSellingRows.map(({ product, totalReduced, revenue }) => (
-                                            <TableRow key={product.id}>
-                                                <TableCell sx={{ fontWeight: 600 }}>{product.name}</TableCell>
+                                        {topSellingRows.map(({ product, _id, name, totalReduced, revenue }) => (
+                                            <TableRow key={_id}>
+                                                <TableCell sx={{ fontWeight: 600 }}>{name}</TableCell>
                                                 <TableCell>
                                                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                                         <TrendingDown size={14} color={theme.palette.error.main} />
@@ -261,7 +252,7 @@ const ReportsPage: React.FC = () => {
                                                 <TableCell sx={{ fontWeight: 700 }}>
                                                     {formatCurrency(revenue, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                                                 </TableCell>
-                                                <TableCell>{product.stock} Units</TableCell>
+                                                <TableCell>{product?.stock ?? 0} Units</TableCell>
                                             </TableRow>
                                         ))}
                                     </TableBody>

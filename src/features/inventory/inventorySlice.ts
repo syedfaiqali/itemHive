@@ -12,7 +12,7 @@ export interface Product {
     minStock: number;
     description: string;
     imageUrl?: string;
-    lastUpdated: string;
+    lastUpdated?: string;
     batchNumber?: string;
     expiryDate?: string;
     supplier?: string;

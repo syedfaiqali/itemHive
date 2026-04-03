@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
     Box,
     Typography,
@@ -40,9 +40,10 @@ import {
     Filter,
     X
 } from 'lucide-react';
-import { useSelector } from 'react-redux';
-import type { RootState } from '../../store';
+import { useDispatch, useSelector } from 'react-redux';
+import type { AppDispatch, RootState } from '../../store';
 import type { Transaction } from '../../features/transactions/transactionSlice';
+import { fetchTransactions } from '../../features/transactions/transactionSlice';
 import {
     addDays,
     endOfMonth,
@@ -62,7 +63,8 @@ import useAppCurrency from '../../hooks/useAppCurrency';
 
 const TransactionHistory: React.FC = () => {
     const theme = useTheme();
-    const { transactions } = useSelector((state: RootState) => state.transactions || { transactions: [] });
+    const dispatch = useDispatch<AppDispatch>();
+    const { transactions, loading, error } = useSelector((state: RootState) => state.transactions || { transactions: [], loading: false, error: null });
     const { formatCurrency } = useAppCurrency();
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
@@ -76,6 +78,10 @@ const TransactionHistory: React.FC = () => {
     const isInvalidRange = Boolean(fromDate && toDate && fromDate > toDate);
     const isDatePickerOpen = Boolean(datePickerAnchorEl);
     const TopSlideTransition = (props: SlideProps) => <Slide {...props} direction="down" />;
+
+    useEffect(() => {
+        dispatch(fetchTransactions());
+    }, [dispatch]);
 
     const formatDateInput = (date: Date) => date.toISOString().split('T')[0];
 
@@ -207,6 +213,11 @@ const TransactionHistory: React.FC = () => {
 
             <Card sx={{ borderRadius: 4, overflow: 'hidden' }}>
                 <CardContent sx={{ p: 0 }}>
+                    {error && (
+                        <Alert severity="error" sx={{ m: 2 }}>
+                            {error}
+                        </Alert>
+                    )}
                     <Box sx={{ p: 2, display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap', borderBottom: '1px solid', borderColor: 'divider' }}>
                         <TextField
                             placeholder="Search by ID, Product or User..."
@@ -245,7 +256,9 @@ const TransactionHistory: React.FC = () => {
                                 {filteredTransactions.length === 0 ? (
                                     <TableRow>
                                         <TableCell colSpan={8} align="center" sx={{ py: 8 }}>
-                                            <Typography color="text.secondary">No transactions found.</Typography>
+                                            <Typography color="text.secondary">
+                                                {loading ? 'Loading transactions...' : 'No transactions found.'}
+                                            </Typography>
                                         </TableCell>
                                     </TableRow>
                                 ) : (

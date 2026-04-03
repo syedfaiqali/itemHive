@@ -54,6 +54,19 @@ import { alpha, useTheme, styled } from '@mui/material/styles';
 import { motion } from 'framer-motion';
 import useAppCurrency from '../../hooks/useAppCurrency';
 
+const AddProductDialogTransition = React.forwardRef<HTMLDivElement, any>((props, ref) => (
+    <motion.div
+        ref={ref}
+        initial={{ opacity: 0, scale: 0.9, y: 40 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.9, y: 40 }}
+        transition={{ duration: 0.4, type: 'spring', damping: 30, stiffness: 200 }}
+        {...props}
+    />
+));
+
+AddProductDialogTransition.displayName = 'AddProductDialogTransition';
+
 const IconContainer = styled(Box)(({ theme, color }: { theme?: any, color?: string }) => ({
     width: 44,
     height: 44,
@@ -231,7 +244,6 @@ const ProductList: React.FC = () => {
             stock: parseInt(addFormData.stock),
             minStock: parseInt(addFormData.minStock),
             description: addFormData.description,
-            lastUpdated: new Date().toISOString(),
             batchNumber: addFormData.batchNumber || `B-${Math.floor(Math.random() * 9000) + 1000}`,
             expiryDate: addFormData.expiryDate || new Date(Date.now() + 31536000000).toISOString().split('T')[0],
             supplier: addFormData.supplier || 'General Supplier'
@@ -588,7 +600,7 @@ const ProductList: React.FC = () => {
                                     { label: 'BATCH', value: viewProduct.batchNumber || 'N/A', icon: <Layers size={18} />, color: '#a855f7' },
                                     { label: 'EXPIRY', value: viewProduct.expiryDate || 'N/A', icon: <History size={18} />, color: '#ef4444' },
                                     { label: 'SUPPLIER', value: viewProduct.supplier || 'N/A', icon: <ShieldCheck size={18} />, color: '#0ea5e9' },
-                                    { label: 'UPDATED', value: new Date(viewProduct.lastUpdated).toLocaleDateString(), icon: <History size={18} />, color: '#64748b' },
+                                    { label: 'UPDATED', value: viewProduct.lastUpdated ? new Date(viewProduct.lastUpdated).toLocaleDateString() : 'N/A', icon: <History size={18} />, color: '#64748b' },
                                 ].map((item, idx) => (
                                     <Grid size={{ xs: 6, sm: 3 }} key={item.label}>
                                         <motion.div
@@ -768,16 +780,7 @@ const ProductList: React.FC = () => {
                     component: 'form',
                     onSubmit: handleAddSubmit
                 }}
-                TransitionComponent={React.forwardRef((props: any, ref) => (
-                    <motion.div
-                        ref={ref}
-                        initial={{ opacity: 0, scale: 0.9, y: 40 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.9, y: 40 }}
-                        transition={{ duration: 0.4, type: "spring", damping: 30, stiffness: 200 }}
-                        {...props}
-                    />
-                ))}
+                TransitionComponent={AddProductDialogTransition}
             >
                 <DialogTitle>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>

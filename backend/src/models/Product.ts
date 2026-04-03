@@ -33,9 +33,8 @@ const ProductSchema: Schema<IProduct> = new Schema({
 }, { timestamps: true });
 
 // Automatically update lastUpdated before saving
-ProductSchema.pre<IProduct>('save', function (next) {
+ProductSchema.pre('save', function () {
     this.lastUpdated = new Date();
-    next();
 });
 
 export default mongoose.model<IProduct>('Product', ProductSchema);

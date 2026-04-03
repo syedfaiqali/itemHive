@@ -154,7 +154,7 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
                 id: `low-stock-${p.id}`,
                 title: p.stock === 0 ? 'Out of Stock' : 'Low Stock Alert',
                 detail: `${p.name} - ${p.stock} left (min ${p.minStock})`,
-                time: `Updated ${new Date(p.lastUpdated).toLocaleString()}`,
+                time: `Updated ${p.lastUpdated ? new Date(p.lastUpdated).toLocaleString() : 'recently'}`,
             }))
         : [];
 

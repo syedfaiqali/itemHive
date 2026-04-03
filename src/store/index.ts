@@ -13,6 +13,7 @@ import storage from 'redux-persist/lib/storage';
 import authReducer from '../features/auth/authSlice';
 import inventoryReducer from '../features/inventory/inventorySlice';
 import transactionReducer from '../features/transactions/transactionSlice';
+import reportsReducer from '../features/reports/reportSlice';
 import themeReducer from '../features/theme/themeSlice';
 import posReducer from '../features/pos/posSlice';
 import ordersReducer from '../features/orders/ordersSlice';
@@ -22,6 +23,7 @@ const rootReducer = combineReducers({
     auth: authReducer,
     inventory: inventoryReducer,
     transactions: transactionReducer,
+    reports: reportsReducer,
     theme: themeReducer,
     pos: posReducer,
     orders: ordersReducer,

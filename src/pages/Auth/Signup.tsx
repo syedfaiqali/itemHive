@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     Box,
     Typography,
@@ -9,18 +9,28 @@ import {
     Alert,
     Container,
     Paper,
-    MenuItem
+    MenuItem,
+    CircularProgress
 } from '@mui/material';
 import { Mail, Lock, Eye, EyeOff, UserPlus, User, Smartphone, Tablet, Package, ScanLine, Boxes, ShoppingCart, Barcode } from 'lucide-react';
+import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { alpha, useTheme } from '@mui/material/styles';
+import { clearError, registerUser } from '../../features/auth/authSlice';
+import type { AppDispatch, RootState } from '../../store';
 
 const Signup: React.FC = () => {
     const theme = useTheme();
+    const dispatch = useDispatch<AppDispatch>();
     const navigate = useNavigate();
+    const { loading, error } = useSelector((state: RootState) => state.auth);
     const [showPassword, setShowPassword] = useState(false);
     const [success, setSuccess] = useState(false);
+    const [name, setName] = useState('');
+    const [email, setEmail] = useState('');
+    const [role, setRole] = useState<'admin' | 'cashier'>('cashier');
+    const [password, setPassword] = useState('');
     const floatingWidgets = [
         { icon: <Smartphone size={20} />, left: '12%', top: '20%', rotate: -7 },
         { icon: <Tablet size={20} />, left: '30%', top: '42%', rotate: 6 },
@@ -32,13 +42,34 @@ const Signup: React.FC = () => {
         { icon: <Package size={20} />, left: '56%', top: '74%', rotate: 8 },
     ];
 
-    const handleSubmit = (e: React.FormEvent) => {
+    useEffect(() => {
+        return () => {
+            dispatch(clearError());
+        };
+    }, [dispatch]);
+
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        setSuccess(true);
-        setTimeout(() => {
-            navigate('/login');
-        }, 2000);
+
+        const result = await dispatch(registerUser({ name, email, password, role }));
+        if (registerUser.fulfilled.match(result)) {
+            setSuccess(true);
+        }
     };
+
+    useEffect(() => {
+        if (!success) {
+            return;
+        }
+
+        const timeoutId = window.setTimeout(() => {
+            dispatch(clearError());
+            setSuccess(false);
+            navigate('/login');
+        }, 1500);
+
+        return () => window.clearTimeout(timeoutId);
+    }, [success, dispatch, navigate]);
 
     return (
         <Box
@@ -120,13 +151,22 @@ const Signup: React.FC = () => {
                             </Alert>
                         )}
 
+                        {error && (
+                            <Alert severity="error" sx={{ mb: 1.25, borderRadius: 2 }}>
+                                {error}
+                            </Alert>
+                        )}
+
                         <form onSubmit={handleSubmit}>
                             <TextField
                                 fullWidth
                                 label="Full Name"
                                 variant="outlined"
                                 margin="dense"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
                                 required
+                                disabled={loading || success}
                                 InputProps={{
                                     startAdornment: (
                                         <InputAdornment position="start">
@@ -141,7 +181,10 @@ const Signup: React.FC = () => {
                                 label="Email Address"
                                 variant="outlined"
                                 margin="dense"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
                                 required
+                                disabled={loading || success}
                                 InputProps={{
                                     startAdornment: (
                                         <InputAdornment position="start">
@@ -157,12 +200,14 @@ const Signup: React.FC = () => {
                                 label="Role"
                                 variant="outlined"
                                 margin="dense"
-                                defaultValue="user"
+                                value={role}
+                                onChange={(e) => setRole(e.target.value as 'admin' | 'cashier')}
                                 required
+                                disabled={loading || success}
                                 sx={{ mb: 0.25 }}
                             >
                                 <MenuItem value="admin">Administrator (Manager)</MenuItem>
-                                <MenuItem value="user">Staff Member (Consumption only)</MenuItem>
+                                <MenuItem value="cashier">Staff Member (Cashier)</MenuItem>
                             </TextField>
                             <TextField
                                 fullWidth
@@ -170,7 +215,10 @@ const Signup: React.FC = () => {
                                 type={showPassword ? 'text' : 'password'}
                                 variant="outlined"
                                 margin="dense"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
                                 required
+                                disabled={loading || success}
                                 InputProps={{
                                     startAdornment: (
                                         <InputAdornment position="start">
@@ -179,7 +227,7 @@ const Signup: React.FC = () => {
                                     ),
                                     endAdornment: (
                                         <InputAdornment position="end">
-                                            <IconButton onClick={() => setShowPassword(!showPassword)} edge="end">
+                                            <IconButton onClick={() => setShowPassword(!showPassword)} edge="end" disabled={loading || success}>
                                                 {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                                             </IconButton>
                                         </InputAdornment>
@@ -193,7 +241,8 @@ const Signup: React.FC = () => {
                                 variant="contained"
                                 size="large"
                                 type="submit"
-                                startIcon={<UserPlus size={20} />}
+                                disabled={loading || success}
+                                startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <UserPlus size={20} />}
                                 sx={{
                                     py: 1.05,
                                     borderRadius: 2,
@@ -202,7 +251,7 @@ const Signup: React.FC = () => {
                                     boxShadow: `0 12px 22px -12px ${alpha(theme.palette.primary.main, 0.8)}`
                                 }}
                             >
-                                Create Account
+                                {loading ? 'Creating Account...' : 'Create Account'}
                             </Button>
                         </form>
 
@@ -213,6 +262,7 @@ const Signup: React.FC = () => {
                                     variant="text"
                                     size="small"
                                     onClick={() => navigate('/login')}
+                                    disabled={loading}
                                     sx={{ fontWeight: 700, textTransform: 'none' }}
                                 >
                                     Sign In
