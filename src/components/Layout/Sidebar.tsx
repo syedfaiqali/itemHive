@@ -21,6 +21,7 @@ import {
     BarChart3,
     Monitor as TerminalIcon,
     ClipboardList,
+    Pin,
     ChevronLeft,
     ChevronRight
 } from 'lucide-react';
@@ -53,6 +54,7 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onDrawerToggle }) => {
         { text: 'Order Desk', icon: <ClipboardList size={20} />, path: '/orders', roles: ['admin', 'user'] },
         { text: 'Transactions', icon: <History size={20} />, path: '/transactions', roles: ['admin', 'user'] },
         { text: 'Reports', icon: <BarChart3 size={20} />, path: '/reports', roles: ['admin'] },
+        { text: 'Sticky Notes', icon: <Pin size={20} />, path: '/notes', roles: ['admin', 'user'] },
     ];
 
     const drawer = (

@@ -23,6 +23,7 @@ const Signup = React.lazy(() => import('./pages/Auth/Signup'));
 const OrderDesk = React.lazy(() => import('./pages/Orders/OrderDesk'));
 const SettingsPage = React.lazy(() => import('./pages/Settings/SettingsPage'));
 const ProfilePage = React.lazy(() => import('./pages/Profile/ProfilePage'));
+const StickyNotes = React.lazy(() => import('./pages/Notes/StickyNotes'));
 
 const AppContent: React.FC = () => {
   const { mode } = useSelector((state: RootState) => state.theme);
@@ -61,6 +62,11 @@ const AppContent: React.FC = () => {
               } />
               <Route path="transactions" element={<TransactionHistory />} />
               <Route path="reports" element={<ReportsPage />} />
+              <Route path="notes" element={
+                <ProtectedRoute allowedRoles={['admin', 'cashier']}>
+                  <StickyNotes />
+                </ProtectedRoute>
+              } />
               <Route path="settings" element={
                 <ProtectedRoute allowedRoles={['admin', 'cashier']}>
                   <SettingsPage />
