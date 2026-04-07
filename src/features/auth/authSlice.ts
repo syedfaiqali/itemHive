@@ -7,6 +7,14 @@ export interface User {
     email: string;
     role: 'admin' | 'cashier';
     photoUrl?: string;
+    preferences?: {
+        country: 'PK' | 'US' | 'DE' | 'GB' | 'CH' | 'CD' | 'CG' | 'IN' | 'AE';
+        currency: 'USD' | 'EUR' | 'GBP' | 'CHF' | 'CDF' | 'XAF' | 'PKR' | 'INR' | 'AED';
+        notifications: {
+            orderUpdates: boolean;
+            lowStockAlerts: boolean;
+        };
+    };
 }
 
 interface AuthState {

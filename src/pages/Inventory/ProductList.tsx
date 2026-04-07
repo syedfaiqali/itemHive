@@ -338,7 +338,7 @@ const ProductList: React.FC = () => {
                     <Button
                         variant="contained"
                         startIcon={<Plus size={20} />}
-                        onClick={() => setShowAddModal(true)}
+                        onClick={() => navigate('/inventory/add')}
                         sx={{ borderRadius: 2, px: 3, py: 1.2, fontWeight: 800 }}
                     >
                         Add Product

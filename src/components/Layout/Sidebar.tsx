@@ -21,6 +21,8 @@ import {
     BarChart3,
     Monitor as TerminalIcon,
     ClipboardList,
+    WalletCards,
+    CalendarClock,
     ChevronLeft,
     ChevronRight
 } from 'lucide-react';
@@ -47,11 +49,13 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onDrawerToggle }) => {
     const currentWidth = isSidebarCollapsed ? collapsedWidth : drawerWidth;
 
     const menuItems = [
-        { text: 'Dashboard', icon: <LayoutDashboard size={20} />, path: '/', roles: ['admin', 'user'] },
-        { text: 'POS Terminal', icon: <TerminalIcon size={20} />, path: '/pos', roles: ['admin', 'user'] },
-        { text: 'Inventory', icon: <Package size={20} />, path: '/inventory', roles: ['admin', 'user'] },
-        { text: 'Order Desk', icon: <ClipboardList size={20} />, path: '/orders', roles: ['admin', 'user'] },
-        { text: 'Transactions', icon: <History size={20} />, path: '/transactions', roles: ['admin', 'user'] },
+        { text: 'Dashboard', icon: <LayoutDashboard size={20} />, path: '/', roles: ['admin', 'cashier'] },
+        { text: 'POS Terminal', icon: <TerminalIcon size={20} />, path: '/pos', roles: ['admin', 'cashier'] },
+        { text: 'Inventory', icon: <Package size={20} />, path: '/inventory', roles: ['admin', 'cashier'] },
+        { text: 'Order Desk', icon: <ClipboardList size={20} />, path: '/orders', roles: ['admin', 'cashier'] },
+        { text: 'Transactions', icon: <History size={20} />, path: '/transactions', roles: ['admin', 'cashier'] },
+        { text: 'Credit Customers', icon: <WalletCards size={20} />, path: '/credits', roles: ['admin', 'cashier'] },
+        { text: 'Installments', icon: <CalendarClock size={20} />, path: '/installments', roles: ['admin', 'cashier'] },
         { text: 'Reports', icon: <BarChart3 size={20} />, path: '/reports', roles: ['admin'] },
     ];
 

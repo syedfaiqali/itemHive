@@ -11,7 +11,7 @@ export interface Transaction {
     userName: string;
     timestamp: string;
     totalPrice: number;
-    paymentMethod?: 'cash' | 'card' | 'credit';
+    paymentMethod?: 'cash' | 'card' | 'credit' | 'installment';
     paidVia?: 'cash' | 'card';
     paidNow?: number;
     dueAmount?: number;
@@ -20,6 +20,7 @@ export interface Transaction {
     unitCost?: number;
     unitPrice?: number;
     grossProfit?: number;
+    installmentPlanId?: string;
 }
 
 interface TransactionState {

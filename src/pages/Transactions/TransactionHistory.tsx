@@ -129,7 +129,9 @@ const TransactionHistory: React.FC = () => {
         (
             t.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
             t.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            t.id.toLowerCase().includes(searchTerm.toLowerCase())
+            t.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (t.customerName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (t.customerCnic || '').toLowerCase().includes(searchTerm.toLowerCase())
         ) &&
         (!fromDate || new Date(t.timestamp) >= new Date(`${fromDate}T00:00:00`)) &&
         (!toDate || new Date(t.timestamp) <= new Date(`${toDate}T23:59:59.999`))
@@ -141,7 +143,7 @@ const TransactionHistory: React.FC = () => {
 
     const exportToCSV = () => {
         setExportingCsv(true);
-        const headers = ['TX ID', 'Timestamp', 'Product', 'User', 'Customer', 'CNIC', 'Type', 'Quantity', 'Unit Price', 'Value', 'Profit/Loss'];
+        const headers = ['TX ID', 'Timestamp', 'Product', 'User', 'Customer', 'CNIC', 'Payment Method', 'Paid Now', 'Remaining Due', 'Type', 'Quantity', 'Unit Price', 'Value', 'Profit/Loss'];
         const rows = filteredTransactions.map(t => [
             t.id,
             t.timestamp,
@@ -149,6 +151,9 @@ const TransactionHistory: React.FC = () => {
             t.userName,
             t.customerName || '',
             t.customerCnic || '',
+            t.paymentMethod || '',
+            t.paidNow || 0,
+            t.dueAmount || 0,
             t.type,
             t.amount,
             t.unitPrice || 0,
@@ -243,27 +248,25 @@ const TransactionHistory: React.FC = () => {
                     </Box>
 
                     <TableContainer sx={{ overflowX: 'auto' }}>
-                        <Table sx={{ minWidth: 760 }}>
+                        <Table sx={{ minWidth: 980 }}>
                             <TableHead sx={{ bgcolor: 'rgba(0,0,0,0.02)' }}>
                                 <TableRow>
-                                    <TableCell sx={{ fontWeight: 700 }}>TX ID</TableCell>
-                                    <TableCell sx={{ fontWeight: 700 }}>DATE & TIME</TableCell>
-                                    <TableCell sx={{ fontWeight: 700 }}>PRODUCT</TableCell>
-                                    <TableCell sx={{ fontWeight: 700 }}>USER</TableCell>
-                                    <TableCell sx={{ fontWeight: 700 }}>CUSTOMER</TableCell>
-                                    <TableCell sx={{ fontWeight: 700 }}>CNIC</TableCell>
-                                    <TableCell sx={{ fontWeight: 700 }}>TYPE</TableCell>
-                                    <TableCell sx={{ fontWeight: 700 }}>QUANTITY</TableCell>
-                                    <TableCell sx={{ fontWeight: 700 }}>UNIT PRICE</TableCell>
-                                    <TableCell sx={{ fontWeight: 700 }}>VALUE</TableCell>
-                                    <TableCell sx={{ fontWeight: 700 }}>P/L</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, whiteSpace: 'nowrap' }}>TX ID</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, whiteSpace: 'nowrap' }}>DATE & TIME</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, minWidth: 190 }}>PRODUCT</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, minWidth: 150 }}>STAFF</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, minWidth: 190 }}>CUSTOMER</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, minWidth: 170 }}>PAYMENT</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, whiteSpace: 'nowrap' }}>TYPE</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, whiteSpace: 'nowrap' }}>QTY</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, minWidth: 120 }}>AMOUNTS</TableCell>
                                     <TableCell align="right" sx={{ fontWeight: 700 }}>ACTIONS</TableCell>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
                                 {filteredTransactions.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={12} align="center" sx={{ py: 8 }}>
+                                        <TableCell colSpan={10} align="center" sx={{ py: 8 }}>
                                             <Typography color="text.secondary">
                                                 {loading ? 'Loading transactions...' : 'No transactions found.'}
                                             </Typography>
@@ -272,14 +275,23 @@ const TransactionHistory: React.FC = () => {
                                 ) : (
                                     filteredTransactions.map((tx) => (
                                         <TableRow key={tx.id} hover>
-                                            <TableCell sx={{ fontWeight: 600, color: 'primary.main' }}>#{tx.id}</TableCell>
+                                            <TableCell sx={{ fontWeight: 700, color: 'primary.main', whiteSpace: 'nowrap' }}>#{tx.id}</TableCell>
                                             <TableCell>
                                                 <Box>
                                                     <Typography variant="body2">{format(new Date(tx.timestamp), 'MMM dd, yyyy')}</Typography>
                                                     <Typography variant="caption" color="text.secondary">{format(new Date(tx.timestamp), 'hh:mm a')}</Typography>
                                                 </Box>
                                             </TableCell>
-                                            <TableCell sx={{ fontWeight: 600 }}>{tx.productName}</TableCell>
+                                            <TableCell>
+                                                <Typography variant="body2" fontWeight={700}>
+                                                    {tx.productName}
+                                                </Typography>
+                                                <Typography variant="caption" color="text.secondary">
+                                                    {tx.unitPrice != null
+                                                        ? `Unit: ${formatCurrency(tx.unitPrice, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
+                                                        : 'Unit price unavailable'}
+                                                </Typography>
+                                            </TableCell>
                                             <TableCell>
                                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                                     <Box
@@ -301,8 +313,25 @@ const TransactionHistory: React.FC = () => {
                                                     <Typography variant="body2">{tx.userName}</Typography>
                                                 </Box>
                                             </TableCell>
-                                            <TableCell>{tx.customerName || '-'}</TableCell>
-                                            <TableCell>{tx.customerCnic || '-'}</TableCell>
+                                            <TableCell>
+                                                <Typography variant="body2" fontWeight={tx.customerName ? 700 : 500}>
+                                                    {tx.customerName || 'Walk-in Customer'}
+                                                </Typography>
+                                                <Typography variant="caption" color="text.secondary">
+                                                    {tx.customerCnic || 'No CNIC'}
+                                                </Typography>
+                                            </TableCell>
+                                            <TableCell>
+                                                <Typography variant="body2" fontWeight={700} sx={{ textTransform: 'capitalize' }}>
+                                                    {tx.paymentMethod || '-'}
+                                                </Typography>
+                                                <Typography variant="caption" color="text.secondary">
+                                                    Paid: {formatCurrency(tx.paidNow || 0, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                                                </Typography>
+                                                <Typography variant="caption" display="block" color={(tx.dueAmount || 0) > 0 ? 'warning.main' : 'text.secondary'}>
+                                                    Due: {formatCurrency(tx.dueAmount || 0, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                                                </Typography>
+                                            </TableCell>
                                             <TableCell>
                                                 <Chip
                                                     icon={tx.type === 'addition' ? <ArrowUpRight size={14} /> : <ArrowDownLeft size={14} />}
@@ -312,17 +341,20 @@ const TransactionHistory: React.FC = () => {
                                                     sx={{ fontWeight: 700, borderRadius: 1.5 }}
                                                 />
                                             </TableCell>
-                                            <TableCell sx={{ fontWeight: 700 }}>
+                                            <TableCell sx={{ fontWeight: 700, whiteSpace: 'nowrap' }}>
                                                 {tx.type === 'addition' ? '+' : '-'}{tx.amount}
                                             </TableCell>
-                                            <TableCell sx={{ fontWeight: 700 }}>
-                                                {tx.unitPrice != null ? formatCurrency(tx.unitPrice, { minimumFractionDigits: 0, maximumFractionDigits: 2 }) : '-'}
-                                            </TableCell>
-                                            <TableCell sx={{ fontWeight: 800 }}>
-                                                {tx.totalPrice != null ? formatCurrency(tx.totalPrice, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : '-'}
-                                            </TableCell>
-                                            <TableCell sx={{ fontWeight: 800, color: (tx.grossProfit || 0) >= 0 ? 'success.main' : 'error.main' }}>
-                                                {tx.grossProfit != null ? formatCurrency(tx.grossProfit, { minimumFractionDigits: 0, maximumFractionDigits: 2 }) : '-'}
+                                            <TableCell>
+                                                <Typography variant="body2" fontWeight={800}>
+                                                    {tx.totalPrice != null ? formatCurrency(tx.totalPrice, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : '-'}
+                                                </Typography>
+                                                <Typography
+                                                    variant="caption"
+                                                    color={(tx.grossProfit || 0) >= 0 ? 'success.main' : 'error.main'}
+                                                    fontWeight={800}
+                                                >
+                                                    P/L: {tx.grossProfit != null ? formatCurrency(tx.grossProfit, { minimumFractionDigits: 0, maximumFractionDigits: 2 }) : '-'}
+                                                </Typography>
                                             </TableCell>
                                             <TableCell align="right">
                                                 <IconButton size="small" onClick={() => setSelectedTx(tx)}>
@@ -534,6 +566,20 @@ const TransactionHistory: React.FC = () => {
                                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                                     <Typography fontWeight={700}>CNIC:</Typography>
                                     <Typography>{selectedTx.customerCnic || '-'}</Typography>
+                                </Box>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                                    <Typography fontWeight={700}>Payment Method:</Typography>
+                                    <Typography sx={{ textTransform: 'capitalize' }}>{selectedTx.paymentMethod || 'cash'}</Typography>
+                                </Box>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                                    <Typography fontWeight={700}>Paid Now:</Typography>
+                                    <Typography>{formatCurrency(selectedTx.paidNow || 0, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</Typography>
+                                </Box>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                                    <Typography fontWeight={700}>Remaining Due:</Typography>
+                                    <Typography color={(selectedTx.dueAmount || 0) > 0 ? 'warning.main' : 'text.primary'}>
+                                        {formatCurrency(selectedTx.dueAmount || 0, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                                    </Typography>
                                 </Box>
                                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                                     <Typography fontWeight={700}>Unit Price:</Typography>

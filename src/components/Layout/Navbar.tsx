@@ -29,9 +29,18 @@ import type { RootState } from '../../store';
 import { logout } from '../../features/auth/authSlice';
 import { toggleDarkMode, setDarkMode } from '../../features/theme/themeSlice';
 import { useLocation, useNavigate } from 'react-router-dom';
+import api from '../../api/axios';
 
 interface NavbarProps {
     onMenuClick: () => void;
+}
+
+interface NavbarNotificationItem {
+    id: string;
+    title: string;
+    detail: string;
+    time: string;
+    path?: string;
 }
 
 const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
@@ -47,6 +56,7 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
     const { notifications } = useSelector((state: RootState) => state.settings);
     const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
     const [notifAnchorEl, setNotifAnchorEl] = React.useState<null | HTMLElement>(null);
+    const [installmentNotifications, setInstallmentNotifications] = React.useState<NavbarNotificationItem[]>([]);
 
     const drawerWidth = 260;
     const collapsedWidth = 80;
@@ -67,6 +77,47 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
     const handleNotifClose = () => {
         setNotifAnchorEl(null);
     };
+
+    React.useEffect(() => {
+        const loadInstallmentNotifications = async () => {
+            try {
+                const response = await api.get('/installments');
+                const plans = (response.data || []) as Array<any>;
+                const now = new Date();
+                const dueItems = plans
+                    .filter((plan) => plan.status === 'active')
+                    .map((plan) => {
+                        const nextPending = (plan.schedule || []).find((item: any) => item.status === 'pending');
+                        if (!nextPending) {
+                            return null;
+                        }
+
+                        const dueDate = new Date(nextPending.dueDate);
+                        if (dueDate > now) {
+                            return null;
+                        }
+
+                        return {
+                            id: `installment-${plan.planCode}-${nextPending.installmentNumber}`,
+                            title: dueDate.toDateString() === now.toDateString() ? 'Installment Due Today' : 'Overdue Installment',
+                            detail: `${plan.customerName} - ${nextPending.amount} due for ${plan.productName}`,
+                            time: `Due ${dueDate.toLocaleDateString()}`,
+                            path: '/installments',
+                        };
+                    })
+                    .filter(Boolean)
+                    .slice(0, 3) as NavbarNotificationItem[];
+
+                setInstallmentNotifications(dueItems);
+            } catch {
+                setInstallmentNotifications([]);
+            }
+        };
+
+        loadInstallmentNotifications();
+        window.addEventListener('itemhive-installments-updated', loadInstallmentNotifications);
+        return () => window.removeEventListener('itemhive-installments-updated', loadInstallmentNotifications);
+    }, [location.pathname]);
 
     const handleLogout = () => {
         dispatch(logout());
@@ -129,7 +180,7 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
         },
     });
 
-    const orderAndStockNotifications = notifications.orderUpdates
+    const orderAndStockNotifications: NavbarNotificationItem[] = notifications.orderUpdates
         ? [
             ...orders.slice(0, 2).map((order) => ({
                 id: `order-${order.id}`,
@@ -146,7 +197,7 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
         ]
         : [];
 
-    const lowStockNotifications = notifications.lowStockAlerts
+    const lowStockNotifications: NavbarNotificationItem[] = notifications.lowStockAlerts
         ? products
             .filter((p) => p.stock <= p.minStock)
             .slice(0, 2)
@@ -158,7 +209,7 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
             }))
         : [];
 
-    const recentNotifications = [...orderAndStockNotifications, ...lowStockNotifications].slice(0, 6);
+    const recentNotifications = [...installmentNotifications, ...orderAndStockNotifications, ...lowStockNotifications].slice(0, 6);
     const notificationsEnabled = notifications.orderUpdates || notifications.lowStockAlerts;
 
     return (
@@ -410,7 +461,16 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
                             </Box>
                         ) : (
                             recentNotifications.map((n) => (
-                                <MenuItem key={n.id} onClick={handleNotifClose} sx={{ alignItems: 'flex-start', gap: 1 }}>
+                                <MenuItem
+                                    key={n.id}
+                                    onClick={() => {
+                                        handleNotifClose();
+                                        if (n.path) {
+                                            navigate(n.path);
+                                        }
+                                    }}
+                                    sx={{ alignItems: 'flex-start', gap: 1 }}
+                                >
                                     <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'primary.main', mt: 0.8 }} />
                                     <Box>
                                         <Typography variant="body2" fontWeight={700}>{n.title}</Typography>

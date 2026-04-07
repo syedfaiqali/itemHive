@@ -20,6 +20,16 @@ export interface Product {
     supplier?: string;
 }
 
+export interface ProductImageSuggestion {
+    id: string;
+    title: string;
+    brand: string;
+    imageUrl: string;
+    thumbnailUrl: string;
+    source: 'openfoodfacts' | 'openbeautyfacts' | 'openproductsfacts' | 'openpetfoodfacts';
+    subtitle: string;
+}
+
 interface InventoryState {
     products: Product[];
     loading: boolean;
@@ -65,6 +75,23 @@ export const addProductApi = createAsyncThunk(
             return normalizeProduct(response.data);
         } catch (error: any) {
             return rejectWithValue(error.response?.data?.message || 'Failed to add product');
+        }
+    }
+);
+
+export const fetchProductImageSuggestions = createAsyncThunk(
+    'inventory/fetchProductImageSuggestions',
+    async (
+        { name, category }: { name: string; category?: string },
+        { rejectWithValue }
+    ) => {
+        try {
+            const response = await api.get('/products/image-suggestions', {
+                params: { name, category },
+            });
+            return response.data.suggestions as ProductImageSuggestion[];
+        } catch (error: any) {
+            return rejectWithValue(error.response?.data?.message || 'Failed to fetch image suggestions');
         }
     }
 );

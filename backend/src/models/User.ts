@@ -7,6 +7,14 @@ export interface IUser extends Document {
     password?: string;
     role: 'admin' | 'cashier';
     avatar?: string;
+    preferences: {
+        country: 'PK' | 'US' | 'DE' | 'GB' | 'CH' | 'CD' | 'CG' | 'IN' | 'AE';
+        currency: 'USD' | 'EUR' | 'GBP' | 'CHF' | 'CDF' | 'XAF' | 'PKR' | 'INR' | 'AED';
+        notifications: {
+            orderUpdates: boolean;
+            lowStockAlerts: boolean;
+        };
+    };
     comparePassword: (password: string) => Promise<boolean>;
 }
 
@@ -16,6 +24,14 @@ const UserSchema: Schema = new Schema({
     password: { type: String, select: false },
     role: { type: String, enum: ['admin', 'cashier'], default: 'cashier' },
     avatar: { type: String },
+    preferences: {
+        country: { type: String, enum: ['PK', 'US', 'DE', 'GB', 'CH', 'CD', 'CG', 'IN', 'AE'], default: 'PK' },
+        currency: { type: String, enum: ['USD', 'EUR', 'GBP', 'CHF', 'CDF', 'XAF', 'PKR', 'INR', 'AED'], default: 'PKR' },
+        notifications: {
+            orderUpdates: { type: Boolean, default: true },
+            lowStockAlerts: { type: Boolean, default: true },
+        },
+    },
 }, { timestamps: true });
 
 // Hash password before saving

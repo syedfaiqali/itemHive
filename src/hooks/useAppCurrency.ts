@@ -22,8 +22,8 @@ interface CurrencyFormatOptions {
 
 export const useAppCurrency = () => {
     const storedCurrency = useSelector((state: RootState) => state.settings.currency);
-    const currency = storedCurrency || 'USD';
-    const locale = localeByCurrency[currency] || 'en-US';
+    const currency = storedCurrency || 'PKR';
+    const locale = localeByCurrency[currency] || 'en-PK';
 
     const currencySymbol = useMemo(() => {
         const parts = new Intl.NumberFormat(locale, {

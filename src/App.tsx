@@ -10,11 +10,15 @@ import getAppTheme from './theme/theme';
 import { useSelector } from 'react-redux';
 import type { RootState } from './store';
 import ScrollToTop from './components/Common/ScrollToTop';
+import { useDispatch } from 'react-redux';
+import type { AppDispatch } from './store';
+import { fetchSettings } from './features/settings/settingsSlice';
 
 // Lazy load pages for better performance
 import Login from './pages/Auth/Login';
 const Dashboard = React.lazy(() => import('./pages/Dashboard/Dashboard'));
 const ProductList = React.lazy(() => import('./pages/Inventory/ProductList'));
+const AddProduct = React.lazy(() => import('./pages/Inventory/AddProduct'));
 const ReduceStock = React.lazy(() => import('./pages/Inventory/ReduceStock'));
 const POSTerminal = React.lazy(() => import('./pages/POS/POSTerminal'));
 const TransactionHistory = React.lazy(() => import('./pages/Transactions/TransactionHistory'));
@@ -23,10 +27,20 @@ const Signup = React.lazy(() => import('./pages/Auth/Signup'));
 const OrderDesk = React.lazy(() => import('./pages/Orders/OrderDesk'));
 const SettingsPage = React.lazy(() => import('./pages/Settings/SettingsPage'));
 const ProfilePage = React.lazy(() => import('./pages/Profile/ProfilePage'));
+const CreditCustomersPage = React.lazy(() => import('./pages/Credit/CreditCustomersPage'));
+const InstallmentsPage = React.lazy(() => import('./pages/Installments/InstallmentsPage'));
 
 const AppContent: React.FC = () => {
+  const dispatch = useDispatch<AppDispatch>();
   const { mode } = useSelector((state: RootState) => state.theme);
+  const { isAuthenticated } = useSelector((state: RootState) => state.auth);
   const theme = React.useMemo(() => getAppTheme(mode), [mode]);
+
+  React.useEffect(() => {
+    if (isAuthenticated) {
+      dispatch(fetchSettings());
+    }
+  }, [dispatch, isAuthenticated]);
 
   return (
     <ThemeProvider theme={theme}>
@@ -44,6 +58,7 @@ const AppContent: React.FC = () => {
             }>
               <Route index element={<Dashboard />} />
               <Route path="inventory" element={<ProductList />} />
+              <Route path="inventory/add" element={<AddProduct />} />
               <Route path="inventory/reduce" element={
                 <ProtectedRoute allowedRoles={['cashier', 'admin']}>
                   <ReduceStock />
@@ -60,6 +75,16 @@ const AppContent: React.FC = () => {
                 </ProtectedRoute>
               } />
               <Route path="transactions" element={<TransactionHistory />} />
+              <Route path="credits" element={
+                <ProtectedRoute allowedRoles={['cashier', 'admin']}>
+                  <CreditCustomersPage />
+                </ProtectedRoute>
+              } />
+              <Route path="installments" element={
+                <ProtectedRoute allowedRoles={['cashier', 'admin']}>
+                  <InstallmentsPage />
+                </ProtectedRoute>
+              } />
               <Route path="reports" element={<ReportsPage />} />
               <Route path="settings" element={
                 <ProtectedRoute allowedRoles={['admin', 'cashier']}>

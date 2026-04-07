@@ -18,7 +18,18 @@ import {
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState } from '../../store';
 import { setDarkMode } from '../../features/theme/themeSlice';
-import { setCurrency, setLowStockAlertsEnabled, setOrderUpdatesEnabled, type CurrencyCode } from '../../features/settings/settingsSlice';
+import {
+    countryCurrencyMap,
+    fetchSettings,
+    saveSettings,
+    setCountry,
+    setCurrency,
+    setLowStockAlertsEnabled,
+    setOrderUpdatesEnabled,
+    type CountryCode,
+    type CurrencyCode
+} from '../../features/settings/settingsSlice';
+import type { AppDispatch } from '../../store';
 
 const currencyOptions: Array<{ value: CurrencyCode; label: string }> = [
     { value: 'USD', label: 'USD - US Dollar' },
@@ -32,11 +43,39 @@ const currencyOptions: Array<{ value: CurrencyCode; label: string }> = [
     { value: 'AED', label: 'AED - UAE Dirham' },
 ];
 
+const countryOptions: Array<{ value: CountryCode; label: string }> = [
+    { value: 'PK', label: 'Pakistan' },
+    { value: 'US', label: 'United States' },
+    { value: 'DE', label: 'Germany' },
+    { value: 'GB', label: 'United Kingdom' },
+    { value: 'CH', label: 'Switzerland' },
+    { value: 'CD', label: 'DR Congo' },
+    { value: 'CG', label: 'Congo' },
+    { value: 'IN', label: 'India' },
+    { value: 'AE', label: 'United Arab Emirates' },
+];
+
 const SettingsPage: React.FC = () => {
     const theme = useTheme();
-    const dispatch = useDispatch();
+    const dispatch = useDispatch<AppDispatch>();
     const { mode } = useSelector((state: RootState) => state.theme);
-    const { notifications, currency } = useSelector((state: RootState) => state.settings);
+    const { notifications, country, currency, loading } = useSelector((state: RootState) => state.settings);
+
+    React.useEffect(() => {
+        dispatch(fetchSettings());
+    }, [dispatch]);
+
+    const persistSettings = (
+        nextCountry: CountryCode,
+        nextCurrency: CurrencyCode,
+        nextNotifications: typeof notifications
+    ) => {
+        dispatch(saveSettings({
+            country: nextCountry,
+            currency: nextCurrency,
+            notifications: nextNotifications,
+        }));
+    };
 
     return (
         <Box>
@@ -53,6 +92,74 @@ const SettingsPage: React.FC = () => {
                         <CardContent>
                             <Typography variant="h6" fontWeight={700} gutterBottom>Regional</Typography>
                             <Divider sx={{ mb: 2 }} />
+                            <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+                                <InputLabel
+                                    id="country-select-label"
+                                    sx={{
+                                        fontWeight: 600,
+                                        '&.Mui-focused': { color: 'primary.main' },
+                                    }}
+                                >
+                                    Country
+                                </InputLabel>
+                                <Select
+                                    labelId="country-select-label"
+                                    value={country}
+                                    label="Country"
+                                    onChange={(e) => {
+                                        const nextCountry = e.target.value as CountryCode;
+                                        const nextCurrency = countryCurrencyMap[nextCountry];
+                                        dispatch(setCountry(nextCountry));
+                                        persistSettings(nextCountry, nextCurrency, notifications);
+                                    }}
+                                    sx={{
+                                        fontWeight: 600,
+                                        '& .MuiOutlinedInput-notchedOutline': {
+                                            borderColor: alpha(theme.palette.primary.main, 0.25),
+                                        },
+                                        '&:hover .MuiOutlinedInput-notchedOutline': {
+                                            borderColor: alpha(theme.palette.primary.main, 0.5),
+                                        },
+                                        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                            borderColor: 'primary.main',
+                                            borderWidth: 2,
+                                        },
+                                    }}
+                                    MenuProps={{
+                                        PaperProps: {
+                                            sx: {
+                                                mt: 0.5,
+                                                border: '1px solid',
+                                                borderColor: 'divider',
+                                                bgcolor: 'background.paper',
+                                            },
+                                        },
+                                    }}
+                                >
+                                    {countryOptions.map((option) => (
+                                        <MenuItem
+                                            key={option.value}
+                                            value={option.value}
+                                            sx={{
+                                                fontWeight: option.value === country ? 700 : 500,
+                                                '&:hover': {
+                                                    backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                                                    color: 'primary.main',
+                                                },
+                                                '&.Mui-selected': {
+                                                    backgroundColor: alpha(theme.palette.primary.main, 0.14),
+                                                    color: 'primary.main',
+                                                },
+                                                '&.Mui-selected:hover': {
+                                                    backgroundColor: alpha(theme.palette.primary.main, 0.2),
+                                                },
+                                            }}
+                                        >
+                                            {option.label}
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
                             <FormControl fullWidth size="small">
                                 <InputLabel
                                     id="currency-select-label"
@@ -67,7 +174,11 @@ const SettingsPage: React.FC = () => {
                                     labelId="currency-select-label"
                                     value={currency}
                                     label="Currency"
-                                    onChange={(e) => dispatch(setCurrency(e.target.value as CurrencyCode))}
+                                    onChange={(e) => {
+                                        const nextCurrency = e.target.value as CurrencyCode;
+                                        dispatch(setCurrency(nextCurrency));
+                                        persistSettings(country, nextCurrency, notifications);
+                                    }}
                                     sx={{
                                         fontWeight: 600,
                                         '& .MuiOutlinedInput-notchedOutline': {
@@ -116,6 +227,9 @@ const SettingsPage: React.FC = () => {
                                     ))}
                                 </Select>
                             </FormControl>
+                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1.25 }}>
+                                Default currency follows the selected country. Pakistan starts with PKR by default.
+                            </Typography>
                         </CardContent>
                     </Card>
                 </Grid>
@@ -146,7 +260,14 @@ const SettingsPage: React.FC = () => {
                                 control={
                                     <Switch
                                         checked={notifications.orderUpdates}
-                                        onChange={(e) => dispatch(setOrderUpdatesEnabled(e.target.checked))}
+                                        onChange={(e) => {
+                                            const nextNotifications = {
+                                                ...notifications,
+                                                orderUpdates: e.target.checked,
+                                            };
+                                            dispatch(setOrderUpdatesEnabled(e.target.checked));
+                                            persistSettings(country, currency, nextNotifications);
+                                        }}
                                     />
                                 }
                                 label="Order updates"
@@ -155,11 +276,21 @@ const SettingsPage: React.FC = () => {
                                 control={
                                     <Switch
                                         checked={notifications.lowStockAlerts}
-                                        onChange={(e) => dispatch(setLowStockAlertsEnabled(e.target.checked))}
+                                        onChange={(e) => {
+                                            const nextNotifications = {
+                                                ...notifications,
+                                                lowStockAlerts: e.target.checked,
+                                            };
+                                            dispatch(setLowStockAlertsEnabled(e.target.checked));
+                                            persistSettings(country, currency, nextNotifications);
+                                        }}
                                     />
                                 }
                                 label="Low stock alerts"
                             />
+                            <Typography variant="caption" color="text.secondary">
+                                {loading ? 'Saving changes...' : 'Settings are synced with the backend database.'}
+                            </Typography>
                         </CardContent>
                     </Card>
                 </Grid>

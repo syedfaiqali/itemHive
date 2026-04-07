@@ -322,12 +322,12 @@ const Login: React.FC = () => {
                                     border: `1px dashed ${alpha(theme.palette.primary.main, 0.26)}`
                                 }}
                             >
-                                <Typography variant="caption" color="text.secondary" display="block" align="center">
+                                {/* <Typography variant="caption" color="text.secondary" display="block" align="center">
                                     <strong>Admin:</strong> admin@itemhive.pro / admin123
                                 </Typography>
                                 <Typography variant="caption" color="text.secondary" display="block" align="center">
                                     <strong>Staff:</strong> cashier@itemhive.pro / cashier123
-                                </Typography>
+                                </Typography> */}
                             </Box>
                         </Box>
                     </Paper>

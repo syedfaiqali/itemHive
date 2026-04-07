@@ -9,7 +9,7 @@ export interface ITransaction extends Document {
     type: 'addition' | 'reduction';
     amount: number;
     totalPrice: number;
-    paymentMethod?: 'cash' | 'card' | 'credit';
+    paymentMethod?: 'cash' | 'card' | 'credit' | 'installment';
     paidVia?: 'cash' | 'card';
     paidNow?: number;
     dueAmount?: number;
@@ -18,6 +18,7 @@ export interface ITransaction extends Document {
     unitCost?: number;
     unitPrice?: number;
     grossProfit?: number;
+    installmentPlanId?: string;
 }
 
 const TransactionSchema: Schema = new Schema({
@@ -29,7 +30,7 @@ const TransactionSchema: Schema = new Schema({
     type: { type: String, enum: ['addition', 'reduction'], required: true, index: true },
     amount: { type: Number, required: true },
     totalPrice: { type: Number, required: true },
-    paymentMethod: { type: String, enum: ['cash', 'card', 'credit'], default: 'cash' },
+    paymentMethod: { type: String, enum: ['cash', 'card', 'credit', 'installment'], default: 'cash' },
     paidVia: { type: String, enum: ['cash', 'card'], default: undefined },
     paidNow: { type: Number, default: 0 },
     dueAmount: { type: Number, default: 0 },
@@ -38,6 +39,8 @@ const TransactionSchema: Schema = new Schema({
     unitCost: { type: Number, default: 0 },
     unitPrice: { type: Number, default: 0 },
     grossProfit: { type: Number, default: 0 }
+    ,
+    installmentPlanId: { type: String, default: '', index: true }
 }, { timestamps: true });
 
 export default mongoose.model<ITransaction>('Transaction', TransactionSchema);

@@ -18,6 +18,7 @@ import {
     DialogTitle,
     DialogContent,
     DialogActions,
+    MenuItem,
     Stack,
     Snackbar,
     Alert,
@@ -46,8 +47,10 @@ import type { Product } from '../../features/inventory/inventorySlice';
 import type { AppDispatch } from '../../store';
 import { motion, AnimatePresence } from 'framer-motion';
 import useAppCurrency from '../../hooks/useAppCurrency';
+import api from '../../api/axios';
 
 const categories = ['All', ...PRODUCT_CATEGORIES];
+type CheckoutMethod = 'cash' | 'card' | 'credit' | 'installment';
 
 const escapePdfText = (text: string) => text
     .replace(/\\/g, '\\\\')
@@ -106,13 +109,13 @@ const POSTerminal: React.FC = () => {
 
     const [searchTerm, setSearchTerm] = useState('');
     const [activeTab, setActiveTab] = useState(0);
-    const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'credit' | null>(null);
+    const [paymentMethod, setPaymentMethod] = useState<CheckoutMethod | null>(null);
     const [orderDone, setOrderDone] = useState(false);
     const [receiptId, setReceiptId] = useState('');
     const [receiptTime, setReceiptTime] = useState('');
     const [stockToast, setStockToast] = useState({ open: false, message: '' });
     const [confirmOpen, setConfirmOpen] = useState(false);
-    const [pendingMethod, setPendingMethod] = useState<'cash' | 'card' | 'credit' | null>(null);
+    const [pendingMethod, setPendingMethod] = useState<CheckoutMethod | null>(null);
     const [creditOpen, setCreditOpen] = useState(false);
     const [creditPaidInput, setCreditPaidInput] = useState('');
     const [creditPaidVia, setCreditPaidVia] = useState<'cash' | 'card'>('cash');
@@ -120,6 +123,17 @@ const POSTerminal: React.FC = () => {
     const [creditDue, setCreditDue] = useState(0);
     const [creditCustomerName, setCreditCustomerName] = useState('');
     const [creditCustomerCnic, setCreditCustomerCnic] = useState('');
+    const [installmentOpen, setInstallmentOpen] = useState(false);
+    const [installmentCustomerName, setInstallmentCustomerName] = useState('');
+    const [installmentCustomerCnic, setInstallmentCustomerCnic] = useState('');
+    const [installmentCustomerPhone, setInstallmentCustomerPhone] = useState('');
+    const [installmentCustomerAddress, setInstallmentCustomerAddress] = useState('');
+    const [witnessOneName, setWitnessOneName] = useState('');
+    const [witnessOneAddress, setWitnessOneAddress] = useState('');
+    const [witnessTwoName, setWitnessTwoName] = useState('');
+    const [witnessTwoAddress, setWitnessTwoAddress] = useState('');
+    const [installmentMonths, setInstallmentMonths] = useState<3 | 6 | 9 | 12>(3);
+    const [installmentSaleDate, setInstallmentSaleDate] = useState(new Date().toISOString().split('T')[0]);
 
     const filteredProducts = useMemo(() => {
         return products.filter(p => {
@@ -137,16 +151,16 @@ const POSTerminal: React.FC = () => {
     const draftCreditPaid = Math.min(Math.max(Number(creditPaidInput || 0), 0), total);
     const draftCreditDue = Math.max(total - draftCreditPaid, 0);
 
-    const handleSaveReceiptPdf = (id: string, method: 'cash' | 'card' | 'credit', receiptTimeIso: string) => {
+    const handleSaveReceiptPdf = (id: string, method: CheckoutMethod, receiptTimeIso: string) => {
         const dateLabel = new Date(receiptTimeIso).toLocaleString();
         const lines = [
             'ItemHive POS Receipt',
             `Order ID: ${id}`,
             `Date: ${dateLabel}`,
             `Cashier: ${user?.name || 'Staff'}`,
-            `Payment: ${method === 'credit' ? `CREDIT (${creditPaidVia.toUpperCase()} + DUE)` : method.toUpperCase()}`,
-            method === 'credit' ? `Customer: ${creditCustomerName}` : '',
-            method === 'credit' ? `CNIC: ${creditCustomerCnic}` : '',
+            `Payment: ${method === 'credit' ? `CREDIT (${creditPaidVia.toUpperCase()} + DUE)` : method === 'installment' ? `INSTALLMENT (${installmentMonths} MONTHS)` : method.toUpperCase()}`,
+            method === 'credit' ? `Customer: ${creditCustomerName}` : method === 'installment' ? `Customer: ${installmentCustomerName}` : '',
+            method === 'credit' ? `CNIC: ${creditCustomerCnic}` : method === 'installment' ? `CNIC: ${installmentCustomerCnic}` : '',
             '----------------------------------------',
             ...cart.map((item) => `${item.name} x${item.quantity} @ ${formatCurrency(item.price)} = ${formatCurrency(item.price * item.quantity)}`),
             '----------------------------------------',
@@ -156,6 +170,7 @@ const POSTerminal: React.FC = () => {
             `Profit/Loss: ${formatCurrency(projectedProfit)}`,
             method === 'credit' ? `Paid Now: ${formatCurrency(creditPaidNow)}` : '',
             method === 'credit' ? `Remaining Due: ${formatCurrency(creditDue)}` : '',
+            method === 'installment' ? `Monthly Installment: ${formatCurrency(total / installmentMonths)}` : '',
             method === 'credit' ? `Order Total: ${formatCurrency(total)}` : `Total Paid: ${formatCurrency(total)}`,
             '----------------------------------------',
             'Thank you for shopping with us!'
@@ -203,6 +218,25 @@ const POSTerminal: React.FC = () => {
         setCreditOpen(true);
     };
 
+    const handleOpenInstallment = () => {
+        if (cart.length !== 1) {
+            setStockToast({ open: true, message: 'Installment sale currently supports one product at a time.' });
+            return;
+        }
+
+        setInstallmentCustomerName('');
+        setInstallmentCustomerCnic('');
+        setInstallmentCustomerPhone('');
+        setInstallmentCustomerAddress('');
+        setWitnessOneName('');
+        setWitnessOneAddress('');
+        setWitnessTwoName('');
+        setWitnessTwoAddress('');
+        setInstallmentMonths(3);
+        setInstallmentSaleDate(new Date().toISOString().split('T')[0]);
+        setInstallmentOpen(true);
+    };
+
     const handleContinueCredit = () => {
         if (!creditCustomerName.trim() || !creditCustomerCnic.trim()) {
             setStockToast({ open: true, message: 'Customer name and CNIC are required for credit sales.' });
@@ -219,12 +253,73 @@ const POSTerminal: React.FC = () => {
         setConfirmOpen(true);
     };
 
+    const handleContinueInstallment = () => {
+        if (!installmentCustomerName.trim() || !installmentCustomerCnic.trim() || !installmentCustomerPhone.trim() || !installmentCustomerAddress.trim()) {
+            setStockToast({ open: true, message: 'Customer name, CNIC, phone, and address are required for installment sales.' });
+            return;
+        }
+        if (!witnessOneName.trim() || !witnessOneAddress.trim() || !witnessTwoName.trim() || !witnessTwoAddress.trim()) {
+            setStockToast({ open: true, message: 'Both witness names and addresses are required.' });
+            return;
+        }
+
+        setPendingMethod('installment');
+        setInstallmentOpen(false);
+        setConfirmOpen(true);
+    };
+
     const handleConfirmCheckout = async () => {
         if (!pendingMethod) return;
 
         const id = `R${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 10)}`;
         const receiptTimeIso = new Date().toISOString();
         const currentMethod = pendingMethod;
+
+        if (pendingMethod === 'installment') {
+            const item = cart[0];
+
+            try {
+                await api.post('/installments', {
+                    planCode: `INS-${Date.now()}`,
+                    productId: item.id,
+                    productName: item.name,
+                    amount: item.quantity,
+                    totalAmount: item.price * item.quantity,
+                    unitPrice: item.price,
+                    customerName: installmentCustomerName.trim(),
+                    customerCnic: installmentCustomerCnic.trim(),
+                    customerPhone: installmentCustomerPhone.trim(),
+                    customerAddress: installmentCustomerAddress.trim(),
+                    saleDate: installmentSaleDate,
+                    installmentMonths,
+                    userName: user?.name || 'Staff',
+                    witnesses: [
+                        { name: witnessOneName.trim(), address: witnessOneAddress.trim() },
+                        { name: witnessTwoName.trim(), address: witnessTwoAddress.trim() },
+                    ],
+                });
+
+                await Promise.all([
+                    dispatch(fetchProducts()),
+                    dispatch(fetchTransactions()),
+                ]);
+
+                window.dispatchEvent(new Event('itemhive-installments-updated'));
+                setReceiptId(id);
+                setReceiptTime(receiptTimeIso);
+                setPaymentMethod(currentMethod);
+                setOrderDone(true);
+                setConfirmOpen(false);
+                setPendingMethod(null);
+                return;
+            } catch (error: any) {
+                setStockToast({
+                    open: true,
+                    message: error.response?.data?.message || 'Installment plan could not be created.',
+                });
+                return;
+            }
+        }
 
         const results = await Promise.all(cart.map((item) => {
             const tx = {
@@ -282,6 +377,15 @@ const POSTerminal: React.FC = () => {
         setCreditDue(0);
         setCreditCustomerName('');
         setCreditCustomerCnic('');
+        setInstallmentCustomerName('');
+        setInstallmentCustomerCnic('');
+        setInstallmentCustomerPhone('');
+        setInstallmentCustomerAddress('');
+        setWitnessOneName('');
+        setWitnessOneAddress('');
+        setWitnessTwoName('');
+        setWitnessTwoAddress('');
+        setInstallmentMonths(3);
     };
 
     const handlePrint = () => {
@@ -718,7 +822,7 @@ const POSTerminal: React.FC = () => {
                     </Stack>
 
                     <Grid container spacing={1}>
-                        <Grid size={{ xs: 4 }}>
+                        <Grid size={{ xs: 3 }}>
                             <Button
                                 fullWidth
                                 variant="outlined"
@@ -730,7 +834,7 @@ const POSTerminal: React.FC = () => {
                                 Cash
                             </Button>
                         </Grid>
-                        <Grid size={{ xs: 4 }}>
+                        <Grid size={{ xs: 3 }}>
                             <Button
                                 fullWidth
                                 variant="outlined"
@@ -742,7 +846,7 @@ const POSTerminal: React.FC = () => {
                                 Card
                             </Button>
                         </Grid>
-                        <Grid size={{ xs: 4 }}>
+                        <Grid size={{ xs: 3 }}>
                             <Button
                                 fullWidth
                                 variant="outlined"
@@ -752,6 +856,18 @@ const POSTerminal: React.FC = () => {
                                 sx={{ py: 1, borderRadius: 2, fontWeight: 700 }}
                             >
                                 Credit
+                            </Button>
+                        </Grid>
+                        <Grid size={{ xs: 3 }}>
+                            <Button
+                                fullWidth
+                                variant="outlined"
+                                startIcon={<Receipt size={20} />}
+                                disabled={cart.length === 0}
+                                onClick={handleOpenInstallment}
+                                sx={{ py: 1, borderRadius: 2, fontWeight: 700 }}
+                            >
+                                EMI
                             </Button>
                         </Grid>
                         <Grid size={{ xs: 6 }}>
@@ -867,6 +983,76 @@ const POSTerminal: React.FC = () => {
             </Dialog>
 
             <Dialog
+                open={installmentOpen}
+                onClose={() => setInstallmentOpen(false)}
+                maxWidth="sm"
+                fullWidth
+                PaperProps={{ sx: { borderRadius: 3 } }}
+            >
+                <DialogTitle sx={{ fontWeight: 800 }}>Installment Sale</DialogTitle>
+                <DialogContent>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        Capture customer details, two witnesses, and choose a monthly installment plan.
+                    </Typography>
+                    <Grid container spacing={2}>
+                        <Grid size={{ xs: 12, md: 6 }}>
+                            <TextField fullWidth label="Customer Name" value={installmentCustomerName} onChange={(e) => setInstallmentCustomerName(e.target.value)} />
+                        </Grid>
+                        <Grid size={{ xs: 12, md: 6 }}>
+                            <TextField fullWidth label="Customer CNIC" value={installmentCustomerCnic} onChange={(e) => setInstallmentCustomerCnic(e.target.value)} />
+                        </Grid>
+                        <Grid size={{ xs: 12, md: 6 }}>
+                            <TextField fullWidth label="Customer Phone" value={installmentCustomerPhone} onChange={(e) => setInstallmentCustomerPhone(e.target.value)} />
+                        </Grid>
+                        <Grid size={{ xs: 12, md: 6 }}>
+                            <TextField select fullWidth label="Installment Months" value={String(installmentMonths)} onChange={(e) => setInstallmentMonths(Number(e.target.value) as 3 | 6 | 9 | 12)}>
+                                <MenuItem value="3">3 Months</MenuItem>
+                                <MenuItem value="6">6 Months</MenuItem>
+                                <MenuItem value="9">9 Months</MenuItem>
+                                <MenuItem value="12">12 Months</MenuItem>
+                            </TextField>
+                        </Grid>
+                        <Grid size={12}>
+                            <TextField fullWidth label="Customer Address" value={installmentCustomerAddress} onChange={(e) => setInstallmentCustomerAddress(e.target.value)} multiline rows={2} />
+                        </Grid>
+                        <Grid size={{ xs: 12, md: 6 }}>
+                            <TextField fullWidth label="Witness 1 Name" value={witnessOneName} onChange={(e) => setWitnessOneName(e.target.value)} />
+                        </Grid>
+                        <Grid size={{ xs: 12, md: 6 }}>
+                            <TextField fullWidth label="Witness 1 Address" value={witnessOneAddress} onChange={(e) => setWitnessOneAddress(e.target.value)} />
+                        </Grid>
+                        <Grid size={{ xs: 12, md: 6 }}>
+                            <TextField fullWidth label="Witness 2 Name" value={witnessTwoName} onChange={(e) => setWitnessTwoName(e.target.value)} />
+                        </Grid>
+                        <Grid size={{ xs: 12, md: 6 }}>
+                            <TextField fullWidth label="Witness 2 Address" value={witnessTwoAddress} onChange={(e) => setWitnessTwoAddress(e.target.value)} />
+                        </Grid>
+                        <Grid size={{ xs: 12, md: 6 }}>
+                            <TextField
+                                fullWidth
+                                type="date"
+                                label="Sale Date"
+                                InputLabelProps={{ shrink: true }}
+                                value={installmentSaleDate}
+                                onChange={(e) => setInstallmentSaleDate(e.target.value)}
+                            />
+                        </Grid>
+                        <Grid size={{ xs: 12, md: 6 }}>
+                            <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'action.hover', border: '1px solid', borderColor: 'divider' }}>
+                                <Typography variant="body2" fontWeight={700}>Order Total: {formatCurrency(total)}</Typography>
+                                <Typography variant="body2" fontWeight={700}>Monthly Installment: {formatCurrency(total / installmentMonths)}</Typography>
+                                <Typography variant="body2" color="text.secondary">First due date will be one month after sale date.</Typography>
+                            </Box>
+                        </Grid>
+                    </Grid>
+                </DialogContent>
+                <DialogActions sx={{ p: 2 }}>
+                    <Button variant="outlined" onClick={() => setInstallmentOpen(false)}>Cancel</Button>
+                    <Button variant="contained" onClick={handleContinueInstallment}>Continue</Button>
+                </DialogActions>
+            </Dialog>
+
+            <Dialog
                 open={confirmOpen}
                 onClose={handleCancelCheckout}
                 maxWidth="xs"
@@ -891,6 +1077,17 @@ const POSTerminal: React.FC = () => {
                                 <Typography variant="body2">CNIC: <strong>{creditCustomerCnic}</strong></Typography>
                                 <Typography variant="body2" fontWeight={700}>Paid via {creditPaidVia.toUpperCase()}: {formatCurrency(creditPaidNow)}</Typography>
                                 <Typography variant="body2" fontWeight={900} color="warning.main">Due Later: {formatCurrency(creditDue)}</Typography>
+                            </Box>
+                        )}
+                        {pendingMethod === 'installment' && (
+                            <Box sx={{ mt: 1 }}>
+                                <Typography variant="body2">Customer: <strong>{installmentCustomerName}</strong></Typography>
+                                <Typography variant="body2">CNIC: <strong>{installmentCustomerCnic}</strong></Typography>
+                                <Typography variant="body2">Phone: <strong>{installmentCustomerPhone}</strong></Typography>
+                                <Typography variant="body2" fontWeight={700}>Plan: <strong>{installmentMonths} months</strong></Typography>
+                                <Typography variant="body2" fontWeight={900} color="warning.main">
+                                    Monthly Installment: {formatCurrency(total / installmentMonths)}
+                                </Typography>
                             </Box>
                         )}
                         <Typography variant="h6" fontWeight={900} color="primary.main" sx={{ mt: 0.5 }}>
@@ -934,9 +1131,9 @@ const POSTerminal: React.FC = () => {
                             <Typography variant="h6" fontWeight={800} className="gradient-text">ItemHive POS</Typography>
                             <Typography variant="caption" color="text.secondary" display="block">Terminal #01 - {user?.name || 'Staff'}</Typography>
                             <Typography variant="caption" color="text.secondary">{new Date().toLocaleString()}</Typography>
-                            {paymentMethod === 'credit' && (
+                            {(paymentMethod === 'credit' || paymentMethod === 'installment') && (
                                 <Typography variant="caption" color="text.secondary" display="block">
-                                    Customer: {creditCustomerName} | CNIC: {creditCustomerCnic}
+                                    Customer: {paymentMethod === 'credit' ? creditCustomerName : installmentCustomerName} | CNIC: {paymentMethod === 'credit' ? creditCustomerCnic : installmentCustomerCnic}
                                 </Typography>
                             )}
                         </Box>
@@ -965,7 +1162,7 @@ const POSTerminal: React.FC = () => {
                                 <Typography variant="caption" fontWeight={700}>{formatCurrency(tax)}</Typography>
                             </Box>
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
-                                <Typography variant="body1" fontWeight={900}>{paymentMethod === 'credit' ? 'Order Total' : 'Total Paid'}</Typography>
+                                <Typography variant="body1" fontWeight={900}>{paymentMethod === 'credit' || paymentMethod === 'installment' ? 'Order Total' : 'Total Paid'}</Typography>
                                 <Typography variant="body1" fontWeight={900} color="primary.main">{formatCurrency(total)}</Typography>
                             </Box>
                             {paymentMethod === 'credit' && (
@@ -977,6 +1174,20 @@ const POSTerminal: React.FC = () => {
                                     <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                                         <Typography variant="caption" color="warning.main">Due Later</Typography>
                                         <Typography variant="caption" fontWeight={800} color="warning.main">{formatCurrency(creditDue)}</Typography>
+                                    </Box>
+                                </>
+                            )}
+                            {paymentMethod === 'installment' && (
+                                <>
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                        <Typography variant="caption">Plan Duration</Typography>
+                                        <Typography variant="caption" fontWeight={700}>{installmentMonths} months</Typography>
+                                    </Box>
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                        <Typography variant="caption" color="warning.main">Monthly Installment</Typography>
+                                        <Typography variant="caption" fontWeight={800} color="warning.main">
+                                            {formatCurrency(total / installmentMonths)}
+                                        </Typography>
                                     </Box>
                                 </>
                             )}
