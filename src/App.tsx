@@ -23,13 +23,14 @@ const ReduceStock = React.lazy(() => import('./pages/Inventory/ReduceStock'));
 const POSTerminal = React.lazy(() => import('./pages/POS/POSTerminal'));
 const TransactionHistory = React.lazy(() => import('./pages/Transactions/TransactionHistory'));
 const ReportsPage = React.lazy(() => import('./pages/Reports/ReportsPage'));
+const ReportsPage = React.lazy(() => import('./pages/Reports/ReportsPage'));
 const Signup = React.lazy(() => import('./pages/Auth/Signup'));
 const OrderDesk = React.lazy(() => import('./pages/Orders/OrderDesk'));
 const SettingsPage = React.lazy(() => import('./pages/Settings/SettingsPage'));
 const ProfilePage = React.lazy(() => import('./pages/Profile/ProfilePage'));
 const CreditCustomersPage = React.lazy(() => import('./pages/Credit/CreditCustomersPage'));
 const InstallmentsPage = React.lazy(() => import('./pages/Installments/InstallmentsPage'));
-
+const StickyNotes = React.lazy(() => import('./pages/Notes/StickyNotes'));
 const AppContent: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const { mode } = useSelector((state: RootState) => state.theme);
@@ -75,6 +76,12 @@ const AppContent: React.FC = () => {
                 </ProtectedRoute>
               } />
               <Route path="transactions" element={<TransactionHistory />} />
+				<Route path="reports" element={<ReportsPage />} />
+              <Route path="notes" element={
+                <ProtectedRoute allowedRoles={['admin', 'cashier']}>
+                  <StickyNotes />
+                </ProtectedRoute>
+              } />
               <Route path="credits" element={
                 <ProtectedRoute allowedRoles={['cashier', 'admin']}>
                   <CreditCustomersPage />

@@ -23,6 +23,7 @@ import {
     ClipboardList,
     WalletCards,
     CalendarClock,
+    Pin,
     ChevronLeft,
     ChevronRight
 } from 'lucide-react';
@@ -57,6 +58,7 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onDrawerToggle }) => {
         { text: 'Credit Customers', icon: <WalletCards size={20} />, path: '/credits', roles: ['admin', 'cashier'] },
         { text: 'Installments', icon: <CalendarClock size={20} />, path: '/installments', roles: ['admin', 'cashier'] },
         { text: 'Reports', icon: <BarChart3 size={20} />, path: '/reports', roles: ['admin'] },
+        { text: 'Sticky Notes', icon: <Pin size={20} />, path: '/notes', roles: ['admin', 'user'] },
     ];
 
     const drawer = (
