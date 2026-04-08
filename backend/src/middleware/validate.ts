@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import Joi from 'joi';
+import { USER_ROLES } from '../utils/accessControl';
 
 /**
  * Express middleware factory for validating request body against a Joi schema.
@@ -35,7 +36,7 @@ export const registerSchema = Joi.object({
     name: Joi.string().min(2).required(),
     email: Joi.string().email().required(),
     password: Joi.string().min(6).required(),
-    role: Joi.string().valid('admin', 'cashier').optional(),
+    role: Joi.string().valid(...USER_ROLES).optional(),
 });
 
 export const productSchema = Joi.object({
@@ -100,4 +101,18 @@ export const settingsSchema = Joi.object({
         orderUpdates: Joi.boolean().required(),
         lowStockAlerts: Joi.boolean().required(),
     }).required(),
+});
+
+export const updateUserStatusSchema = Joi.object({
+    isActive: Joi.boolean().optional(),
+    isVisible: Joi.boolean().optional(),
+}).or('isActive', 'isVisible');
+
+export const updateAdminLimitSchema = Joi.object({
+    userCreationLimit: Joi.number().integer().min(0).required(),
+});
+
+export const inventoryRequestDecisionSchema = Joi.object({
+    status: Joi.string().valid('approved', 'rejected').required(),
+    decisionNote: Joi.string().allow('').optional(),
 });

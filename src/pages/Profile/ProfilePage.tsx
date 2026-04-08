@@ -27,7 +27,11 @@ const ProfilePage: React.FC = () => {
     const [photoUrl, setPhotoUrl] = useState(user?.photoUrl || '');
     const [saved, setSaved] = useState(false);
 
-    const roleLabel = user?.role === 'admin' ? 'Administrator' : 'Staff Member';
+    const roleLabel = user?.role === 'super_admin'
+        ? 'Super Admin'
+        : user?.role === 'admin'
+            ? 'Administrator'
+            : 'Team User';
 
     if (!user) {
         return null;
@@ -101,7 +105,7 @@ const ProfilePage: React.FC = () => {
                                     <Chip
                                         label={roleLabel}
                                         size="small"
-                                        color={user.role === 'admin' ? 'primary' : 'default'}
+                                        color={user.role === 'super_admin' || user.role === 'admin' ? 'primary' : 'default'}
                                         sx={{ mt: 0.5, fontWeight: 700 }}
                                     />
                                 </Box>

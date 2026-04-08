@@ -323,10 +323,10 @@ const Login: React.FC = () => {
                                 }}
                             >
                                 {/* <Typography variant="caption" color="text.secondary" display="block" align="center">
-                                    <strong>Admin:</strong> admin@itemhive.pro / admin123
+                                    <strong>Super Admin:</strong> admin@itemhive.com / admin123
                                 </Typography>
                                 <Typography variant="caption" color="text.secondary" display="block" align="center">
-                                    <strong>Staff:</strong> cashier@itemhive.pro / cashier123
+                                    <strong>Users:</strong> accounts are created by an admin or super admin
                                 </Typography> */}
                             </Box>
                         </Box>

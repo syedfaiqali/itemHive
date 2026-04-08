@@ -8,8 +8,8 @@ const router = Router();
 router.get('/', protect, getProducts);
 router.get('/image-suggestions', protect, getProductImageSuggestions);
 router.get('/:id', protect, getProductById);
-router.post('/', protect, authorize('admin'), validate(productSchema), createProduct);
-router.put('/:id', protect, authorize('admin'), validate(productSchema), updateProduct);
-router.delete('/:id', protect, authorize('admin'), deleteProduct);
+router.post('/', protect, authorize('super_admin', 'admin'), validate(productSchema), createProduct);
+router.put('/:id', protect, authorize('super_admin', 'admin'), validate(productSchema), updateProduct);
+router.delete('/:id', protect, authorize('super_admin', 'admin'), deleteProduct);
 
 export default router;

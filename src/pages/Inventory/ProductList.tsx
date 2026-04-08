@@ -159,10 +159,15 @@ const ProductList: React.FC = () => {
     React.useEffect(() => {
         const queryParams = new URLSearchParams(location.search);
         if (queryParams.get('add') === 'true') {
-            setShowAddModal(true);
+            if (user?.role === 'super_admin' || user?.role === 'admin') {
+                setShowAddModal(true);
+            } else {
+                navigate('/inventory/add', { replace: true });
+                return;
+            }
             navigate('/inventory', { replace: true });
         }
-    }, [location.search, navigate]);
+    }, [location.search, navigate, user?.role]);
 
     const handleSnackClose = () => setSnack({ ...snack, open: false });
 
@@ -177,7 +182,7 @@ const ProductList: React.FC = () => {
         return () => clearTimeout(handler);
     }, [searchTerm]);
 
-    const isAdmin = user?.role === 'admin';
+    const isManager = user?.role === 'super_admin' || user?.role === 'admin';
 
     const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, id: string) => {
         setAnchorEl(event.currentTarget);
@@ -334,16 +339,14 @@ const ProductList: React.FC = () => {
                         Track stock levels, pricing, and low-stock alerts in one view.
                     </Typography>
                 </Box>
-                {isAdmin && (
-                    <Button
-                        variant="contained"
-                        startIcon={<Plus size={20} />}
-                        onClick={() => navigate('/inventory/add')}
-                        sx={{ borderRadius: 2, px: 3, py: 1.2, fontWeight: 800 }}
-                    >
-                        Add Product
-                    </Button>
-                )}
+                <Button
+                    variant="contained"
+                    startIcon={<Plus size={20} />}
+                    onClick={() => navigate('/inventory/add')}
+                    sx={{ borderRadius: 2, px: 3, py: 1.2, fontWeight: 800 }}
+                >
+                    {isManager ? 'Add Product' : 'Request Inventory'}
+                </Button>
             </Box>
 
             <Card className="section-rise-delay" sx={{ borderRadius: 4, overflow: 'hidden' }}>
@@ -507,7 +510,7 @@ const ProductList: React.FC = () => {
                 anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
             >
                 <MenuItem onClick={handleViewClick}><Eye size={16} style={{ marginRight: 8 }} /> View Details</MenuItem>
-                {isAdmin && (
+                {isManager && (
                     <>
                         <MenuItem onClick={handleEditClick}><Edit size={16} style={{ marginRight: 8 }} /> Edit Product</MenuItem>
                         <MenuItem onClick={handleDeleteClick} sx={{ color: 'error.main' }}><Trash2 size={16} style={{ marginRight: 8 }} /> Delete</MenuItem>
@@ -645,7 +648,7 @@ const ProductList: React.FC = () => {
                     >
                         Close
                     </Button>
-                    {isAdmin && (
+                    {isManager && (
                         <Button
                             onClick={() => { setEditProduct(viewProduct); setViewProduct(null); }}
                             variant="contained"

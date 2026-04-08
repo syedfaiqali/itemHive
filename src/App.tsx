@@ -31,6 +31,8 @@ const CreditCustomersPage = React.lazy(() => import('./pages/Credit/CreditCustom
 const InstallmentsPage = React.lazy(() => import('./pages/Installments/InstallmentsPage'));
 const NotificationsPage = React.lazy(() => import('./pages/Notifications/NotificationsPage'));
 const StickyNotes = React.lazy(() => import('./pages/Notes/StickyNotes'));
+const TeamManagementPage = React.lazy(() => import('./pages/Admin/TeamManagementPage'));
+const InventoryRequestsPage = React.lazy(() => import('./pages/Inventory/InventoryRequestsPage'));
 const AppContent: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const { mode } = useSelector((state: RootState) => state.theme);
@@ -60,51 +62,57 @@ const AppContent: React.FC = () => {
               <Route index element={<Dashboard />} />
               <Route path="inventory" element={<ProductList />} />
               <Route path="inventory/add" element={<AddProduct />} />
+              <Route path="inventory/requests" element={<InventoryRequestsPage />} />
               <Route path="inventory/reduce" element={
-                <ProtectedRoute allowedRoles={['cashier', 'admin']}>
+                <ProtectedRoute allowedRoles={['super_admin', 'admin']}>
                   <ReduceStock />
                 </ProtectedRoute>
               } />
               <Route path="pos" element={
-                <ProtectedRoute allowedRoles={['cashier', 'admin']}>
+                <ProtectedRoute allowedRoles={['super_admin', 'admin', 'user']}>
                   <POSTerminal />
                 </ProtectedRoute>
               } />
               <Route path="orders" element={
-                <ProtectedRoute allowedRoles={['cashier', 'admin']}>
+                <ProtectedRoute allowedRoles={['super_admin', 'admin', 'user']}>
                   <OrderDesk />
                 </ProtectedRoute>
               } />
               <Route path="transactions" element={<TransactionHistory />} />
               <Route path="reports" element={<ReportsPage />} />
               <Route path="notes" element={
-                <ProtectedRoute allowedRoles={['admin', 'cashier']}>
+                <ProtectedRoute allowedRoles={['super_admin', 'admin', 'user']}>
                   <StickyNotes />
                 </ProtectedRoute>
               } />
               <Route path="credits" element={
-                <ProtectedRoute allowedRoles={['cashier', 'admin']}>
+                <ProtectedRoute allowedRoles={['super_admin', 'admin', 'user']}>
                   <CreditCustomersPage />
                 </ProtectedRoute>
               } />
               <Route path="installments" element={
-                <ProtectedRoute allowedRoles={['cashier', 'admin']}>
+                <ProtectedRoute allowedRoles={['super_admin', 'admin', 'user']}>
                   <InstallmentsPage />
                 </ProtectedRoute>
               } />
               <Route path="notifications" element={
-                <ProtectedRoute allowedRoles={['cashier', 'admin']}>
+                <ProtectedRoute allowedRoles={['super_admin', 'admin', 'user']}>
                   <NotificationsPage />
                 </ProtectedRoute>
               } />
               <Route path="reports" element={<ReportsPage />} />
+              <Route path="team" element={
+                <ProtectedRoute allowedRoles={['super_admin', 'admin']}>
+                  <TeamManagementPage />
+                </ProtectedRoute>
+              } />
               <Route path="settings" element={
-                <ProtectedRoute allowedRoles={['admin', 'cashier']}>
+                <ProtectedRoute allowedRoles={['super_admin', 'admin', 'user']}>
                   <SettingsPage />
                 </ProtectedRoute>
               } />
               <Route path="profile" element={
-                <ProtectedRoute allowedRoles={['admin', 'cashier']}>
+                <ProtectedRoute allowedRoles={['super_admin', 'admin', 'user']}>
                   <ProfilePage />
                 </ProtectedRoute>
               } />

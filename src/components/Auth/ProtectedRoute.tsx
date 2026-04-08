@@ -2,10 +2,11 @@ import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../../store';
+import type { UserRole } from '../../features/auth/authSlice';
 
 interface ProtectedRouteProps {
     children: React.ReactNode;
-    allowedRoles?: ('admin' | 'cashier')[];
+    allowedRoles?: UserRole[];
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles }) => {

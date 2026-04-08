@@ -1,12 +1,17 @@
 import mongoose, { Schema, Document } from 'mongoose';
 import bcrypt from 'bcryptjs';
+import { normalizeRole, USER_ROLES, type UserRole } from '../utils/accessControl';
 
 export interface IUser extends Document {
     name: string;
     email: string;
     password?: string;
-    role: 'admin' | 'cashier';
+    role: UserRole;
     avatar?: string;
+    isActive: boolean;
+    isVisible: boolean;
+    userCreationLimit: number;
+    createdBy?: mongoose.Types.ObjectId;
     preferences: {
         country: 'PK' | 'US' | 'DE' | 'GB' | 'CH' | 'CD' | 'CG' | 'IN' | 'AE';
         currency: 'USD' | 'EUR' | 'GBP' | 'CHF' | 'CDF' | 'XAF' | 'PKR' | 'INR' | 'AED';
@@ -22,8 +27,12 @@ const UserSchema: Schema = new Schema({
     name: { type: String, required: true },
     email: { type: String, required: true, unique: true, index: true },
     password: { type: String, select: false },
-    role: { type: String, enum: ['admin', 'cashier'], default: 'cashier' },
+    role: { type: String, enum: USER_ROLES, default: 'user' },
     avatar: { type: String },
+    isActive: { type: Boolean, default: true, index: true },
+    isVisible: { type: Boolean, default: true, index: true },
+    userCreationLimit: { type: Number, default: 0, min: 0 },
+    createdBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     preferences: {
         country: { type: String, enum: ['PK', 'US', 'DE', 'GB', 'CH', 'CD', 'CG', 'IN', 'AE'], default: 'PK' },
         currency: { type: String, enum: ['USD', 'EUR', 'GBP', 'CHF', 'CDF', 'XAF', 'PKR', 'INR', 'AED'], default: 'PKR' },
@@ -36,6 +45,9 @@ const UserSchema: Schema = new Schema({
 
 // Hash password before saving
 UserSchema.pre('save', async function (this: any) {
+    this.role = normalizeRole(this.role);
+    this.email = String(this.email || '').trim().toLowerCase();
+
     if (!this.isModified('password') || !this.password) return;
     try {
         const salt = await bcrypt.genSalt(10);

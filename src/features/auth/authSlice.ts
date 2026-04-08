@@ -1,12 +1,18 @@
 import { createSlice, createAsyncThunk, type PayloadAction } from '@reduxjs/toolkit';
+import { REHYDRATE } from 'redux-persist';
 import api from '../../api/axios';
+
+export type UserRole = 'super_admin' | 'admin' | 'user';
 
 export interface User {
     id: string;
     name: string;
     email: string;
-    role: 'admin' | 'cashier';
+    role: UserRole;
     photoUrl?: string;
+    isActive?: boolean;
+    isVisible?: boolean;
+    userCreationLimit?: number;
     preferences?: {
         country: 'PK' | 'US' | 'DE' | 'GB' | 'CH' | 'CD' | 'CG' | 'IN' | 'AE';
         currency: 'USD' | 'EUR' | 'GBP' | 'CHF' | 'CDF' | 'XAF' | 'PKR' | 'INR' | 'AED';
@@ -24,6 +30,36 @@ interface AuthState {
     loading: boolean;
     error: string | null;
 }
+
+const SUPER_ADMIN_EMAILS = ['admin@itemhive.com', 'admin@itemhive.pro'];
+
+const normalizeRole = (role?: string, email?: string): UserRole => {
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    if (SUPER_ADMIN_EMAILS.includes(normalizedEmail)) {
+        return 'super_admin';
+    }
+
+    if (role === 'super_admin' || role === 'admin' || role === 'user') {
+        return role;
+    }
+
+    if (role === 'cashier') {
+        return 'user';
+    }
+
+    return 'user';
+};
+
+const normalizeUser = (user: User | null): User | null => {
+    if (!user) {
+        return null;
+    }
+
+    return {
+        ...user,
+        role: normalizeRole(user.role, user.email),
+    };
+};
 
 const initialState: AuthState = {
     user: null,
@@ -49,7 +85,7 @@ export const loginUser = createAsyncThunk(
 export const registerUser = createAsyncThunk(
     'auth/register',
     async (
-        payload: { name: string; email: string; password: string; role: 'admin' | 'cashier' },
+        payload: { name: string; email: string; password: string; role: UserRole },
         { rejectWithValue }
     ) => {
         try {
@@ -84,7 +120,7 @@ const authSlice = createSlice({
             .addCase(loginUser.fulfilled, (state, action: PayloadAction<{ token: string; user: User }>) => {
                 state.loading = false;
                 state.isAuthenticated = true;
-                state.user = action.payload.user;
+                state.user = normalizeUser(action.payload.user);
                 state.token = action.payload.token;
             })
             .addCase(loginUser.rejected, (state, action: PayloadAction<any>) => {
@@ -101,6 +137,16 @@ const authSlice = createSlice({
             .addCase(registerUser.rejected, (state, action: PayloadAction<any>) => {
                 state.loading = false;
                 state.error = action.payload;
+            })
+            .addCase(REHYDRATE as any, (state, action: PayloadAction<any>) => {
+                const persistedAuth = action.payload?.auth;
+                if (!persistedAuth) {
+                    return;
+                }
+
+                state.user = normalizeUser(persistedAuth.user ?? state.user);
+                state.token = persistedAuth.token ?? state.token;
+                state.isAuthenticated = Boolean(persistedAuth.token ?? state.token);
             });
     }
 });

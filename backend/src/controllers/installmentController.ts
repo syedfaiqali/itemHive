@@ -4,6 +4,7 @@ import InstallmentPlan from '../models/InstallmentPlan';
 import Product from '../models/Product';
 import Transaction from '../models/Transaction';
 import type { AuthRequest } from '../middleware/auth';
+import { normalizeRole } from '../utils/accessControl';
 
 const round2 = (value: number) => Math.round(value * 100) / 100;
 
@@ -90,11 +91,17 @@ export const createInstallmentPlan = async (req: AuthRequest, res: Response) => 
             throw new Error('Insufficient stock');
         }
 
-        const resolvedUnitPrice = Number(unitPrice ?? product.salePrice ?? product.price ?? 0);
+        const actorRole = normalizeRole(req.user?.role);
+        const defaultUnitPrice = Number(product.salePrice ?? product.price ?? 0);
+        const resolvedUnitPrice = Number(unitPrice ?? defaultUnitPrice);
         const resolvedTotalAmount = Number(totalAmount ?? resolvedUnitPrice * Number(amount || 0));
         const resolvedAdvancePayment = round2(Number(advancePayment ?? 0));
         const resolvedMonths = Number(installmentMonths) as 3 | 6 | 9 | 12;
         const financedAmount = round2(resolvedTotalAmount - resolvedAdvancePayment);
+
+        if (actorRole === 'user' && resolvedUnitPrice !== defaultUnitPrice) {
+            throw new Error('Users are not allowed to change the sale price');
+        }
 
         if (!Number.isFinite(resolvedAdvancePayment) || resolvedAdvancePayment < 0) {
             throw new Error('Advance payment must be zero or more');
@@ -118,7 +125,7 @@ export const createInstallmentPlan = async (req: AuthRequest, res: Response) => 
             type: 'reduction',
             amount,
             totalPrice: resolvedTotalAmount,
-            userName: userName || 'Staff',
+            userName: req.user?.name || userName || 'Staff',
             paymentMethod: 'installment',
             paidNow: resolvedAdvancePayment,
             dueAmount: financedAmount,

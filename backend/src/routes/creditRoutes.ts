@@ -5,7 +5,7 @@ import { creditPaymentSchema, validate } from '../middleware/validate';
 
 const router = Router();
 
-router.get('/customers', protect, authorize('admin', 'cashier'), getCreditCustomers);
-router.post('/payments', protect, authorize('admin', 'cashier'), validate(creditPaymentSchema), createCreditPayment);
+router.get('/customers', protect, authorize('super_admin', 'admin', 'user'), getCreditCustomers);
+router.post('/payments', protect, authorize('super_admin', 'admin', 'user'), validate(creditPaymentSchema), createCreditPayment);
 
 export default router;

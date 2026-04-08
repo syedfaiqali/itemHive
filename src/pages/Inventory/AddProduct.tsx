@@ -34,6 +34,7 @@ import type { AppDispatch } from '../../store';
 import type { RootState } from '../../store';
 import { motion } from 'framer-motion';
 import useAppCurrency from '../../hooks/useAppCurrency';
+import api from '../../api/axios';
 
 const categories = PRODUCT_CATEGORIES;
 
@@ -41,6 +42,8 @@ const AddProduct: React.FC = () => {
     const navigate = useNavigate();
     const dispatch = useDispatch<AppDispatch>();
     const [success, setSuccess] = useState(false);
+    const [submitError, setSubmitError] = useState('');
+    const [submitting, setSubmitting] = useState(false);
     const [imageSuggestions, setImageSuggestions] = useState<ProductImageSuggestion[]>([]);
     const [suggestionsLoading, setSuggestionsLoading] = useState(false);
     const [imageError, setImageError] = useState('');
@@ -51,6 +54,8 @@ const AddProduct: React.FC = () => {
     const { currency, currencySymbol } = useAppCurrency();
 
     const { products } = useSelector((state: RootState) => state.inventory);
+    const { user } = useSelector((state: RootState) => state.auth);
+    const canCreateDirectly = user?.role === 'super_admin' || user?.role === 'admin';
     const [formData, setFormData] = useState({
         sku: '',
         name: '',
@@ -179,8 +184,9 @@ const AddProduct: React.FC = () => {
         setImageError('');
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setSubmitError('');
 
         // Check for duplicate SKU
         if (products.some((p: Product) => p.sku === formData.sku)) {
@@ -188,7 +194,7 @@ const AddProduct: React.FC = () => {
             return;
         }
 
-        dispatch(addProductApi({
+        const payload = {
             id: Math.random().toString(36).substr(2, 9),
             sku: formData.sku.toUpperCase(),
             name: formData.name,
@@ -200,12 +206,26 @@ const AddProduct: React.FC = () => {
             minStock: parseInt(formData.minStock),
             description: formData.description,
             imageUrl: formData.imageUrl
-        }));
+        };
 
-        setSuccess(true);
-        setTimeout(() => {
-            navigate('/inventory');
-        }, 1500);
+        setSubmitting(true);
+
+        try {
+            if (canCreateDirectly) {
+                await dispatch(addProductApi(payload)).unwrap();
+            } else {
+                await api.post('/inventory-requests', payload);
+            }
+
+            setSuccess(true);
+            setTimeout(() => {
+                navigate(canCreateDirectly ? '/inventory' : '/inventory/requests');
+            }, 1500);
+        } catch (error: any) {
+            setSubmitError(error?.response?.data?.message || error?.message || 'Unable to submit this product right now.');
+        } finally {
+            setSubmitting(false);
+        }
     };
 
     return (
@@ -214,12 +234,26 @@ const AddProduct: React.FC = () => {
                 <IconButton onClick={() => navigate('/inventory')} sx={{ bgcolor: 'background.paper' }}>
                     <ChevronLeft size={20} />
                 </IconButton>
-                <Typography variant="h4" fontWeight={800}>Add New Product</Typography>
+                <Typography variant="h4" fontWeight={800}>{canCreateDirectly ? 'Add New Product' : 'Request Inventory Approval'}</Typography>
             </Box>
 
             {success && (
                 <Alert severity="success" sx={{ mb: 3, borderRadius: 2 }}>
-                    Product added successfully! Redirecting to inventory...
+                    {canCreateDirectly
+                        ? 'Product added successfully! Redirecting to inventory...'
+                        : 'Inventory request submitted successfully! Redirecting to requests...'}
+                </Alert>
+            )}
+
+            {!canCreateDirectly && (
+                <Alert severity="info" sx={{ mb: 3, borderRadius: 2 }}>
+                    Users cannot add stock directly. This request will go to an admin or super admin for approval.
+                </Alert>
+            )}
+
+            {submitError && (
+                <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>
+                    {submitError}
                 </Alert>
             )}
 
@@ -533,10 +567,11 @@ const AddProduct: React.FC = () => {
                                         type="submit"
                                         variant="contained"
                                         size="large"
-                                        startIcon={<Save size={20} />}
+                                        startIcon={submitting ? <CircularProgress size={18} color="inherit" /> : <Save size={20} />}
+                                        disabled={submitting}
                                         sx={{ borderRadius: 2, px: 4 }}
                                     >
-                                        Save Product
+                                        {submitting ? 'Submitting...' : canCreateDirectly ? 'Save Product' : 'Submit for Approval'}
                                     </Button>
                                 </Grid>
                             </Grid>

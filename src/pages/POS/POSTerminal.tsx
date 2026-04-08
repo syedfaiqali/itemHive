@@ -115,6 +115,7 @@ const POSTerminal: React.FC = () => {
     const { products } = useSelector((state: RootState) => state.inventory);
     const { cart, taxRate, activeDiscount } = useSelector((state: RootState) => state.pos);
     const { formatCurrency, currencySymbol } = useAppCurrency();
+    const canOverridePrice = user?.role === 'super_admin' || user?.role === 'admin';
 
     const [searchTerm, setSearchTerm] = useState('');
     const [activeTab, setActiveTab] = useState(0);
@@ -797,6 +798,7 @@ const POSTerminal: React.FC = () => {
                                                     label="Sell Price"
                                                     value={item.price}
                                                     onChange={(e) => dispatch(updateCartItemPrice({ id: item.id, price: Number(e.target.value || 0) }))}
+                                                    disabled={!canOverridePrice}
                                                     sx={{ mt: 1, maxWidth: 150 }}
                                                     InputProps={{
                                                         startAdornment: (
@@ -1097,8 +1099,9 @@ const POSTerminal: React.FC = () => {
                                 label={`Installment Price (${currencySymbol})`}
                                 value={installmentUnitPriceInput}
                                 onChange={(e) => setInstallmentUnitPriceInput(e.target.value)}
+                                disabled={!canOverridePrice}
                                 inputProps={{ min: 0, step: '0.01' }}
-                                helperText={`Price per unit x ${installmentQuantity}`}
+                                helperText={canOverridePrice ? `Price per unit x ${installmentQuantity}` : 'Only admin and super admin can change installment price'}
                             />
                         </Grid>
                         <Grid size={{ xs: 12, md: 6 }}>

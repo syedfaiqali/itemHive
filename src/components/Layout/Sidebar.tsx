@@ -24,6 +24,8 @@ import {
     WalletCards,
     CalendarClock,
     Pin,
+    Users,
+    ClipboardCheck,
     ChevronLeft,
     ChevronRight
 } from 'lucide-react';
@@ -48,17 +50,20 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onDrawerToggle }) => {
     const { user } = useSelector((state: RootState) => state.auth);
     const { isSidebarCollapsed } = useSelector((state: RootState) => state.theme);
     const currentWidth = isSidebarCollapsed ? collapsedWidth : drawerWidth;
+    const currentRole = user?.role || 'user';
 
     const menuItems = [
-        { text: 'Dashboard', icon: <LayoutDashboard size={20} />, path: '/', roles: ['admin', 'cashier'] },
-        { text: 'POS Terminal', icon: <TerminalIcon size={20} />, path: '/pos', roles: ['admin', 'cashier'] },
-        { text: 'Inventory', icon: <Package size={20} />, path: '/inventory', roles: ['admin', 'cashier'] },
-        { text: 'Order Desk', icon: <ClipboardList size={20} />, path: '/orders', roles: ['admin', 'cashier'] },
-        { text: 'Transactions', icon: <History size={20} />, path: '/transactions', roles: ['admin', 'cashier'] },
-        { text: 'Credit Customers', icon: <WalletCards size={20} />, path: '/credits', roles: ['admin', 'cashier'] },
-        { text: 'Installments', icon: <CalendarClock size={20} />, path: '/installments', roles: ['admin', 'cashier'] },
-        { text: 'Reports', icon: <BarChart3 size={20} />, path: '/reports', roles: ['admin'] },
-        { text: 'Sticky Notes', icon: <Pin size={20} />, path: '/notes', roles: ['admin', 'user'] },
+        { text: 'Dashboard', icon: <LayoutDashboard size={20} />, path: '/', roles: ['super_admin', 'admin', 'user'] },
+        { text: 'POS Terminal', icon: <TerminalIcon size={20} />, path: '/pos', roles: ['super_admin', 'admin', 'user'] },
+        { text: 'Inventory', icon: <Package size={20} />, path: '/inventory', roles: ['super_admin', 'admin', 'user'] },
+        { text: 'Inventory Requests', icon: <ClipboardCheck size={20} />, path: '/inventory/requests', roles: ['super_admin', 'admin', 'user'] },
+        { text: 'Order Desk', icon: <ClipboardList size={20} />, path: '/orders', roles: ['super_admin', 'admin', 'user'] },
+        { text: 'Transactions', icon: <History size={20} />, path: '/transactions', roles: ['super_admin', 'admin', 'user'] },
+        { text: 'Credit Customers', icon: <WalletCards size={20} />, path: '/credits', roles: ['super_admin', 'admin', 'user'] },
+        { text: 'Installments', icon: <CalendarClock size={20} />, path: '/installments', roles: ['super_admin', 'admin', 'user'] },
+        { text: 'Reports', icon: <BarChart3 size={20} />, path: '/reports', roles: ['super_admin', 'admin'] },
+        { text: 'Team', icon: <Users size={20} />, path: '/team', roles: ['super_admin', 'admin'] },
+        { text: 'Sticky Notes', icon: <Pin size={20} />, path: '/notes', roles: ['super_admin', 'admin', 'user'] },
     ];
 
     const drawer = (
@@ -131,7 +136,7 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onDrawerToggle }) => {
             </Box>
             <List sx={{ px: 2 }}>
                 {menuItems
-                    .filter(item => item.roles.includes(user?.role || 'user'))
+                    .filter(item => item.roles.includes(currentRole))
                     .map((item) => {
                         const isActive = location.pathname === item.path;
                         return (

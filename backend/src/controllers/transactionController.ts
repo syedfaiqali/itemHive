@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import Transaction from '../models/Transaction';
 import Product from '../models/Product';
 import mongoose from 'mongoose';
+import type { AuthRequest } from '../middleware/auth';
+import { normalizeRole } from '../utils/accessControl';
 
 export const getTransactions = async (req: Request, res: Response) => {
     try {
@@ -12,7 +14,7 @@ export const getTransactions = async (req: Request, res: Response) => {
     }
 };
 
-export const createTransaction = async (req: Request, res: Response) => {
+export const createTransaction = async (req: AuthRequest, res: Response) => {
     const session = await mongoose.startSession();
     session.startTransaction();
 
@@ -39,9 +41,17 @@ export const createTransaction = async (req: Request, res: Response) => {
             throw new Error('Product not found');
         }
 
+        const actorRole = normalizeRole(req.user?.role);
         const resolvedUnitCost = product.purchasePrice ?? 0;
-        const resolvedUnitPrice = unitPrice ?? product.salePrice ?? product.price ?? 0;
-        const resolvedTotalPrice = totalPrice ?? (resolvedUnitPrice * amount);
+        const defaultUnitPrice = Number(product.salePrice ?? product.price ?? 0);
+        const requestedUnitPrice = unitPrice != null ? Number(unitPrice) : defaultUnitPrice;
+
+        if (actorRole === 'user' && requestedUnitPrice !== defaultUnitPrice) {
+            throw new Error('Users are not allowed to change the sale price');
+        }
+
+        const resolvedUnitPrice = requestedUnitPrice;
+        const resolvedTotalPrice = Number(totalPrice ?? (resolvedUnitPrice * amount));
         const resolvedGrossProfit = type === 'reduction'
             ? (resolvedUnitPrice - resolvedUnitCost) * amount
             : 0;
@@ -53,7 +63,7 @@ export const createTransaction = async (req: Request, res: Response) => {
             type,
             amount,
             totalPrice: resolvedTotalPrice,
-            userName,
+            userName: req.user?.name || userName || 'Staff',
             productName,
             paymentMethod: paymentMethod || 'cash',
             paidVia,

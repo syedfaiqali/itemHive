@@ -16,12 +16,12 @@ const seedData = async () => {
         await Product.deleteMany({});
         await User.deleteMany({});
 
-        // Seed Admin User
+        // Seed Super Admin User
         const admin = new User({
-            name: 'Admin User',
-            email: 'admin@itemhive.pro',
+            name: 'Super Admin',
+            email: 'admin@itemhive.com',
             password: 'admin123', // Will be hashed by pre-save hook
-            role: 'admin'
+            role: 'super_admin'
         });
         await admin.save();
 

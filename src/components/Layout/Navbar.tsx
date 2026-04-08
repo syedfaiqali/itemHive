@@ -50,6 +50,11 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
     const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
     const [notifAnchorEl, setNotifAnchorEl] = React.useState<null | HTMLElement>(null);
     const [installmentPlans, setInstallmentPlans] = React.useState<InstallmentNotificationPlan[]>([]);
+    const roleLabel = user?.role === 'super_admin'
+        ? 'Super Admin'
+        : user?.role === 'admin'
+            ? 'Administrator'
+            : 'Team User';
 
     const drawerWidth = 260;
     const collapsedWidth = 80;
@@ -365,7 +370,7 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
                                         {user?.name}
                                     </Typography>
                                     <Typography variant="caption" color="text.secondary" sx={{ letterSpacing: 0.2 }}>
-                                        {user?.role === 'admin' ? 'Administrator' : 'Staff Member'}
+                                        {roleLabel}
                                     </Typography>
                                 </Box>
                             </Box>

@@ -24,13 +24,18 @@ const Signup: React.FC = () => {
     const theme = useTheme();
     const dispatch = useDispatch<AppDispatch>();
     const navigate = useNavigate();
-    const { loading, error } = useSelector((state: RootState) => state.auth);
+    const { loading, error, user } = useSelector((state: RootState) => state.auth);
     const [showPassword, setShowPassword] = useState(false);
     const [success, setSuccess] = useState(false);
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
-    const [role, setRole] = useState<'admin' | 'cashier'>('cashier');
+    const isSuperAdmin = user?.role === 'super_admin';
+    const [role, setRole] = useState<'super_admin' | 'admin' | 'user'>(isSuperAdmin ? 'admin' : 'user');
     const [password, setPassword] = useState('');
+
+    useEffect(() => {
+        setRole(isSuperAdmin ? 'admin' : 'user');
+    }, [isSuperAdmin]);
     const floatingWidgets = [
         { icon: <Smartphone size={20} />, left: '12%', top: '20%', rotate: -7 },
         { icon: <Tablet size={20} />, left: '30%', top: '42%', rotate: 6 },
@@ -141,7 +146,7 @@ const Signup: React.FC = () => {
                                 Join ItemHive
                             </Typography>
                             <Typography variant="body2" color="text.secondary">
-                                Create your workspace access.
+                                {user ? 'Create a new workspace account.' : 'Create the first workspace account.'}
                             </Typography>
                         </Box>
 
@@ -201,13 +206,14 @@ const Signup: React.FC = () => {
                                 variant="outlined"
                                 margin="dense"
                                 value={role}
-                                onChange={(e) => setRole(e.target.value as 'admin' | 'cashier')}
+                                onChange={(e) => setRole(e.target.value as 'super_admin' | 'admin' | 'user')}
                                 required
                                 disabled={loading || success}
                                 sx={{ mb: 0.25 }}
                             >
-                                <MenuItem value="admin">Administrator (Manager)</MenuItem>
-                                <MenuItem value="cashier">Staff Member (Cashier)</MenuItem>
+                                {isSuperAdmin && <MenuItem value="admin">Administrator</MenuItem>}
+                                {isSuperAdmin && <MenuItem value="super_admin">Super Admin</MenuItem>}
+                                <MenuItem value="user">User</MenuItem>
                             </TextField>
                             <TextField
                                 fullWidth

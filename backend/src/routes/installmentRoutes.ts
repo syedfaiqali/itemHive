@@ -5,8 +5,8 @@ import { installmentPaymentSchema, installmentPlanSchema, validate } from '../mi
 
 const router = Router();
 
-router.get('/', protect, authorize('admin', 'cashier'), getInstallmentPlans);
-router.post('/', protect, authorize('admin', 'cashier'), validate(installmentPlanSchema), createInstallmentPlan);
-router.post('/:id/payments', protect, authorize('admin', 'cashier'), validate(installmentPaymentSchema), payInstallment);
+router.get('/', protect, authorize('super_admin', 'admin', 'user'), getInstallmentPlans);
+router.post('/', protect, authorize('super_admin', 'admin', 'user'), validate(installmentPlanSchema), createInstallmentPlan);
+router.post('/:id/payments', protect, authorize('super_admin', 'admin', 'user'), validate(installmentPaymentSchema), payInstallment);
 
 export default router;
