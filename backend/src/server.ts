@@ -14,6 +14,7 @@ import installmentRoutes from './routes/installmentRoutes';
 import settingsRoutes from './routes/settingsRoutes';
 import userRoutes from './routes/userRoutes';
 import inventoryRequestRoutes from './routes/inventoryRequestRoutes';
+import notesRoutes from './routes/notesRoutes';
 import { errorHandler, notFound } from './middleware/errorHandler';
 
 // Environmental variables
@@ -91,6 +92,7 @@ app.use('/api/installments', installmentRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/inventory-requests', inventoryRequestRoutes);
+app.use('/api/notes', notesRoutes);
 
 // ── 404 & Error Handling ──────────────────────────────────────
 app.use(notFound);

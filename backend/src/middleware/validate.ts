@@ -116,3 +116,17 @@ export const inventoryRequestDecisionSchema = Joi.object({
     status: Joi.string().valid('approved', 'rejected').required(),
     decisionNote: Joi.string().allow('').optional(),
 });
+
+export const noteCreateSchema = Joi.object({
+    title: Joi.string().allow('').optional(),
+    body: Joi.string().allow('').optional(),
+    color: Joi.string().allow('').optional(),
+    pinned: Joi.boolean().optional(),
+});
+
+export const noteUpdateSchema = Joi.object({
+    title: Joi.string().allow('').optional(),
+    body: Joi.string().allow('').optional(),
+    color: Joi.string().allow('').optional(),
+    pinned: Joi.boolean().optional(),
+});
