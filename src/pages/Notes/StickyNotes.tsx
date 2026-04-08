@@ -15,21 +15,23 @@ import {
     Stack,
     Chip,
     Tooltip,
-    Divider
+    Divider,
+    Alert,
+    CircularProgress
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import { Pin, Trash2, Edit3, Plus } from 'lucide-react';
+import api from '../../api/axios';
 
 type StickyNote = {
-    id: string;
+    _id: string;
     title: string;
     body: string;
     color: string;
     pinned: boolean;
     updatedAt: string;
+    createdAt: string;
 };
-
-const STORAGE_KEY = 'itemhive_sticky_notes';
 
 const COLOR_OPTIONS = [
     { label: 'Lemon', value: '#FDE68A' },
@@ -46,26 +48,26 @@ const StickyNotes: React.FC = () => {
     const [body, setBody] = React.useState('');
     const [color, setColor] = React.useState(COLOR_OPTIONS[0].value);
     const [editing, setEditing] = React.useState<StickyNote | null>(null);
+    const [loading, setLoading] = React.useState(false);
+    const [saving, setSaving] = React.useState(false);
+    const [error, setError] = React.useState('');
 
-    React.useEffect(() => {
+    const loadNotes = React.useCallback(async () => {
+        setLoading(true);
+        setError('');
         try {
-            const stored = localStorage.getItem(STORAGE_KEY);
-            if (stored) {
-                const parsed = JSON.parse(stored) as StickyNote[];
-                if (Array.isArray(parsed)) setNotes(parsed);
-            }
-        } catch {
-            setNotes([]);
+            const response = await api.get('/notes');
+            setNotes(response.data || []);
+        } catch (fetchError: any) {
+            setError(fetchError.response?.data?.message || 'Unable to load sticky notes.');
+        } finally {
+            setLoading(false);
         }
     }, []);
 
     React.useEffect(() => {
-        try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(notes));
-        } catch {
-            // ignore storage errors
-        }
-    }, [notes]);
+        loadNotes();
+    }, [loadNotes]);
 
     const sortedNotes = React.useMemo(() => {
         return [...notes].sort((a, b) => {
@@ -74,43 +76,70 @@ const StickyNotes: React.FC = () => {
         });
     }, [notes]);
 
-    const handleAdd = () => {
+    const handleAdd = async () => {
         if (!title.trim() && !body.trim()) return;
-        const now = new Date().toISOString();
-        const newNote: StickyNote = {
-            id: Math.random().toString(36).slice(2, 10),
-            title: title.trim() || 'Untitled',
-            body: body.trim(),
-            color,
-            pinned: false,
-            updatedAt: now
-        };
-        setNotes(prev => [newNote, ...prev]);
-        setTitle('');
-        setBody('');
-        setColor(COLOR_OPTIONS[0].value);
+        setSaving(true);
+        setError('');
+        try {
+            const response = await api.post('/notes', {
+                title: title.trim(),
+                body: body.trim(),
+                color,
+            });
+            setNotes(prev => [response.data, ...prev]);
+            setTitle('');
+            setBody('');
+            setColor(COLOR_OPTIONS[0].value);
+        } catch (saveError: any) {
+            setError(saveError.response?.data?.message || 'Unable to save note.');
+        } finally {
+            setSaving(false);
+        }
     };
 
-    const handleTogglePin = (id: string) => {
-        setNotes(prev => prev.map(note => (
-            note.id === id
-                ? { ...note, pinned: !note.pinned, updatedAt: new Date().toISOString() }
-                : note
-        )));
+    const handleTogglePin = async (note: StickyNote) => {
+        setSaving(true);
+        setError('');
+        try {
+            const response = await api.patch(`/notes/${note._id}`, { pinned: !note.pinned });
+            setNotes(prev => prev.map(item => (item._id === note._id ? response.data : item)));
+        } catch (saveError: any) {
+            setError(saveError.response?.data?.message || 'Unable to update note.');
+        } finally {
+            setSaving(false);
+        }
     };
 
-    const handleDelete = (id: string) => {
-        setNotes(prev => prev.filter(note => note.id !== id));
+    const handleDelete = async (id: string) => {
+        setSaving(true);
+        setError('');
+        try {
+            await api.delete(`/notes/${id}`);
+            setNotes(prev => prev.filter(note => note._id !== id));
+        } catch (deleteError: any) {
+            setError(deleteError.response?.data?.message || 'Unable to delete note.');
+        } finally {
+            setSaving(false);
+        }
     };
 
-    const handleEditSave = () => {
+    const handleEditSave = async () => {
         if (!editing) return;
-        setNotes(prev => prev.map(note => (
-            note.id === editing.id
-                ? { ...editing, title: editing.title.trim() || 'Untitled', body: editing.body.trim(), updatedAt: new Date().toISOString() }
-                : note
-        )));
-        setEditing(null);
+        setSaving(true);
+        setError('');
+        try {
+            const response = await api.patch(`/notes/${editing._id}`, {
+                title: editing.title.trim(),
+                body: editing.body.trim(),
+                color: editing.color,
+            });
+            setNotes(prev => prev.map(note => (note._id === editing._id ? response.data : note)));
+            setEditing(null);
+        } catch (saveError: any) {
+            setError(saveError.response?.data?.message || 'Unable to update note.');
+        } finally {
+            setSaving(false);
+        }
     };
 
     return (
@@ -166,6 +195,7 @@ const StickyNotes: React.FC = () => {
                                     variant="contained"
                                     startIcon={<Plus size={18} />}
                                     onClick={handleAdd}
+                                    disabled={saving}
                                     sx={{ borderRadius: 2, fontWeight: 800 }}
                                 >
                                     Add Note
@@ -176,14 +206,24 @@ const StickyNotes: React.FC = () => {
                 </CardContent>
             </Card>
 
-            {sortedNotes.length === 0 ? (
+            {error && (
+                <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError('')}>
+                    {error}
+                </Alert>
+            )}
+
+            {loading ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
+                    <CircularProgress />
+                </Box>
+            ) : sortedNotes.length === 0 ? (
                 <Box sx={{ textAlign: 'center', py: 6, color: 'text.secondary' }}>
                     No notes yet. Add your first sticky note above.
                 </Box>
             ) : (
                 <Grid container spacing={3}>
                     {sortedNotes.map((note) => (
-                        <Grid key={note.id} size={{ xs: 12, sm: 6, md: 4 }}>
+                        <Grid key={note._id} size={{ xs: 12, sm: 6, md: 4 }}>
                             <Card
                                 sx={{
                                     borderRadius: 4,
@@ -203,7 +243,8 @@ const StickyNotes: React.FC = () => {
                                         <Tooltip title={note.pinned ? 'Unpin' : 'Pin'}>
                                             <IconButton
                                                 size="small"
-                                                onClick={() => handleTogglePin(note.id)}
+                                                onClick={() => handleTogglePin(note)}
+                                                disabled={saving}
                                                 sx={{
                                                     bgcolor: note.pinned ? alpha(theme.palette.primary.main, 0.2) : 'transparent',
                                                     '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.2) }
@@ -214,7 +255,7 @@ const StickyNotes: React.FC = () => {
                                         </Tooltip>
                                     </Box>
                                     <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', mb: 2 }}>
-                                        {note.body || '—'}
+                                        {note.body || '-'}
                                     </Typography>
                                     <Divider sx={{ mb: 1.5, borderColor: alpha('#000', 0.08) }} />
                                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -222,10 +263,10 @@ const StickyNotes: React.FC = () => {
                                             Updated: {new Date(note.updatedAt).toLocaleString()}
                                         </Typography>
                                         <Box>
-                                            <IconButton size="small" onClick={() => setEditing(note)}>
+                                            <IconButton size="small" onClick={() => setEditing(note)} disabled={saving}>
                                                 <Edit3 size={16} />
                                             </IconButton>
-                                            <IconButton size="small" onClick={() => handleDelete(note.id)}>
+                                            <IconButton size="small" onClick={() => handleDelete(note._id)} disabled={saving}>
                                                 <Trash2 size={16} />
                                             </IconButton>
                                         </Box>
@@ -275,8 +316,8 @@ const StickyNotes: React.FC = () => {
                     )}
                 </DialogContent>
                 <DialogActions sx={{ p: 2 }}>
-                    <Button variant="outlined" onClick={() => setEditing(null)}>Cancel</Button>
-                    <Button variant="contained" onClick={handleEditSave}>Save</Button>
+                    <Button variant="outlined" onClick={() => setEditing(null)} disabled={saving}>Cancel</Button>
+                    <Button variant="contained" onClick={handleEditSave} disabled={saving}>Save</Button>
                 </DialogActions>
             </Dialog>
         </Box>

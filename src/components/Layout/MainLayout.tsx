@@ -40,7 +40,7 @@ const MainLayout: React.FC = () => {
                     p: { xs: 1.5, sm: 2, md: 3 },
                     width: { sm: `calc(100% - ${currentWidth}px)` },
                     // ml: { sm: `${currentWidth}px` },
-                    mt: '64px',
+                    mt: { xs: '56px', sm: '64px' },
                     overflowX: 'hidden',
                     transition: (theme) => theme.transitions.create(['width', 'margin'], {
                         easing: theme.transitions.easing.sharp,

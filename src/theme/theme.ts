@@ -125,6 +125,9 @@ export const getAppTheme = (mode: PaletteMode) => createTheme({
             styleOverrides: {
                 root: {
                     borderRadius: 8,
+                    overflowX: 'auto',
+                    maxWidth: '100%',
+                    WebkitOverflowScrolling: 'touch',
                 },
             },
         },
@@ -149,6 +152,10 @@ export const getAppTheme = (mode: PaletteMode) => createTheme({
                     borderBottom: mode === 'light'
                         ? '1px solid rgba(15, 23, 42, 0.08)'
                         : '1px solid rgba(148, 163, 184, 0.2)',
+                    '@media (max-width:600px)': {
+                        padding: '10px 12px',
+                        fontSize: '0.78rem',
+                    },
                 },
             },
         },

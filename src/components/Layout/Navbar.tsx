@@ -399,7 +399,7 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
                         transformOrigin={{ vertical: 'top', horizontal: 'right' }}
                         open={Boolean(notifAnchorEl)}
                         onClose={handleNotifClose}
-                        PaperProps={{ sx: { width: 320, p: 0.5 } }}
+                        PaperProps={{ sx: { width: { xs: 'calc(100vw - 32px)', sm: 320 }, p: 0.5 } }}
                     >
                         <Box sx={{ px: 2, py: 1 }}>
                             <Typography variant="subtitle2">Notifications</Typography>

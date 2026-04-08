@@ -134,56 +134,70 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onDrawerToggle }) => {
             <Box sx={{ p: isSidebarCollapsed ? 2 : 3, textAlign: isSidebarCollapsed ? 'center' : 'left' }}>
 
             </Box>
-            <List sx={{ px: 2 }}>
-                {menuItems
-                    .filter(item => item.roles.includes(currentRole))
-                    .map((item) => {
-                        const isActive = location.pathname === item.path;
-                        return (
-                            <ListItem key={item.text} disablePadding sx={{ mb: 0.5 }}>
-                                <ListItemButton
-                                    onClick={() => {
-                                        navigate(item.path);
-                                        if (mobileOpen) onDrawerToggle();
-                                    }}
-                                    sx={{
-                                        p: isSidebarCollapsed ? 1.5 : 2,
-                                        justifyContent: isSidebarCollapsed ? 'center' : 'initial',
-                                        borderRadius: 2,
-                                        backgroundColor: isActive ? 'primary.main' : 'transparent',
-                                        color: isActive ? 'primary.contrastText' : 'text.primary',
-                                        '&:hover': {
-                                            backgroundColor: isActive ? 'primary.dark' : (theme) => alpha(theme.palette.primary.main, 0.1),
-                                            color: isActive ? 'primary.contrastText' : 'primary.main',
-                                            '& .MuiListItemIcon-root': {
-                                                color: isActive ? 'primary.contrastText' : 'primary.main',
-                                            }
-                                        },
-                                    }}
-                                >
-                                    <ListItemIcon
+            <Box
+                sx={{
+                    flexGrow: 1,
+                    overflowY: 'auto',
+                    px: 2,
+                    pb: 1.5,
+                    '&::-webkit-scrollbar': { width: 6 },
+                    '&::-webkit-scrollbar-thumb': {
+                        backgroundColor: alpha(theme.palette.primary.main, 0.35),
+                        borderRadius: 8,
+                    },
+                }}
+            >
+                <List sx={{ px: 0 }}>
+                    {menuItems
+                        .filter(item => item.roles.includes(currentRole))
+                        .map((item) => {
+                            const isActive = location.pathname === item.path;
+                            return (
+                                <ListItem key={item.text} disablePadding sx={{ mb: 0.5 }}>
+                                    <ListItemButton
+                                        onClick={() => {
+                                            navigate(item.path);
+                                            if (mobileOpen) onDrawerToggle();
+                                        }}
                                         sx={{
-                                            minWidth: isSidebarCollapsed ? 0 : 40,
-                                            mr: isSidebarCollapsed ? 0 : 0,
-                                            justifyContent: 'center',
-                                            color: isActive ? 'primary.contrastText' : 'text.secondary'
+                                            p: isSidebarCollapsed ? 1.5 : 2,
+                                            justifyContent: isSidebarCollapsed ? 'center' : 'initial',
+                                            borderRadius: 2,
+                                            backgroundColor: isActive ? 'primary.main' : 'transparent',
+                                            color: isActive ? 'primary.contrastText' : 'text.primary',
+                                            '&:hover': {
+                                                backgroundColor: isActive ? 'primary.dark' : (theme) => alpha(theme.palette.primary.main, 0.1),
+                                                color: isActive ? 'primary.contrastText' : 'primary.main',
+                                                '& .MuiListItemIcon-root': {
+                                                    color: isActive ? 'primary.contrastText' : 'primary.main',
+                                                }
+                                            },
                                         }}
                                     >
-                                        {item.icon}
-                                    </ListItemIcon>
-                                    <ListItemText
-                                        primary={item.text}
-                                        sx={{ opacity: isSidebarCollapsed ? 0 : 1, width: isSidebarCollapsed ? 0 : 'auto', m: 0 }}
-                                        primaryTypographyProps={{
-                                            fontSize: '0.9rem',
-                                            fontWeight: isActive ? 700 : 600
-                                        }}
-                                    />
-                                </ListItemButton>
-                            </ListItem>
-                        );
-                    })}
-            </List>
+                                        <ListItemIcon
+                                            sx={{
+                                                minWidth: isSidebarCollapsed ? 0 : 40,
+                                                mr: isSidebarCollapsed ? 0 : 0,
+                                                justifyContent: 'center',
+                                                color: isActive ? 'primary.contrastText' : 'text.secondary'
+                                            }}
+                                        >
+                                            {item.icon}
+                                        </ListItemIcon>
+                                        <ListItemText
+                                            primary={item.text}
+                                            sx={{ opacity: isSidebarCollapsed ? 0 : 1, width: isSidebarCollapsed ? 0 : 'auto', m: 0 }}
+                                            primaryTypographyProps={{
+                                                fontSize: '0.9rem',
+                                                fontWeight: isActive ? 700 : 600
+                                            }}
+                                        />
+                                    </ListItemButton>
+                                </ListItem>
+                            );
+                        })}
+                </List>
+            </Box>
             <Box sx={{ mt: 'auto', p: 2 }}>
                 <Divider sx={{ mb: 2 }} />
             </Box>
