@@ -9,6 +9,9 @@ import authRoutes from './routes/authRoutes';
 import productRoutes from './routes/productRoutes';
 import transactionRoutes from './routes/transactionRoutes';
 import reportRoutes from './routes/reportRoutes';
+import creditRoutes from './routes/creditRoutes';
+import installmentRoutes from './routes/installmentRoutes';
+import settingsRoutes from './routes/settingsRoutes';
 import { errorHandler, notFound } from './middleware/errorHandler';
 
 // Environmental variables
@@ -81,6 +84,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/credit', creditRoutes);
+app.use('/api/installments', installmentRoutes);
+app.use('/api/settings', settingsRoutes);
 
 // ── 404 & Error Handling ──────────────────────────────────────
 app.use(notFound);

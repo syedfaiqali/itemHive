@@ -70,6 +70,7 @@ export const installmentPlanSchema = Joi.object({
     amount: Joi.number().integer().positive().required(),
     totalAmount: Joi.number().positive().required(),
     unitPrice: Joi.number().positive().required(),
+    advancePayment: Joi.number().min(0).required(),
     customerName: Joi.string().min(2).required(),
     customerCnic: Joi.string().min(5).required(),
     customerPhone: Joi.string().min(5).required(),
@@ -80,6 +81,7 @@ export const installmentPlanSchema = Joi.object({
     witnesses: Joi.array().length(2).items(
         Joi.object({
             name: Joi.string().min(2).required(),
+            cnic: Joi.string().min(5).required(),
             address: Joi.string().min(5).required(),
         })
     ).required(),

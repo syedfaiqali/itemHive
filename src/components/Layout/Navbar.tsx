@@ -30,17 +30,10 @@ import { logout } from '../../features/auth/authSlice';
 import { toggleDarkMode, setDarkMode } from '../../features/theme/themeSlice';
 import { useLocation, useNavigate } from 'react-router-dom';
 import api from '../../api/axios';
+import { buildNotifications, type InstallmentNotificationPlan, type NotificationItem } from '../../lib/notifications';
 
 interface NavbarProps {
     onMenuClick: () => void;
-}
-
-interface NavbarNotificationItem {
-    id: string;
-    title: string;
-    detail: string;
-    time: string;
-    path?: string;
 }
 
 const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
@@ -56,7 +49,7 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
     const { notifications } = useSelector((state: RootState) => state.settings);
     const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
     const [notifAnchorEl, setNotifAnchorEl] = React.useState<null | HTMLElement>(null);
-    const [installmentNotifications, setInstallmentNotifications] = React.useState<NavbarNotificationItem[]>([]);
+    const [installmentPlans, setInstallmentPlans] = React.useState<InstallmentNotificationPlan[]>([]);
 
     const drawerWidth = 260;
     const collapsedWidth = 80;
@@ -82,35 +75,9 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
         const loadInstallmentNotifications = async () => {
             try {
                 const response = await api.get('/installments');
-                const plans = (response.data || []) as Array<any>;
-                const now = new Date();
-                const dueItems = plans
-                    .filter((plan) => plan.status === 'active')
-                    .map((plan) => {
-                        const nextPending = (plan.schedule || []).find((item: any) => item.status === 'pending');
-                        if (!nextPending) {
-                            return null;
-                        }
-
-                        const dueDate = new Date(nextPending.dueDate);
-                        if (dueDate > now) {
-                            return null;
-                        }
-
-                        return {
-                            id: `installment-${plan.planCode}-${nextPending.installmentNumber}`,
-                            title: dueDate.toDateString() === now.toDateString() ? 'Installment Due Today' : 'Overdue Installment',
-                            detail: `${plan.customerName} - ${nextPending.amount} due for ${plan.productName}`,
-                            time: `Due ${dueDate.toLocaleDateString()}`,
-                            path: '/installments',
-                        };
-                    })
-                    .filter(Boolean)
-                    .slice(0, 3) as NavbarNotificationItem[];
-
-                setInstallmentNotifications(dueItems);
+                setInstallmentPlans((response.data || []) as InstallmentNotificationPlan[]);
             } catch {
-                setInstallmentNotifications([]);
+                setInstallmentPlans([]);
             }
         };
 
@@ -118,6 +85,22 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
         window.addEventListener('itemhive-installments-updated', loadInstallmentNotifications);
         return () => window.removeEventListener('itemhive-installments-updated', loadInstallmentNotifications);
     }, [location.pathname]);
+
+    const allNotifications = React.useMemo(
+        () =>
+            buildNotifications({
+                installmentPlans,
+                orders,
+                transactions,
+                products,
+                orderUpdatesEnabled: notifications.orderUpdates,
+                lowStockAlertsEnabled: notifications.lowStockAlerts,
+            }),
+        [installmentPlans, notifications.lowStockAlerts, notifications.orderUpdates, orders, products, transactions]
+    );
+
+    const recentNotifications = React.useMemo(() => allNotifications.slice(0, 6), [allNotifications]);
+    const hasConfigurableNotificationsEnabled = notifications.orderUpdates || notifications.lowStockAlerts;
 
     const handleLogout = () => {
         dispatch(logout());
@@ -179,38 +162,6 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
             },
         },
     });
-
-    const orderAndStockNotifications: NavbarNotificationItem[] = notifications.orderUpdates
-        ? [
-            ...orders.slice(0, 2).map((order) => ({
-                id: `order-${order.id}`,
-                title: `Order ${order.status === 'fulfilled' ? 'fulfilled' : 'rejected'}`,
-                detail: `${order.productName} - ${order.quantity} units`,
-                time: new Date(order.timestamp).toLocaleString(),
-            })),
-            ...transactions.slice(0, 2).map((tx) => ({
-                id: `tx-${tx.id}`,
-                title: tx.type === 'addition' ? 'Stock Added' : 'Stock Reduced',
-                detail: `${tx.productName} - ${tx.amount} units`,
-                time: new Date(tx.timestamp).toLocaleString(),
-            }))
-        ]
-        : [];
-
-    const lowStockNotifications: NavbarNotificationItem[] = notifications.lowStockAlerts
-        ? products
-            .filter((p) => p.stock <= p.minStock)
-            .slice(0, 2)
-            .map((p) => ({
-                id: `low-stock-${p.id}`,
-                title: p.stock === 0 ? 'Out of Stock' : 'Low Stock Alert',
-                detail: `${p.name} - ${p.stock} left (min ${p.minStock})`,
-                time: `Updated ${p.lastUpdated ? new Date(p.lastUpdated).toLocaleString() : 'recently'}`,
-            }))
-        : [];
-
-    const recentNotifications = [...installmentNotifications, ...orderAndStockNotifications, ...lowStockNotifications].slice(0, 6);
-    const notificationsEnabled = notifications.orderUpdates || notifications.lowStockAlerts;
 
     return (
         <AppBar
@@ -451,7 +402,7 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
                                 Latest order and stock updates
                             </Typography>
                         </Box>
-                        {!notificationsEnabled ? (
+                        {!hasConfigurableNotificationsEnabled && recentNotifications.length === 0 ? (
                             <Box sx={{ px: 2, py: 2, color: 'text.secondary' }}>
                                 Notifications are turned off in Settings.
                             </Box>
@@ -460,7 +411,7 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
                                 No notifications yet.
                             </Box>
                         ) : (
-                            recentNotifications.map((n) => (
+                            recentNotifications.map((n: NotificationItem) => (
                                 <MenuItem
                                     key={n.id}
                                     onClick={() => {
@@ -481,8 +432,15 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
                             ))
                         )}
                         <Box sx={{ px: 2, py: 1 }}>
-                            <Button fullWidth variant="text" onClick={handleNotifClose}>
-                                Close
+                            <Button
+                                fullWidth
+                                variant="text"
+                                onClick={() => {
+                                    handleNotifClose();
+                                    navigate('/notifications');
+                                }}
+                            >
+                                Show all notifications
                             </Button>
                         </Box>
                     </Menu>

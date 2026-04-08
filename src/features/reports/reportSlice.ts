@@ -8,6 +8,14 @@ export interface SalesTrendPoint {
     profit?: number;
 }
 
+export type ReportPeriod = '7days' | 'monthly' | 'yearly' | 'custom';
+
+export interface ReportFilters {
+    period: ReportPeriod;
+    from?: string;
+    to?: string;
+}
+
 export interface CategoryValuationPoint {
     name: string;
     value: number;
@@ -39,9 +47,9 @@ const initialState: ReportsState = {
 
 export const fetchSalesTrend = createAsyncThunk(
     'reports/fetchSalesTrend',
-    async (days: number = 7, { rejectWithValue }) => {
+    async (filters: ReportFilters = { period: '7days' }, { rejectWithValue }) => {
         try {
-            const response = await api.get(`/reports/sales-trend?days=${days}`);
+            const response = await api.get('/reports/sales-trend', { params: filters });
             return response.data;
         } catch (error: any) {
             return rejectWithValue(error.response?.data?.message || 'Failed to fetch sales trend');
@@ -63,9 +71,9 @@ export const fetchCategoryValuation = createAsyncThunk(
 
 export const fetchTopSellingProducts = createAsyncThunk(
     'reports/fetchTopSellingProducts',
-    async (_, { rejectWithValue }) => {
+    async (filters: ReportFilters = { period: '7days' }, { rejectWithValue }) => {
         try {
-            const response = await api.get('/reports/top-selling');
+            const response = await api.get('/reports/top-selling', { params: filters });
             return response.data;
         } catch (error: any) {
             return rejectWithValue(error.response?.data?.message || 'Failed to fetch top-selling products');

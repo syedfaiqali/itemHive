@@ -58,6 +58,15 @@ const escapePdfText = (text: string) => text
     .replace(/\)/g, '\\)')
     .replace(/[^\x20-\x7E]/g, '?');
 
+const receiptDivider = '='.repeat(40);
+
+const padReceiptLine = (label: string, value: string, width = 40) => {
+    const cleanLabel = label.trim();
+    const cleanValue = value.trim();
+    const spaces = Math.max(width - cleanLabel.length - cleanValue.length, 1);
+    return `${cleanLabel}${' '.repeat(spaces)}${cleanValue}`;
+};
+
 const buildSimplePdf = (lines: string[]) => {
     const textStream = [
         'BT',
@@ -129,11 +138,15 @@ const POSTerminal: React.FC = () => {
     const [installmentCustomerPhone, setInstallmentCustomerPhone] = useState('');
     const [installmentCustomerAddress, setInstallmentCustomerAddress] = useState('');
     const [witnessOneName, setWitnessOneName] = useState('');
+    const [witnessOneCnic, setWitnessOneCnic] = useState('');
     const [witnessOneAddress, setWitnessOneAddress] = useState('');
     const [witnessTwoName, setWitnessTwoName] = useState('');
+    const [witnessTwoCnic, setWitnessTwoCnic] = useState('');
     const [witnessTwoAddress, setWitnessTwoAddress] = useState('');
     const [installmentMonths, setInstallmentMonths] = useState<3 | 6 | 9 | 12>(3);
     const [installmentSaleDate, setInstallmentSaleDate] = useState(new Date().toISOString().split('T')[0]);
+    const [installmentUnitPriceInput, setInstallmentUnitPriceInput] = useState('');
+    const [installmentAdvanceInput, setInstallmentAdvanceInput] = useState('0');
 
     const filteredProducts = useMemo(() => {
         return products.filter(p => {
@@ -150,30 +163,57 @@ const POSTerminal: React.FC = () => {
     const total = subtotal + tax - activeDiscount;
     const draftCreditPaid = Math.min(Math.max(Number(creditPaidInput || 0), 0), total);
     const draftCreditDue = Math.max(total - draftCreditPaid, 0);
+    const installmentItem = cart[0];
+    const installmentQuantity = installmentItem?.quantity || 0;
+    const defaultInstallmentUnitPrice = installmentItem?.price || 0;
+    const draftInstallmentUnitPrice = Math.max(Number(installmentUnitPriceInput || defaultInstallmentUnitPrice || 0), 0);
+    const draftInstallmentTotal = draftInstallmentUnitPrice * installmentQuantity;
+    const draftInstallmentAdvance = Math.min(Math.max(Number(installmentAdvanceInput || 0), 0), Math.max(draftInstallmentTotal - 0.01, 0));
+    const draftInstallmentRemaining = Math.max(draftInstallmentTotal - draftInstallmentAdvance, 0);
+    const draftMonthlyInstallment = installmentMonths > 0 ? draftInstallmentRemaining / installmentMonths : 0;
+    const draftInstallmentProfit = installmentItem
+        ? (draftInstallmentUnitPrice - installmentItem.purchasePrice) * installmentQuantity
+        : 0;
 
     const handleSaveReceiptPdf = (id: string, method: CheckoutMethod, receiptTimeIso: string) => {
         const dateLabel = new Date(receiptTimeIso).toLocaleString();
+        const paymentLabel = method === 'credit'
+            ? `CREDIT (${creditPaidVia.toUpperCase()} + DUE)`
+            : method === 'installment'
+                ? `INSTALLMENT (${installmentMonths} MONTHS)`
+                : method.toUpperCase();
+        const pdfTotal = method === 'installment' ? draftInstallmentTotal : total;
+        const pdfProfit = method === 'installment' ? draftInstallmentProfit : projectedProfit;
         const lines = [
-            'ItemHive POS Receipt',
-            `Order ID: ${id}`,
-            `Date: ${dateLabel}`,
-            `Cashier: ${user?.name || 'Staff'}`,
-            `Payment: ${method === 'credit' ? `CREDIT (${creditPaidVia.toUpperCase()} + DUE)` : method === 'installment' ? `INSTALLMENT (${installmentMonths} MONTHS)` : method.toUpperCase()}`,
+            'ITEMHIVE PAYMENT SLIP',
+            receiptDivider,
+            padReceiptLine('Slip No.', id),
+            padReceiptLine('Date', dateLabel),
+            padReceiptLine('Cashier', user?.name || 'Staff'),
+            padReceiptLine('Payment', paymentLabel),
             method === 'credit' ? `Customer: ${creditCustomerName}` : method === 'installment' ? `Customer: ${installmentCustomerName}` : '',
             method === 'credit' ? `CNIC: ${creditCustomerCnic}` : method === 'installment' ? `CNIC: ${installmentCustomerCnic}` : '',
-            '----------------------------------------',
-            ...cart.map((item) => `${item.name} x${item.quantity} @ ${formatCurrency(item.price)} = ${formatCurrency(item.price * item.quantity)}`),
-            '----------------------------------------',
-            `Subtotal: ${formatCurrency(subtotal)}`,
-            `Tax (10%): ${formatCurrency(tax)}`,
-            activeDiscount > 0 ? `Discount: -${formatCurrency(activeDiscount)}` : '',
-            `Profit/Loss: ${formatCurrency(projectedProfit)}`,
-            method === 'credit' ? `Paid Now: ${formatCurrency(creditPaidNow)}` : '',
-            method === 'credit' ? `Remaining Due: ${formatCurrency(creditDue)}` : '',
-            method === 'installment' ? `Monthly Installment: ${formatCurrency(total / installmentMonths)}` : '',
-            method === 'credit' ? `Order Total: ${formatCurrency(total)}` : `Total Paid: ${formatCurrency(total)}`,
-            '----------------------------------------',
-            'Thank you for shopping with us!'
+            receiptDivider,
+            'ITEMS',
+            ...cart.map((item) => {
+                const lineUnitPrice = method === 'installment' ? draftInstallmentUnitPrice : item.price;
+                return `${item.name} x${item.quantity}\n${padReceiptLine(`  @ ${formatCurrency(lineUnitPrice)}`, formatCurrency(lineUnitPrice * item.quantity))}`;
+            }).flatMap((line) => line.split('\n')),
+            receiptDivider,
+            'SUMMARY',
+            padReceiptLine('Subtotal', formatCurrency(subtotal)),
+            padReceiptLine('Tax (10%)', formatCurrency(tax)),
+            activeDiscount > 0 ? padReceiptLine('Discount', `-${formatCurrency(activeDiscount)}`) : '',
+            method === 'credit' ? padReceiptLine('Paid Now', formatCurrency(creditPaidNow)) : '',
+            method === 'credit' ? padReceiptLine('Remaining Due', formatCurrency(creditDue)) : '',
+            method === 'installment' ? padReceiptLine('Advance Paid', formatCurrency(draftInstallmentAdvance)) : '',
+            method === 'installment' ? padReceiptLine('EMI Balance', formatCurrency(draftInstallmentRemaining)) : '',
+            method === 'installment' ? padReceiptLine('Monthly EMI', formatCurrency(draftMonthlyInstallment)) : '',
+            padReceiptLine(method === 'installment' ? 'Installment Total' : method === 'credit' ? 'Order Total' : 'Total Paid', formatCurrency(pdfTotal)),
+            padReceiptLine('Profit/Loss', formatCurrency(pdfProfit)),
+            receiptDivider,
+            'Thank you for shopping with us.',
+            'Please keep this slip for your record.'
         ].filter(Boolean);
 
         const pdfBlob = buildSimplePdf(lines);
@@ -229,11 +269,15 @@ const POSTerminal: React.FC = () => {
         setInstallmentCustomerPhone('');
         setInstallmentCustomerAddress('');
         setWitnessOneName('');
+        setWitnessOneCnic('');
         setWitnessOneAddress('');
         setWitnessTwoName('');
+        setWitnessTwoCnic('');
         setWitnessTwoAddress('');
         setInstallmentMonths(3);
         setInstallmentSaleDate(new Date().toISOString().split('T')[0]);
+        setInstallmentUnitPriceInput(String(cart[0]?.price || 0));
+        setInstallmentAdvanceInput('0');
         setInstallmentOpen(true);
     };
 
@@ -258,8 +302,16 @@ const POSTerminal: React.FC = () => {
             setStockToast({ open: true, message: 'Customer name, CNIC, phone, and address are required for installment sales.' });
             return;
         }
-        if (!witnessOneName.trim() || !witnessOneAddress.trim() || !witnessTwoName.trim() || !witnessTwoAddress.trim()) {
-            setStockToast({ open: true, message: 'Both witness names and addresses are required.' });
+        if (!witnessOneName.trim() || !witnessOneCnic.trim() || !witnessOneAddress.trim() || !witnessTwoName.trim() || !witnessTwoCnic.trim() || !witnessTwoAddress.trim()) {
+            setStockToast({ open: true, message: 'Both witness names, CNICs, and addresses are required.' });
+            return;
+        }
+        if (draftInstallmentTotal <= 0) {
+            setStockToast({ open: true, message: 'Installment sale price must be greater than zero.' });
+            return;
+        }
+        if (draftInstallmentRemaining <= 0) {
+            setStockToast({ open: true, message: 'Advance payment must be less than the installment sale total.' });
             return;
         }
 
@@ -284,8 +336,9 @@ const POSTerminal: React.FC = () => {
                     productId: item.id,
                     productName: item.name,
                     amount: item.quantity,
-                    totalAmount: item.price * item.quantity,
-                    unitPrice: item.price,
+                    totalAmount: draftInstallmentTotal,
+                    unitPrice: draftInstallmentUnitPrice,
+                    advancePayment: draftInstallmentAdvance,
                     customerName: installmentCustomerName.trim(),
                     customerCnic: installmentCustomerCnic.trim(),
                     customerPhone: installmentCustomerPhone.trim(),
@@ -294,8 +347,8 @@ const POSTerminal: React.FC = () => {
                     installmentMonths,
                     userName: user?.name || 'Staff',
                     witnesses: [
-                        { name: witnessOneName.trim(), address: witnessOneAddress.trim() },
-                        { name: witnessTwoName.trim(), address: witnessTwoAddress.trim() },
+                        { name: witnessOneName.trim(), cnic: witnessOneCnic.trim(), address: witnessOneAddress.trim() },
+                        { name: witnessTwoName.trim(), cnic: witnessTwoCnic.trim(), address: witnessTwoAddress.trim() },
                     ],
                 });
 
@@ -382,10 +435,14 @@ const POSTerminal: React.FC = () => {
         setInstallmentCustomerPhone('');
         setInstallmentCustomerAddress('');
         setWitnessOneName('');
+        setWitnessOneCnic('');
         setWitnessOneAddress('');
         setWitnessTwoName('');
+        setWitnessTwoCnic('');
         setWitnessTwoAddress('');
         setInstallmentMonths(3);
+        setInstallmentUnitPriceInput('');
+        setInstallmentAdvanceInput('0');
     };
 
     const handlePrint = () => {
@@ -992,7 +1049,7 @@ const POSTerminal: React.FC = () => {
                 <DialogTitle sx={{ fontWeight: 800 }}>Installment Sale</DialogTitle>
                 <DialogContent>
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                        Capture customer details, two witnesses, and choose a monthly installment plan.
+                        Capture customer details, witness CNICs, set the installment sale price, and create EMI after any advance payment.
                     </Typography>
                     <Grid container spacing={2}>
                         <Grid size={{ xs: 12, md: 6 }}>
@@ -1019,13 +1076,41 @@ const POSTerminal: React.FC = () => {
                             <TextField fullWidth label="Witness 1 Name" value={witnessOneName} onChange={(e) => setWitnessOneName(e.target.value)} />
                         </Grid>
                         <Grid size={{ xs: 12, md: 6 }}>
+                            <TextField fullWidth label="Witness 1 CNIC" value={witnessOneCnic} onChange={(e) => setWitnessOneCnic(e.target.value)} />
+                        </Grid>
+                        <Grid size={{ xs: 12, md: 6 }}>
                             <TextField fullWidth label="Witness 1 Address" value={witnessOneAddress} onChange={(e) => setWitnessOneAddress(e.target.value)} />
                         </Grid>
                         <Grid size={{ xs: 12, md: 6 }}>
                             <TextField fullWidth label="Witness 2 Name" value={witnessTwoName} onChange={(e) => setWitnessTwoName(e.target.value)} />
                         </Grid>
                         <Grid size={{ xs: 12, md: 6 }}>
+                            <TextField fullWidth label="Witness 2 CNIC" value={witnessTwoCnic} onChange={(e) => setWitnessTwoCnic(e.target.value)} />
+                        </Grid>
+                        <Grid size={{ xs: 12, md: 6 }}>
                             <TextField fullWidth label="Witness 2 Address" value={witnessTwoAddress} onChange={(e) => setWitnessTwoAddress(e.target.value)} />
+                        </Grid>
+                        <Grid size={{ xs: 12, md: 6 }}>
+                            <TextField
+                                fullWidth
+                                type="number"
+                                label={`Installment Price (${currencySymbol})`}
+                                value={installmentUnitPriceInput}
+                                onChange={(e) => setInstallmentUnitPriceInput(e.target.value)}
+                                inputProps={{ min: 0, step: '0.01' }}
+                                helperText={`Price per unit x ${installmentQuantity}`}
+                            />
+                        </Grid>
+                        <Grid size={{ xs: 12, md: 6 }}>
+                            <TextField
+                                fullWidth
+                                type="number"
+                                label={`Advance Payment (${currencySymbol})`}
+                                value={installmentAdvanceInput}
+                                onChange={(e) => setInstallmentAdvanceInput(e.target.value)}
+                                inputProps={{ min: 0, step: '0.01' }}
+                                helperText="Advance is deducted before EMI is created."
+                            />
                         </Grid>
                         <Grid size={{ xs: 12, md: 6 }}>
                             <TextField
@@ -1039,8 +1124,10 @@ const POSTerminal: React.FC = () => {
                         </Grid>
                         <Grid size={{ xs: 12, md: 6 }}>
                             <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'action.hover', border: '1px solid', borderColor: 'divider' }}>
-                                <Typography variant="body2" fontWeight={700}>Order Total: {formatCurrency(total)}</Typography>
-                                <Typography variant="body2" fontWeight={700}>Monthly Installment: {formatCurrency(total / installmentMonths)}</Typography>
+                                <Typography variant="body2" fontWeight={700}>Installment Sale Total: {formatCurrency(draftInstallmentTotal)}</Typography>
+                                <Typography variant="body2" fontWeight={700}>Advance Payment: {formatCurrency(draftInstallmentAdvance)}</Typography>
+                                <Typography variant="body2" fontWeight={700}>EMI Balance: {formatCurrency(draftInstallmentRemaining)}</Typography>
+                                <Typography variant="body2" fontWeight={700}>Monthly Installment: {formatCurrency(draftMonthlyInstallment)}</Typography>
                                 <Typography variant="body2" color="text.secondary">First due date will be one month after sale date.</Typography>
                             </Box>
                         </Grid>
@@ -1085,16 +1172,18 @@ const POSTerminal: React.FC = () => {
                                 <Typography variant="body2">CNIC: <strong>{installmentCustomerCnic}</strong></Typography>
                                 <Typography variant="body2">Phone: <strong>{installmentCustomerPhone}</strong></Typography>
                                 <Typography variant="body2" fontWeight={700}>Plan: <strong>{installmentMonths} months</strong></Typography>
+                                <Typography variant="body2" fontWeight={700}>Sale Total: <strong>{formatCurrency(draftInstallmentTotal)}</strong></Typography>
+                                <Typography variant="body2" fontWeight={700}>Advance Paid: <strong>{formatCurrency(draftInstallmentAdvance)}</strong></Typography>
                                 <Typography variant="body2" fontWeight={900} color="warning.main">
-                                    Monthly Installment: {formatCurrency(total / installmentMonths)}
+                                    Monthly Installment: {formatCurrency(draftMonthlyInstallment)}
                                 </Typography>
                             </Box>
                         )}
                         <Typography variant="h6" fontWeight={900} color="primary.main" sx={{ mt: 0.5 }}>
-                            Total: {formatCurrency(total)}
+                            Total: {formatCurrency(pendingMethod === 'installment' ? draftInstallmentTotal : total)}
                         </Typography>
-                        <Typography variant="body2" fontWeight={800} color={projectedProfit >= 0 ? 'success.main' : 'error.main'}>
-                            Profit / Loss: {formatCurrency(projectedProfit)}
+                        <Typography variant="body2" fontWeight={800} color={(pendingMethod === 'installment' ? draftInstallmentProfit : projectedProfit) >= 0 ? 'success.main' : 'error.main'}>
+                            Profit / Loss: {formatCurrency(pendingMethod === 'installment' ? draftInstallmentProfit : projectedProfit)}
                         </Typography>
                     </Box>
                 </DialogContent>
@@ -1126,86 +1215,192 @@ const POSTerminal: React.FC = () => {
                     <Typography variant="body2" color="text.secondary">Order #{receiptId}</Typography>
                 </DialogTitle>
                 <DialogContent>
-                    <Box id="pos-receipt" sx={{ mt: 3, p: 3, bgcolor: 'action.hover', borderRadius: 3, border: '1px dashed', borderColor: 'divider' }}>
-                        <Box sx={{ textAlign: 'center', mb: 3 }}>
-                            <Typography variant="h6" fontWeight={800} className="gradient-text">ItemHive POS</Typography>
-                            <Typography variant="caption" color="text.secondary" display="block">Terminal #01 - {user?.name || 'Staff'}</Typography>
-                            <Typography variant="caption" color="text.secondary">{new Date().toLocaleString()}</Typography>
-                            {(paymentMethod === 'credit' || paymentMethod === 'installment') && (
-                                <Typography variant="caption" color="text.secondary" display="block">
-                                    Customer: {paymentMethod === 'credit' ? creditCustomerName : installmentCustomerName} | CNIC: {paymentMethod === 'credit' ? creditCustomerCnic : installmentCustomerCnic}
-                                </Typography>
-                            )}
+                    <Box
+                        id="pos-receipt"
+                        sx={{
+                            mt: 3,
+                            borderRadius: 4,
+                            overflow: 'hidden',
+                            bgcolor: 'background.paper',
+                            border: '1px solid',
+                            borderColor: alpha(theme.palette.primary.main, 0.18),
+                            boxShadow: theme.palette.mode === 'dark'
+                                ? `0 24px 44px -28px ${alpha('#000', 0.95)}`
+                                : `0 24px 46px -30px ${alpha(theme.palette.primary.dark, 0.32)}`,
+                        }}
+                    >
+                        <Box
+                            sx={{
+                                px: 3,
+                                py: 2.5,
+                                color: 'common.white',
+                                background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 55%, ${theme.palette.secondary.main} 100%)`,
+                            }}
+                        >
+                            <Typography variant="overline" sx={{ opacity: 0.82, letterSpacing: 1.8 }}>
+                                Payment Slip
+                            </Typography>
+                            <Typography variant="h5" fontWeight={900} sx={{ lineHeight: 1.1 }}>
+                                ItemHive POS
+                            </Typography>
+                            <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" sx={{ mt: 1.5 }}>
+                                <Chip size="small" label={`Order #${receiptId}`} sx={{ bgcolor: alpha('#fff', 0.16), color: 'common.white' }} />
+                                <Chip size="small" label={`Method: ${paymentMethod?.toUpperCase()}`} sx={{ bgcolor: alpha('#fff', 0.16), color: 'common.white' }} />
+                            </Stack>
                         </Box>
 
-                        <Stack spacing={1.5}>
-                            {cart.map(item => (
-                                <Box key={item.id} sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                    <Box>
-                                        <Typography variant="body2" fontWeight={700}>{item.name}</Typography>
-                                        <Typography variant="caption" color="text.secondary">{item.quantity} x {formatCurrency(item.price)}</Typography>
+                        <Box sx={{ p: 3 }}>
+                            <Grid container spacing={1.5} sx={{ mb: 2.5 }}>
+                                <Grid size={{ xs: 12, sm: 6 }}>
+                                    <Box sx={{ p: 1.5, borderRadius: 2.5, bgcolor: alpha(theme.palette.primary.main, 0.06) }}>
+                                        <Typography variant="caption" color="text.secondary">Cashier</Typography>
+                                        <Typography variant="body2" fontWeight={800}>{user?.name || 'Staff'}</Typography>
                                     </Box>
-                                    <Typography variant="body2" fontWeight={700}>{formatCurrency(item.price * item.quantity)}</Typography>
+                                </Grid>
+                                <Grid size={{ xs: 12, sm: 6 }}>
+                                    <Box sx={{ p: 1.5, borderRadius: 2.5, bgcolor: alpha(theme.palette.primary.main, 0.06) }}>
+                                        <Typography variant="caption" color="text.secondary">Issued At</Typography>
+                                        <Typography variant="body2" fontWeight={800}>{new Date().toLocaleString()}</Typography>
+                                    </Box>
+                                </Grid>
+                                {(paymentMethod === 'credit' || paymentMethod === 'installment') && (
+                                    <>
+                                        <Grid size={{ xs: 12, sm: 6 }}>
+                                            <Box sx={{ p: 1.5, borderRadius: 2.5, bgcolor: alpha(theme.palette.info.main, 0.06) }}>
+                                                <Typography variant="caption" color="text.secondary">Customer</Typography>
+                                                <Typography variant="body2" fontWeight={800}>
+                                                    {paymentMethod === 'credit' ? creditCustomerName : installmentCustomerName}
+                                                </Typography>
+                                            </Box>
+                                        </Grid>
+                                        <Grid size={{ xs: 12, sm: 6 }}>
+                                            <Box sx={{ p: 1.5, borderRadius: 2.5, bgcolor: alpha(theme.palette.info.main, 0.06) }}>
+                                                <Typography variant="caption" color="text.secondary">Customer CNIC</Typography>
+                                                <Typography variant="body2" fontWeight={800}>
+                                                    {paymentMethod === 'credit' ? creditCustomerCnic : installmentCustomerCnic}
+                                                </Typography>
+                                            </Box>
+                                        </Grid>
+                                    </>
+                                )}
+                            </Grid>
+
+                            <Box sx={{ borderRadius: 3, border: '1px dashed', borderColor: 'divider', overflow: 'hidden' }}>
+                                <Box sx={{ px: 2, py: 1.25, bgcolor: alpha(theme.palette.text.primary, 0.04), display: 'flex', justifyContent: 'space-between' }}>
+                                    <Typography variant="caption" fontWeight={800}>Item</Typography>
+                                    <Typography variant="caption" fontWeight={800}>Amount</Typography>
                                 </Box>
-                            ))}
-                        </Stack>
+                                <Stack spacing={0} divider={<Divider flexItem sx={{ borderStyle: 'dashed' }} />}>
+                                    {cart.map(item => (
+                                        <Box key={item.id} sx={{ px: 2, py: 1.5, display: 'flex', justifyContent: 'space-between', gap: 2 }}>
+                                            <Box>
+                                                <Typography variant="body2" fontWeight={800}>{item.name}</Typography>
+                                                <Typography variant="caption" color="text.secondary">
+                                                    {item.quantity} x {formatCurrency(paymentMethod === 'installment' ? draftInstallmentUnitPrice : item.price)}
+                                                </Typography>
+                                            </Box>
+                                            <Typography variant="body2" fontWeight={800}>
+                                                {formatCurrency((paymentMethod === 'installment' ? draftInstallmentUnitPrice : item.price) * item.quantity)}
+                                            </Typography>
+                                        </Box>
+                                    ))}
+                                </Stack>
+                            </Box>
 
-                        <Divider sx={{ my: 2, borderStyle: 'dashed' }} />
-
-                        <Stack spacing={0.5}>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <Typography variant="caption">Subtotal</Typography>
-                                <Typography variant="caption" fontWeight={700}>{formatCurrency(subtotal)}</Typography>
-                            </Box>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <Typography variant="caption">Tax (10%)</Typography>
-                                <Typography variant="caption" fontWeight={700}>{formatCurrency(tax)}</Typography>
-                            </Box>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
-                                <Typography variant="body1" fontWeight={900}>{paymentMethod === 'credit' || paymentMethod === 'installment' ? 'Order Total' : 'Total Paid'}</Typography>
-                                <Typography variant="body1" fontWeight={900} color="primary.main">{formatCurrency(total)}</Typography>
-                            </Box>
-                            {paymentMethod === 'credit' && (
-                                <>
-                                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                        <Typography variant="caption">Paid Now ({creditPaidVia.toUpperCase()})</Typography>
-                                        <Typography variant="caption" fontWeight={700}>{formatCurrency(creditPaidNow)}</Typography>
-                                    </Box>
-                                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                        <Typography variant="caption" color="warning.main">Due Later</Typography>
-                                        <Typography variant="caption" fontWeight={800} color="warning.main">{formatCurrency(creditDue)}</Typography>
-                                    </Box>
-                                </>
-                            )}
-                            {paymentMethod === 'installment' && (
-                                <>
-                                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                        <Typography variant="caption">Plan Duration</Typography>
-                                        <Typography variant="caption" fontWeight={700}>{installmentMonths} months</Typography>
-                                    </Box>
-                                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                        <Typography variant="caption" color="warning.main">Monthly Installment</Typography>
-                                        <Typography variant="caption" fontWeight={800} color="warning.main">
-                                            {formatCurrency(total / installmentMonths)}
+                            <Grid container spacing={2} sx={{ mt: 0.5 }}>
+                                <Grid size={{ xs: 12, md: 7 }}>
+                                    <Box
+                                        sx={{
+                                            mt: 2,
+                                            p: 2,
+                                            borderRadius: 3,
+                                            bgcolor: alpha(theme.palette.warning.main, 0.08),
+                                            border: '1px solid',
+                                            borderColor: alpha(theme.palette.warning.main, 0.16),
+                                        }}
+                                    >
+                                        <Typography variant="overline" color="warning.main" sx={{ letterSpacing: 1.2 }}>
+                                            Payment Notes
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                            {paymentMethod === 'installment'
+                                                ? `Advance received and EMI scheduled over ${installmentMonths} months.`
+                                                : paymentMethod === 'credit'
+                                                    ? 'Partial payment received. Remaining balance is due later.'
+                                                    : 'Full payment received successfully.'}
                                         </Typography>
                                     </Box>
-                                </>
-                            )}
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <Typography variant="caption" color={projectedProfit >= 0 ? 'success.main' : 'error.main'}>
-                                    Profit / Loss
+                                </Grid>
+                                <Grid size={{ xs: 12, md: 5 }}>
+                                    <Box
+                                        sx={{
+                                            mt: 2,
+                                            p: 2,
+                                            borderRadius: 3,
+                                            bgcolor: alpha(theme.palette.primary.main, 0.05),
+                                            border: '1px solid',
+                                            borderColor: alpha(theme.palette.primary.main, 0.14),
+                                        }}
+                                    >
+                                        <Stack spacing={1}>
+                                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                <Typography variant="caption">Subtotal</Typography>
+                                                <Typography variant="caption" fontWeight={700}>{formatCurrency(subtotal)}</Typography>
+                                            </Box>
+                                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                <Typography variant="caption">Tax (10%)</Typography>
+                                                <Typography variant="caption" fontWeight={700}>{formatCurrency(tax)}</Typography>
+                                            </Box>
+                                            {paymentMethod === 'credit' && (
+                                                <>
+                                                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                        <Typography variant="caption">Paid Now ({creditPaidVia.toUpperCase()})</Typography>
+                                                        <Typography variant="caption" fontWeight={700}>{formatCurrency(creditPaidNow)}</Typography>
+                                                    </Box>
+                                                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                        <Typography variant="caption" color="warning.main">Remaining Due</Typography>
+                                                        <Typography variant="caption" fontWeight={800} color="warning.main">{formatCurrency(creditDue)}</Typography>
+                                                    </Box>
+                                                </>
+                                            )}
+                                            {paymentMethod === 'installment' && (
+                                                <>
+                                                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                        <Typography variant="caption">Advance Payment</Typography>
+                                                        <Typography variant="caption" fontWeight={700}>{formatCurrency(draftInstallmentAdvance)}</Typography>
+                                                    </Box>
+                                                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                        <Typography variant="caption">EMI Balance</Typography>
+                                                        <Typography variant="caption" fontWeight={700}>{formatCurrency(draftInstallmentRemaining)}</Typography>
+                                                    </Box>
+                                                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                        <Typography variant="caption">Monthly Installment</Typography>
+                                                        <Typography variant="caption" fontWeight={800} color="warning.main">{formatCurrency(draftMonthlyInstallment)}</Typography>
+                                                    </Box>
+                                                </>
+                                            )}
+                                            <Divider sx={{ borderStyle: 'dashed' }} />
+                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <Typography variant="body1" fontWeight={900}>
+                                                    {paymentMethod === 'installment' ? 'Installment Total' : paymentMethod === 'credit' ? 'Order Total' : 'Total Paid'}
+                                                </Typography>
+                                                <Typography variant="h6" fontWeight={900} color="primary.main">
+                                                    {formatCurrency(paymentMethod === 'installment' ? draftInstallmentTotal : total)}
+                                                </Typography>
+                                            </Box>
+                                        </Stack>
+                                    </Box>
+                                </Grid>
+                            </Grid>
+
+                            <Box sx={{ mt: 2.5, pt: 2, borderTop: '1px dashed', borderColor: 'divider', textAlign: 'center' }}>
+                                <Typography variant="caption" sx={{ textTransform: 'uppercase', letterSpacing: 1.1, color: 'text.secondary' }}>
+                                    Please keep this payment slip for your record
                                 </Typography>
-                                <Typography variant="caption" fontWeight={800} color={projectedProfit >= 0 ? 'success.main' : 'error.main'}>
-                                    {formatCurrency(projectedProfit)}
+                                <Typography variant="body2" sx={{ mt: 0.8, fontWeight: 700 }}>
+                                    Thank you for shopping with ItemHive
                                 </Typography>
                             </Box>
-                        </Stack>
-
-                        <Box sx={{ mt: 3, textAlign: 'center', opacity: 0.6 }}>
-                            <Typography variant="caption" fontWeight={700} sx={{ textTransform: 'uppercase' }}>
-                                Paid via {paymentMethod}
-                            </Typography>
-                            <Typography variant="body2" sx={{ mt: 1, fontSize: '0.7rem' }}>Thank you for shopping with us!</Typography>
                         </Box>
                     </Box>
                 </DialogContent>
@@ -1262,17 +1457,27 @@ const POSTerminal: React.FC = () => {
                 @media print {
                     body * { visibility: hidden; }
                     #pos-receipt, #pos-receipt * { visibility: visible; }
+                    body {
+                        background: #fff !important;
+                    }
                     #pos-receipt {
                         position: absolute;
-                        left: 0;
+                        left: 50%;
                         top: 0;
-                        width: 100%;
+                        transform: translateX(-50%);
+                        width: 760px;
+                        max-width: 100%;
                         background: white !important;
-                        border: none !important;
+                        border: 1px solid #d7deea !important;
+                        border-radius: 18px !important;
                         padding: 0 !important;
+                        box-shadow: none !important;
                     }
                     .MuiDialog-container { display: block !important; }
-                    .MuiPaper-root { box-shadow: none !important; }
+                    .MuiPaper-root {
+                        box-shadow: none !important;
+                        background: transparent !important;
+                    }
                 }
                 `}
             </style>

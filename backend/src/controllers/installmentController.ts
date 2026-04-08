@@ -7,9 +7,9 @@ import type { AuthRequest } from '../middleware/auth';
 
 const round2 = (value: number) => Math.round(value * 100) / 100;
 
-const buildSchedule = (saleDateInput: string | Date, months: 3 | 6 | 9 | 12, totalAmount: number) => {
+const buildSchedule = (saleDateInput: string | Date, months: 3 | 6 | 9 | 12, financedAmount: number) => {
     const saleDate = new Date(saleDateInput);
-    const baseInstallment = round2(totalAmount / months);
+    const baseInstallment = round2(financedAmount / months);
     const schedule = [];
     let accumulated = 0;
 
@@ -18,7 +18,7 @@ const buildSchedule = (saleDateInput: string | Date, months: 3 | 6 | 9 | 12, tot
         dueDate.setMonth(dueDate.getMonth() + index + 1);
 
         const amount = index === months - 1
-            ? round2(totalAmount - accumulated)
+            ? round2(financedAmount - accumulated)
             : baseInstallment;
 
         accumulated = round2(accumulated + amount);
@@ -35,11 +35,14 @@ const buildSchedule = (saleDateInput: string | Date, months: 3 | 6 | 9 | 12, tot
 };
 
 const refreshInstallmentStatus = (plan: any) => {
-    const totalPaid = round2(
+    const installmentPayments = round2(
         (plan.schedule || [])
             .filter((item: any) => item.status === 'paid')
             .reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0)
     );
+
+    const advancePayment = round2(Number(plan.advancePayment || 0));
+    const totalPaid = round2(advancePayment + installmentPayments);
 
     plan.paidAmount = totalPaid;
     plan.remainingAmount = round2(Math.max(Number(plan.totalAmount || 0) - totalPaid, 0));
@@ -67,6 +70,7 @@ export const createInstallmentPlan = async (req: AuthRequest, res: Response) => 
             amount,
             totalAmount,
             unitPrice,
+            advancePayment,
             customerName,
             customerCnic,
             customerPhone,
@@ -88,8 +92,23 @@ export const createInstallmentPlan = async (req: AuthRequest, res: Response) => 
 
         const resolvedUnitPrice = Number(unitPrice ?? product.salePrice ?? product.price ?? 0);
         const resolvedTotalAmount = Number(totalAmount ?? resolvedUnitPrice * Number(amount || 0));
+        const resolvedAdvancePayment = round2(Number(advancePayment ?? 0));
         const resolvedMonths = Number(installmentMonths) as 3 | 6 | 9 | 12;
-        const schedule = buildSchedule(saleDate, resolvedMonths, resolvedTotalAmount);
+        const financedAmount = round2(resolvedTotalAmount - resolvedAdvancePayment);
+
+        if (!Number.isFinite(resolvedAdvancePayment) || resolvedAdvancePayment < 0) {
+            throw new Error('Advance payment must be zero or more');
+        }
+
+        if (!Number.isFinite(resolvedTotalAmount) || resolvedTotalAmount <= 0) {
+            throw new Error('Installment total amount must be greater than zero');
+        }
+
+        if (resolvedAdvancePayment >= resolvedTotalAmount) {
+            throw new Error('Advance payment must be less than the installment sale total');
+        }
+
+        const schedule = buildSchedule(saleDate, resolvedMonths, financedAmount);
         const planId = String(planCode || `INS-${Date.now()}`);
 
         const transaction = new Transaction({
@@ -101,8 +120,8 @@ export const createInstallmentPlan = async (req: AuthRequest, res: Response) => 
             totalPrice: resolvedTotalAmount,
             userName: userName || 'Staff',
             paymentMethod: 'installment',
-            paidNow: 0,
-            dueAmount: resolvedTotalAmount,
+            paidNow: resolvedAdvancePayment,
+            dueAmount: financedAmount,
             customerName,
             customerCnic,
             unitCost: product.purchasePrice ?? 0,
@@ -126,10 +145,13 @@ export const createInstallmentPlan = async (req: AuthRequest, res: Response) => 
             witnesses,
             saleDate,
             installmentMonths: resolvedMonths,
+            unitPrice: resolvedUnitPrice,
+            advancePayment: resolvedAdvancePayment,
+            financedAmount,
             monthlyInstallmentAmount: schedule[0]?.amount || 0,
             totalAmount: resolvedTotalAmount,
-            paidAmount: 0,
-            remainingAmount: resolvedTotalAmount,
+            paidAmount: resolvedAdvancePayment,
+            remainingAmount: financedAmount,
             status: 'active',
             createdBy: req.user?.id || userName || 'Staff',
             schedule,

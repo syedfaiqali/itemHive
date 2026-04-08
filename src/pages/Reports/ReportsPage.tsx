@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
     Box,
     Typography,
@@ -12,6 +12,10 @@ import {
     TableHead,
     TableRow,
     Alert,
+    Button,
+    ButtonGroup,
+    Stack,
+    TextField,
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import {
@@ -37,7 +41,7 @@ import {
 } from 'recharts';
 import useAppCurrency from '../../hooks/useAppCurrency';
 import { fetchProducts } from '../../features/inventory/inventorySlice';
-import { fetchCategoryValuation, fetchSalesTrend, fetchTopSellingProducts } from '../../features/reports/reportSlice';
+import { fetchCategoryValuation, fetchSalesTrend, fetchTopSellingProducts, type ReportFilters, type ReportPeriod } from '../../features/reports/reportSlice';
 
 const ReportsPage: React.FC = () => {
     const theme = useTheme();
@@ -45,13 +49,46 @@ const ReportsPage: React.FC = () => {
     const { products } = useSelector((state: RootState) => state.inventory);
     const { salesTrend, categoryValuation, topSelling, error } = useSelector((state: RootState) => state.reports);
     const { currency, formatCurrency } = useAppCurrency();
+    const [selectedPeriod, setSelectedPeriod] = useState<ReportPeriod>('7days');
+    const [generatedFilters, setGeneratedFilters] = useState<ReportFilters>({ period: '7days' });
+    const [fromDate, setFromDate] = useState(() => {
+        const date = new Date();
+        date.setDate(date.getDate() - 6);
+        return date.toISOString().split('T')[0];
+    });
+    const [toDate, setToDate] = useState(() => new Date().toISOString().split('T')[0]);
 
     useEffect(() => {
         dispatch(fetchProducts());
-        dispatch(fetchSalesTrend(7));
+        dispatch(fetchSalesTrend({ period: '7days' }));
         dispatch(fetchCategoryValuation());
-        dispatch(fetchTopSellingProducts());
+        dispatch(fetchTopSellingProducts({ period: '7days' }));
     }, [dispatch]);
+
+    const buildFilters = (): ReportFilters => (
+        selectedPeriod === 'custom'
+            ? { period: 'custom', from: fromDate, to: toDate }
+            : { period: selectedPeriod }
+    );
+
+    const handleGenerateReport = () => {
+        const filters = buildFilters();
+        if (filters.period === 'custom' && (!filters.from || !filters.to)) {
+            return;
+        }
+        dispatch(fetchSalesTrend(filters));
+        dispatch(fetchTopSellingProducts(filters));
+        setGeneratedFilters(filters);
+    };
+
+    const reportHeading = useMemo(() => {
+        if (generatedFilters.period === 'monthly') return 'Last 30 Days';
+        if (generatedFilters.period === 'yearly') return 'Last 12 Months';
+        if (generatedFilters.period === 'custom') {
+            return `${generatedFilters.from || fromDate} to ${generatedFilters.to || toDate}`;
+        }
+        return 'Last 7 Days';
+    }, [fromDate, generatedFilters, toDate]);
 
     const reportPalette = useMemo(
         () => [
@@ -65,19 +102,54 @@ const ReportsPage: React.FC = () => {
         [theme.palette]
     );
 
-    const last7Days = useMemo(
-        () => [...Array(7)].map((_, i) => {
+    const trendData = useMemo(() => {
+        if (generatedFilters.period === 'yearly') {
+            return [...Array(12)].map((_, i) => {
+                const d = new Date();
+                d.setMonth(d.getMonth() - (11 - i), 1);
+                const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                const monthLabel = d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+                const point = salesTrend.find((entry) => entry._id === monthKey);
+                return { name: monthLabel, revenue: point?.revenue || 0, sales: point?.sales || 0 };
+            });
+        }
+
+        const start = generatedFilters.period === 'custom'
+            ? new Date(generatedFilters.from || fromDate)
+            : null;
+        const end = generatedFilters.period === 'custom'
+            ? new Date(generatedFilters.to || toDate)
+            : null;
+
+        if (start && end && !Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime())) {
+            const rows: Array<{ name: string; revenue: number; sales: number }> = [];
+            const cursor = new Date(start);
+            while (cursor <= end) {
+                const dateStr = cursor.toISOString().split('T')[0];
+                const point = salesTrend.find((entry) => entry._id === dateStr);
+                rows.push({
+                    name: cursor.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                    revenue: point?.revenue || 0,
+                    sales: point?.sales || 0,
+                });
+                cursor.setDate(cursor.getDate() + 1);
+            }
+            return rows;
+        }
+
+        const totalDays = generatedFilters.period === 'monthly' ? 30 : 7;
+        return [...Array(totalDays)].map((_, i) => {
             const d = new Date();
-            d.setDate(d.getDate() - (6 - i));
+            d.setDate(d.getDate() - ((totalDays - 1) - i));
             const dateStr = d.toISOString().split('T')[0];
-            const dayLabel = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-
             const point = salesTrend.find((entry) => entry._id === dateStr);
+            const label = generatedFilters.period === 'monthly'
+                ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
-            return { name: dayLabel, revenue: point?.revenue || 0, sales: point?.sales || 0 };
-        }),
-        [salesTrend]
-    );
+            return { name: label, revenue: point?.revenue || 0, sales: point?.sales || 0 };
+        });
+    }, [fromDate, generatedFilters, salesTrend, toDate]);
 
     const pieData = useMemo(() => categoryValuation, [categoryValuation]);
 
@@ -120,7 +192,51 @@ const ReportsPage: React.FC = () => {
                     '@media print': { display: 'none' }
                 }}
             >
-                <Typography variant="h4" fontWeight={800}>Inventory Analytics & Reports</Typography>
+                <Box>
+                    <Typography variant="h4" fontWeight={800}>Inventory Analytics & Reports</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                        Generate 7-day, monthly, yearly, or custom date range reports from the controls below.
+                    </Typography>
+                </Box>
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ width: { xs: '100%', sm: 'auto' } }}>
+                    <ButtonGroup variant="outlined" sx={{ flexWrap: 'wrap' }}>
+                        <Button variant={selectedPeriod === '7days' ? 'contained' : 'outlined'} onClick={() => setSelectedPeriod('7days')}>
+                            7 Days
+                        </Button>
+                        <Button variant={selectedPeriod === 'monthly' ? 'contained' : 'outlined'} onClick={() => setSelectedPeriod('monthly')}>
+                            Monthly
+                        </Button>
+                        <Button variant={selectedPeriod === 'yearly' ? 'contained' : 'outlined'} onClick={() => setSelectedPeriod('yearly')}>
+                            Yearly
+                        </Button>
+                        <Button variant={selectedPeriod === 'custom' ? 'contained' : 'outlined'} onClick={() => setSelectedPeriod('custom')}>
+                            Custom Range
+                        </Button>
+                    </ButtonGroup>
+                    {selectedPeriod === 'custom' && (
+                        <>
+                            <TextField
+                                type="date"
+                                size="small"
+                                label="From"
+                                InputLabelProps={{ shrink: true }}
+                                value={fromDate}
+                                onChange={(e) => setFromDate(e.target.value)}
+                            />
+                            <TextField
+                                type="date"
+                                size="small"
+                                label="To"
+                                InputLabelProps={{ shrink: true }}
+                                value={toDate}
+                                onChange={(e) => setToDate(e.target.value)}
+                            />
+                        </>
+                    )}
+                    <Button variant="contained" onClick={handleGenerateReport}>
+                        Generate Report
+                    </Button>
+                </Stack>
             </Box>
 
             {error && (
@@ -130,7 +246,7 @@ const ReportsPage: React.FC = () => {
             )}
 
             <Alert severity={totalProfit >= 0 ? 'success' : 'warning'} sx={{ mb: 3 }}>
-                Total profit/loss for the last 7 days: {formatCurrency(totalProfit, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                Total profit/loss for {reportHeading.toLowerCase()}: {formatCurrency(totalProfit, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
             </Alert>
 
             <Grid container spacing={3}>
@@ -138,10 +254,10 @@ const ReportsPage: React.FC = () => {
                 <Grid size={{ xs: 12, md: 8 }}>
                     <Card sx={{ borderRadius: 4 }}>
                         <CardContent>
-                            <Typography variant="h6" fontWeight={700} gutterBottom>Revenue Trend (Last 7 Days)</Typography>
+                            <Typography variant="h6" fontWeight={700} gutterBottom>{`Revenue Trend (${reportHeading})`}</Typography>
                             <Box sx={{ height: { xs: 240, sm: 280, md: 300 }, mt: 2.5 }}>
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <AreaChart data={last7Days}>
+                                    <AreaChart data={trendData}>
                                         <defs>
                                             <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
                                                 <stop offset="5%" stopColor={theme.palette.primary.main} stopOpacity={0.22} />
@@ -149,7 +265,7 @@ const ReportsPage: React.FC = () => {
                                             </linearGradient>
                                         </defs>
                                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={alpha(theme.palette.text.primary, 0.1)} />
-                                        <XAxis dataKey="name" axisLine={false} tickLine={false} />
+                                        <XAxis dataKey="name" axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={generatedFilters.period === 'monthly' || generatedFilters.period === 'custom' ? 24 : 8} />
                                         <YAxis axisLine={false} tickLine={false} />
                                         <Tooltip formatter={(value: number | string | undefined) => [formatCurrency(Number(value || 0)), `Revenue (${currency})`]} />
                                         <Area type="monotone" dataKey="revenue" stroke={theme.palette.primary.main} strokeWidth={3} fillOpacity={1} fill="url(#colorRevenue)" name={`Revenue (${currency})`} />
@@ -164,12 +280,12 @@ const ReportsPage: React.FC = () => {
                 <Grid size={{ xs: 12, md: 4 }}>
                     <Card sx={{ borderRadius: 4 }}>
                         <CardContent>
-                            <Typography variant="h6" fontWeight={700} gutterBottom>Sales Volume (Units)</Typography>
+                            <Typography variant="h6" fontWeight={700} gutterBottom>{`Sales Volume (${reportHeading})`}</Typography>
                             <Box sx={{ height: { xs: 240, sm: 280, md: 300 }, mt: 2.5 }}>
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={last7Days}>
+                                    <BarChart data={trendData}>
                                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={alpha(theme.palette.text.primary, 0.1)} />
-                                        <XAxis dataKey="name" axisLine={false} tickLine={false} />
+                                        <XAxis dataKey="name" axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={generatedFilters.period === 'monthly' || generatedFilters.period === 'custom' ? 24 : 8} />
                                         <YAxis axisLine={false} tickLine={false} />
                                         <Tooltip formatter={(value: number | string | undefined) => [Number(value || 0), 'Units Sold']} />
                                         <Bar dataKey="sales" fill={theme.palette.success.main} radius={[4, 4, 0, 0]} name="Units Sold" />

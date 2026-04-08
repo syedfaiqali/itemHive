@@ -1,23 +1,65 @@
-import { Request, Response } from 'express';
+import type { Request, Response } from 'express';
 import Transaction from '../models/Transaction';
 import Product from '../models/Product';
 
+const startOfDay = (value: Date) => {
+    const date = new Date(value);
+    date.setHours(0, 0, 0, 0);
+    return date;
+};
+
+const endOfDay = (value: Date) => {
+    const date = new Date(value);
+    date.setHours(23, 59, 59, 999);
+    return date;
+};
+
+const resolveReportRange = (query: Request['query']) => {
+    const period = String(query.period || '7days');
+    const from = typeof query.from === 'string' ? query.from : '';
+    const to = typeof query.to === 'string' ? query.to : '';
+
+    if (period === 'custom' && from && to) {
+        const fromDate = startOfDay(new Date(from));
+        const toDate = endOfDay(new Date(to));
+
+        if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
+            throw new Error('Invalid date range');
+        }
+
+        if (fromDate > toDate) {
+            throw new Error('From date must be before or equal to to date');
+        }
+
+        return { period, dateLimit: fromDate, endDate: toDate };
+    }
+
+    const daysByPeriod: Record<string, number> = {
+        '7days': 7,
+        monthly: 30,
+        yearly: 365,
+    };
+    const days = daysByPeriod[period] || 7;
+    const dateLimit = startOfDay(new Date());
+    dateLimit.setDate(dateLimit.getDate() - (days - 1));
+    return { period, dateLimit, endDate: endOfDay(new Date()) };
+};
+
 export const getSalesTrend = async (req: Request, res: Response) => {
     try {
-        const days = parseInt(req.query.days as string) || 7;
-        const dateLimit = new Date();
-        dateLimit.setDate(dateLimit.getDate() - days);
+        const { period, dateLimit, endDate } = resolveReportRange(req.query);
+        const groupFormat = period === 'yearly' ? '%Y-%m' : '%Y-%m-%d';
 
         const stats = await Transaction.aggregate([
             {
                 $match: {
-                    timestamp: { $gte: dateLimit },
+                    timestamp: { $gte: dateLimit, $lte: endDate },
                     type: 'reduction'
                 }
             },
             {
                 $group: {
-                    _id: { $dateToString: { format: '%Y-%m-%d', date: '$timestamp' } },
+                    _id: { $dateToString: { format: groupFormat, date: '$timestamp' } },
                     revenue: { $sum: '$totalPrice' },
                     sales: { $sum: '$amount' },
                     profit: { $sum: '$grossProfit' }
@@ -52,8 +94,14 @@ export const getCategoryValuation = async (req: Request, res: Response) => {
 
 export const getTopSellingProducts = async (req: Request, res: Response) => {
     try {
+        const { dateLimit, endDate } = resolveReportRange(req.query);
         const topSelling = await Transaction.aggregate([
-            { $match: { type: 'reduction' } },
+            {
+                $match: {
+                    type: 'reduction',
+                    timestamp: { $gte: dateLimit, $lte: endDate }
+                }
+            },
             {
                 $group: {
                     _id: '$productId',

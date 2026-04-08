@@ -12,6 +12,7 @@ export interface IInstallmentScheduleItem {
 
 export interface IInstallmentWitness {
     name: string;
+    cnic: string;
     address: string;
 }
 
@@ -26,6 +27,9 @@ export interface IInstallmentPlan extends Document {
     witnesses: IInstallmentWitness[];
     saleDate: Date;
     installmentMonths: 3 | 6 | 9 | 12;
+    unitPrice: number;
+    advancePayment: number;
+    financedAmount: number;
     monthlyInstallmentAmount: number;
     totalAmount: number;
     paidAmount: number;
@@ -37,6 +41,7 @@ export interface IInstallmentPlan extends Document {
 
 const InstallmentWitnessSchema = new Schema<IInstallmentWitness>({
     name: { type: String, required: true, trim: true },
+    cnic: { type: String, required: true, trim: true },
     address: { type: String, required: true, trim: true },
 }, { _id: false });
 
@@ -61,6 +66,9 @@ const InstallmentPlanSchema: Schema<IInstallmentPlan> = new Schema({
     witnesses: { type: [InstallmentWitnessSchema], required: true, validate: [(value: IInstallmentWitness[]) => value.length === 2, 'Exactly two witnesses are required'] },
     saleDate: { type: Date, required: true, index: true },
     installmentMonths: { type: Number, enum: [3, 6, 9, 12], required: true },
+    unitPrice: { type: Number, required: true, min: 0 },
+    advancePayment: { type: Number, required: true, min: 0, default: 0 },
+    financedAmount: { type: Number, required: true, min: 0 },
     monthlyInstallmentAmount: { type: Number, required: true, min: 0 },
     totalAmount: { type: Number, required: true, min: 0 },
     paidAmount: { type: Number, default: 0, min: 0 },

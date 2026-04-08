@@ -36,6 +36,7 @@ interface InstallmentScheduleItem {
 
 interface InstallmentWitness {
     name: string;
+    cnic: string;
     address: string;
 }
 
@@ -50,6 +51,9 @@ interface InstallmentPlan {
     witnesses: InstallmentWitness[];
     saleDate: string;
     installmentMonths: 3 | 6 | 9 | 12;
+    unitPrice: number;
+    advancePayment: number;
+    financedAmount: number;
     monthlyInstallmentAmount: number;
     totalAmount: number;
     paidAmount: number;
@@ -205,11 +209,17 @@ const InstallmentsPage: React.FC = () => {
                                                             <Typography variant="caption" color="text.secondary">
                                                                 {plan.witnesses[0]?.name} / {plan.witnesses[1]?.name}
                                                             </Typography>
+                                                            <Typography variant="caption" color="text.secondary" display="block">
+                                                                Witness CNICs: {plan.witnesses[0]?.cnic} / {plan.witnesses[1]?.cnic}
+                                                            </Typography>
                                                         </TableCell>
                                                         <TableCell>
                                                             <Typography variant="body2" fontWeight={700}>{plan.installmentMonths} months</Typography>
                                                             <Typography variant="caption" color="text.secondary">
                                                                 {formatCurrency(plan.monthlyInstallmentAmount, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}/month
+                                                            </Typography>
+                                                            <Typography variant="caption" color="text.secondary" display="block">
+                                                                Advance: {formatCurrency(plan.advancePayment, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                                                             </Typography>
                                                         </TableCell>
                                                         <TableCell>{formatCurrency(plan.totalAmount, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</TableCell>
