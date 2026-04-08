@@ -101,3 +101,17 @@ export const settingsSchema = Joi.object({
         lowStockAlerts: Joi.boolean().required(),
     }).required(),
 });
+
+export const noteCreateSchema = Joi.object({
+    title: Joi.string().allow('').optional(),
+    body: Joi.string().allow('').optional(),
+    color: Joi.string().allow('').optional(),
+    pinned: Joi.boolean().optional(),
+});
+
+export const noteUpdateSchema = Joi.object({
+    title: Joi.string().allow('').optional(),
+    body: Joi.string().allow('').optional(),
+    color: Joi.string().allow('').optional(),
+    pinned: Joi.boolean().optional(),
+});

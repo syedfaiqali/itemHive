@@ -12,6 +12,7 @@ import reportRoutes from './routes/reportRoutes';
 import creditRoutes from './routes/creditRoutes';
 import installmentRoutes from './routes/installmentRoutes';
 import settingsRoutes from './routes/settingsRoutes';
+import notesRoutes from './routes/notesRoutes';
 import { errorHandler, notFound } from './middleware/errorHandler';
 
 // Environmental variables
@@ -87,6 +88,7 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/credit', creditRoutes);
 app.use('/api/installments', installmentRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/notes', notesRoutes);
 
 // ── 404 & Error Handling ──────────────────────────────────────
 app.use(notFound);
