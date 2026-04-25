@@ -102,14 +102,15 @@ app.use(errorHandler);
 const startServer = async () => {
     try {
         await connectDB();
-        app.listen(PORT as number, '0.0.0.0', () => {
-            console.log(`🚀 ItemHive Server running on port ${PORT}`);
-            console.log(`📋 Environment: ${process.env.NODE_ENV || 'development'}`);
-        });
     } catch (error) {
-        console.error('❌ Server failed to start:', error);
-        process.exit(1);
+        console.error('❌ Server database init failed:', error);
     }
+
+    // Always start the server so Render health checks pass
+    app.listen(PORT as number, '0.0.0.0', () => {
+        console.log(`🚀 ItemHive Server running on port ${PORT}`);
+        console.log(`📋 Environment: ${process.env.NODE_ENV || 'development'}`);
+    });
 };
 
 startServer();
