@@ -102,8 +102,8 @@ app.use(errorHandler);
 const startServer = async () => {
     try {
         await connectDB();
-        app.listen(PORT, () => {
-            console.log(`🚀 ItemHive Server running at http://localhost:${PORT}`);
+        app.listen(PORT as number, '0.0.0.0', () => {
+            console.log(`🚀 ItemHive Server running on port ${PORT}`);
             console.log(`📋 Environment: ${process.env.NODE_ENV || 'development'}`);
         });
     } catch (error) {
