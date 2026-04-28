@@ -23,10 +23,17 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-const configuredOrigins = (process.env.CLIENT_URL || 'https://itemhiveinventorysystem.netlify.app' || 'http://localhost:5173')
-    .split(',')
-    .map((origin) => origin.trim())
-    .filter(Boolean);
+const configuredOrigins = process.env.CLIENT_URL
+    ? process.env.CLIENT_URL.split(',').map((origin) => origin.trim()).filter(Boolean)
+    : [];
+
+const defaultAllowedOrigins = [
+    'https://itemhiveinventorysystem.netlify.app',
+    'http://localhost:5173'
+];
+
+const allowedOrigins = Array.from(new Set([...configuredOrigins, ...defaultAllowedOrigins]));
+console.log('📦 CORS allowed origins:', allowedOrigins);
 
 const localhostRegex = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i;
 const privateNetworkRegex = /^https?:\/\/((10(\.\d{1,3}){3})|(172\.(1[6-9]|2\d|3[0-1])(\.\d{1,3}){2})|(192\.168(\.\d{1,3}){2}))(:\d+)?$/i;
@@ -37,11 +44,11 @@ const corsOptions: cors.CorsOptions = {
             return callback(null, true);
         }
 
-        const isConfiguredOrigin = configuredOrigins.includes(origin);
+        const isAllowedOrigin = allowedOrigins.includes(origin);
         const isLocalDevOrigin = localhostRegex.test(origin);
         const isPrivateNetworkOrigin = process.env.NODE_ENV !== 'production' && privateNetworkRegex.test(origin);
 
-        if (isConfiguredOrigin || isLocalDevOrigin || isPrivateNetworkOrigin) {
+        if (isAllowedOrigin || isLocalDevOrigin || isPrivateNetworkOrigin) {
             return callback(null, true);
         }
 
@@ -49,7 +56,8 @@ const corsOptions: cors.CorsOptions = {
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    optionsSuccessStatus: 204
 };
 
 // ── Security & Parsing Middleware ────────────────────────────
