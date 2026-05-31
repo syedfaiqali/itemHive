@@ -19,7 +19,7 @@ export const getUsers = async (req: AuthRequest, res: Response) => {
             : { createdBy: req.user?.id, role: 'user' };
 
         const users = await User.find(query)
-            .select('name email role isActive isVisible userCreationLimit createdBy preferences avatar')
+            .select('name email role isActive isVisible installmentAccess userCreationLimit createdBy preferences avatar')
             .sort({ createdAt: -1 });
 
         return res.json(users.map(serializeUser));
@@ -44,6 +44,13 @@ export const updateUserStatus = async (req: AuthRequest, res: Response) => {
 
         if (typeof req.body.isVisible === 'boolean') {
             user.isVisible = req.body.isVisible;
+        }
+
+        if (typeof req.body.installmentAccess === 'boolean') {
+            if (!['admin', 'user'].includes(normalizeRole(user.role))) {
+                return res.status(400).json({ message: 'Installment access can only be assigned to admin or user accounts' });
+            }
+            user.installmentAccess = req.body.installmentAccess;
         }
 
         await user.save();

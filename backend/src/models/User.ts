@@ -10,6 +10,7 @@ export interface IUser extends Document {
     avatar?: string;
     isActive: boolean;
     isVisible: boolean;
+    installmentAccess: boolean;
     userCreationLimit: number;
     createdBy?: mongoose.Types.ObjectId;
     preferences: {
@@ -31,6 +32,7 @@ const UserSchema: Schema = new Schema({
     avatar: { type: String },
     isActive: { type: Boolean, default: true, index: true },
     isVisible: { type: Boolean, default: true, index: true },
+    installmentAccess: { type: Boolean, default: false },
     userCreationLimit: { type: Number, default: 0, min: 0 },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     preferences: {

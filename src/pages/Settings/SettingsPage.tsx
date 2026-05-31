@@ -12,6 +12,10 @@ import {
     InputLabel,
     Select,
     MenuItem,
+    TextField,
+    Button,
+    Stack,
+    Chip,
     alpha,
     useTheme
 } from '@mui/material';
@@ -27,9 +31,13 @@ import {
     setLowStockAlertsEnabled,
     setOrderUpdatesEnabled,
     type CountryCode,
-    type CurrencyCode
+    type CurrencyCode,
+    type AppSettings,
+    DEFAULT_APP_SETTINGS
 } from '../../features/settings/settingsSlice';
 import type { AppDispatch } from '../../store';
+import type { User } from '../../features/auth/authSlice';
+import api from '../../api/axios';
 
 const currencyOptions: Array<{ value: CurrencyCode; label: string }> = [
     { value: 'USD', label: 'USD - US Dollar' },
@@ -59,21 +67,66 @@ const SettingsPage: React.FC = () => {
     const theme = useTheme();
     const dispatch = useDispatch<AppDispatch>();
     const { mode } = useSelector((state: RootState) => state.theme);
-    const { notifications, country, currency, loading } = useSelector((state: RootState) => state.settings);
+    const { user } = useSelector((state: RootState) => state.auth);
+    const { notifications, country, currency, app, loading } = useSelector((state: RootState) => state.settings);
+    const activeAppSettings = app || DEFAULT_APP_SETTINGS;
+    const [appDraft, setAppDraft] = React.useState<AppSettings>(activeAppSettings);
+    const [teamUsers, setTeamUsers] = React.useState<User[]>([]);
+    const [teamLoading, setTeamLoading] = React.useState(false);
+    const [teamSavingId, setTeamSavingId] = React.useState('');
+    const [teamError, setTeamError] = React.useState('');
 
     React.useEffect(() => {
         dispatch(fetchSettings());
     }, [dispatch]);
 
+    React.useEffect(() => {
+        setAppDraft(app || DEFAULT_APP_SETTINGS);
+    }, [app]);
+
+    const loadTeamUsers = React.useCallback(async () => {
+        if (user?.role !== 'super_admin') return;
+
+        setTeamLoading(true);
+        setTeamError('');
+        try {
+            const response = await api.get('/users');
+            setTeamUsers((response.data as User[]).filter((teamUser) => teamUser.role !== 'super_admin'));
+        } catch (error: any) {
+            setTeamError(error.response?.data?.message || 'Unable to load accounts.');
+        } finally {
+            setTeamLoading(false);
+        }
+    }, [user?.role]);
+
+    React.useEffect(() => {
+        loadTeamUsers();
+    }, [loadTeamUsers]);
+
+    const handleInstallmentAccessChange = async (teamUser: User, installmentAccess: boolean) => {
+        setTeamSavingId(teamUser.id);
+        setTeamError('');
+        try {
+            await api.patch(`/users/${teamUser.id}/status`, { installmentAccess });
+            await loadTeamUsers();
+        } catch (error: any) {
+            setTeamError(error.response?.data?.message || 'Unable to update installment access.');
+        } finally {
+            setTeamSavingId('');
+        }
+    };
+
     const persistSettings = (
         nextCountry: CountryCode,
         nextCurrency: CurrencyCode,
-        nextNotifications: typeof notifications
+        nextNotifications: typeof notifications,
+        nextApp: AppSettings = activeAppSettings
     ) => {
         dispatch(saveSettings({
             country: nextCountry,
             currency: nextCurrency,
             notifications: nextNotifications,
+            app: nextApp,
         }));
     };
 
@@ -250,6 +303,121 @@ const SettingsPage: React.FC = () => {
                         </CardContent>
                     </Card>
                 </Grid>
+
+                {user?.role === 'super_admin' && (
+                    <Grid size={{ xs: 12, md: 6 }}>
+                        <Card>
+                            <CardContent>
+                                <Typography variant="h6" fontWeight={700} gutterBottom>POS & Receipt</Typography>
+                                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                                    Shared configuration used by every POS account and customer receipt.
+                                </Typography>
+                                <Divider sx={{ mb: 2 }} />
+                                <Stack spacing={2}>
+                                    <TextField
+                                        size="small"
+                                        label="Sales Tax %"
+                                        type="number"
+                                        value={appDraft.salesTaxRate}
+                                        onChange={(event) => setAppDraft({ ...appDraft, salesTaxRate: Number(event.target.value) })}
+                                        inputProps={{ min: 0, max: 100, step: 0.01 }}
+                                    />
+                                    <TextField
+                                        size="small"
+                                        label="Shop Name"
+                                        value={appDraft.shopName}
+                                        onChange={(event) => setAppDraft({ ...appDraft, shopName: event.target.value })}
+                                    />
+                                    <TextField
+                                        size="small"
+                                        label="Shop Phone"
+                                        value={appDraft.shopPhone}
+                                        onChange={(event) => setAppDraft({ ...appDraft, shopPhone: event.target.value })}
+                                    />
+                                    <TextField
+                                        size="small"
+                                        label="Shop Address"
+                                        value={appDraft.shopAddress}
+                                        onChange={(event) => setAppDraft({ ...appDraft, shopAddress: event.target.value })}
+                                        multiline
+                                        rows={2}
+                                    />
+                                    <FormControlLabel
+                                        control={
+                                            <Switch
+                                                checked={appDraft.installmentsEnabled}
+                                                onChange={(event) => setAppDraft({ ...appDraft, installmentsEnabled: event.target.checked })}
+                                            />
+                                        }
+                                        label="Enable installments for permitted accounts"
+                                    />
+                                    <Typography variant="caption" color="text.secondary">
+                                        Super admin always keeps access. Enable this switch before granting installment access to selected accounts in Team Management.
+                                    </Typography>
+                                    <Button
+                                        variant="contained"
+                                        onClick={() => persistSettings(country, currency, notifications, appDraft)}
+                                        disabled={loading}
+                                    >
+                                        Save POS Settings
+                                    </Button>
+                                </Stack>
+                            </CardContent>
+                        </Card>
+                    </Grid>
+                )}
+
+                {user?.role === 'super_admin' && (
+                    <Grid size={{ xs: 12, md: 6 }}>
+                        <Card>
+                            <CardContent>
+                                <Typography variant="h6" fontWeight={700} gutterBottom>Installment Access</Typography>
+                                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                                    Choose which accounts can use installments after the master switch is enabled.
+                                </Typography>
+                                <Divider sx={{ mb: 2 }} />
+                                {teamError && (
+                                    <Typography variant="body2" color="error.main" sx={{ mb: 1.5 }}>
+                                        {teamError}
+                                    </Typography>
+                                )}
+                                <Stack spacing={1.5}>
+                                    {teamLoading && <Typography variant="body2" color="text.secondary">Loading accounts...</Typography>}
+                                    {!teamLoading && teamUsers.map((teamUser) => (
+                                        <Box
+                                            key={teamUser.id}
+                                            sx={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'space-between',
+                                                gap: 2,
+                                                p: 1.5,
+                                                borderRadius: 2,
+                                                bgcolor: 'action.hover',
+                                            }}
+                                        >
+                                            <Box>
+                                                <Typography variant="body2" fontWeight={700}>{teamUser.name}</Typography>
+                                                <Typography variant="caption" color="text.secondary">{teamUser.email}</Typography>
+                                            </Box>
+                                            <Stack direction="row" spacing={1} alignItems="center">
+                                                <Chip size="small" label={teamUser.role === 'admin' ? 'Admin' : 'User'} />
+                                                <Switch
+                                                    checked={Boolean(teamUser.installmentAccess)}
+                                                    onChange={(_, checked) => handleInstallmentAccessChange(teamUser, checked)}
+                                                    disabled={teamSavingId === teamUser.id}
+                                                />
+                                            </Stack>
+                                        </Box>
+                                    ))}
+                                    {!teamLoading && !teamUsers.length && (
+                                        <Typography variant="body2" color="text.secondary">No accounts created yet.</Typography>
+                                    )}
+                                </Stack>
+                            </CardContent>
+                        </Card>
+                    </Grid>
+                )}
 
                 <Grid size={{ xs: 12, md: 6 }}>
                     <Card>

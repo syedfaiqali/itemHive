@@ -23,6 +23,9 @@ import {
 } from '@mui/material';
 import api from '../../api/axios';
 import useAppCurrency from '../../hooks/useAppCurrency';
+import { useSelector } from 'react-redux';
+import type { RootState } from '../../store';
+import { getRegionalIdLabel } from '../../lib/regional';
 
 interface InstallmentScheduleItem {
     installmentNumber: number;
@@ -64,6 +67,8 @@ interface InstallmentPlan {
 
 const InstallmentsPage: React.FC = () => {
     const { formatCurrency } = useAppCurrency();
+    const { country } = useSelector((state: RootState) => state.settings);
+    const regionalIdLabel = getRegionalIdLabel(country);
     const [plans, setPlans] = useState<InstallmentPlan[]>([]);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
@@ -210,7 +215,7 @@ const InstallmentsPage: React.FC = () => {
                                                                 {plan.witnesses[0]?.name} / {plan.witnesses[1]?.name}
                                                             </Typography>
                                                             <Typography variant="caption" color="text.secondary" display="block">
-                                                                Witness CNICs: {plan.witnesses[0]?.cnic} / {plan.witnesses[1]?.cnic}
+                                                                Witness IDs ({regionalIdLabel}): {plan.witnesses[0]?.cnic} / {plan.witnesses[1]?.cnic}
                                                             </Typography>
                                                         </TableCell>
                                                         <TableCell>

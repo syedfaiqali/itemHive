@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import User from '../models/User';
+import AppSetting from '../models/AppSetting';
 import { normalizeRole } from '../utils/accessControl';
 
 export interface AuthRequest extends Request {
@@ -11,6 +12,7 @@ export interface AuthRequest extends Request {
         name: string;
         isActive: boolean;
         isVisible: boolean;
+        installmentAccess: boolean;
         userCreationLimit: number;
     };
 }
@@ -33,7 +35,7 @@ const attachUserFromToken = async (req: AuthRequest) => {
     }
 
     const decoded: any = jwt.verify(token, process.env.JWT_SECRET || 'secret');
-    const user = await User.findById(decoded.id).select('name email role isActive isVisible userCreationLimit');
+    const user = await User.findById(decoded.id).select('name email role isActive isVisible installmentAccess userCreationLimit');
 
     if (!user) {
         throw new Error('Not authorized, user not found');
@@ -47,6 +49,7 @@ const attachUserFromToken = async (req: AuthRequest) => {
         name: user.name,
         isActive: user.isActive,
         isVisible: user.isVisible,
+        installmentAccess: normalizedRole === 'super_admin' || Boolean(user.installmentAccess),
         userCreationLimit: user.userCreationLimit ?? 0,
     };
 
@@ -90,4 +93,18 @@ export const authorize = (...roles: string[]) => {
         }
         next();
     };
+};
+
+export const requireInstallmentAccess = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    if (req.user?.role === 'super_admin') {
+        next();
+        return;
+    }
+
+    const appSettings = await AppSetting.findOne({ key: 'global' }).select('installmentsEnabled');
+    if (!appSettings?.installmentsEnabled || !req.user?.installmentAccess) {
+        return res.status(403).json({ message: 'Installment access has not been enabled for this account' });
+    }
+
+    next();
 };

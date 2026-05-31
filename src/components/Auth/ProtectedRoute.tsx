@@ -7,10 +7,12 @@ import type { UserRole } from '../../features/auth/authSlice';
 interface ProtectedRouteProps {
     children: React.ReactNode;
     allowedRoles?: UserRole[];
+    requireInstallmentAccess?: boolean;
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles }) => {
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles, requireInstallmentAccess }) => {
     const { isAuthenticated, user } = useSelector((state: RootState) => state.auth);
+    const { app } = useSelector((state: RootState) => state.settings);
     const location = useLocation();
 
     if (!isAuthenticated) {
@@ -18,6 +20,10 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles 
     }
 
     if (allowedRoles && user && !allowedRoles.includes(user.role)) {
+        return <Navigate to="/" replace />;
+    }
+
+    if (requireInstallmentAccess && user?.role !== 'super_admin' && (!app?.installmentsEnabled || !user?.installmentAccess)) {
         return <Navigate to="/" replace />;
     }
 

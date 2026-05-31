@@ -46,7 +46,8 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
     const { transactions } = useSelector((state: RootState) => state.transactions);
     const { orders } = useSelector((state: RootState) => state.orders);
     const { products } = useSelector((state: RootState) => state.inventory);
-    const { notifications } = useSelector((state: RootState) => state.settings);
+    const { notifications, app } = useSelector((state: RootState) => state.settings);
+    const canAccessInstallments = user?.role === 'super_admin' || Boolean(app?.installmentsEnabled && user?.installmentAccess);
     const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
     const [notifAnchorEl, setNotifAnchorEl] = React.useState<null | HTMLElement>(null);
     const [installmentPlans, setInstallmentPlans] = React.useState<InstallmentNotificationPlan[]>([]);
@@ -78,6 +79,10 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
 
     React.useEffect(() => {
         const loadInstallmentNotifications = async () => {
+            if (!canAccessInstallments) {
+                setInstallmentPlans([]);
+                return;
+            }
             try {
                 const response = await api.get('/installments');
                 setInstallmentPlans((response.data || []) as InstallmentNotificationPlan[]);
@@ -89,7 +94,7 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
         loadInstallmentNotifications();
         window.addEventListener('itemhive-installments-updated', loadInstallmentNotifications);
         return () => window.removeEventListener('itemhive-installments-updated', loadInstallmentNotifications);
-    }, [location.pathname]);
+    }, [canAccessInstallments, location.pathname]);
 
     const allNotifications = React.useMemo(
         () =>

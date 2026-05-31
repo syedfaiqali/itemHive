@@ -26,9 +26,8 @@ api.interceptors.response.use(
     (response) => response,
     (error) => {
         if (error.response && error.response.status === 401) {
-            // Potentially clear local storage or redirect to login
             localStorage.removeItem('token');
-            // window.location.href = '/login';
+            window.dispatchEvent(new Event('itemhive-auth-expired'));
         }
         return Promise.reject(error);
     }

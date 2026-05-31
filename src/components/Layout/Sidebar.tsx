@@ -49,8 +49,10 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onDrawerToggle }) => {
     const navigate = useNavigate();
     const { user } = useSelector((state: RootState) => state.auth);
     const { isSidebarCollapsed } = useSelector((state: RootState) => state.theme);
+    const { app } = useSelector((state: RootState) => state.settings);
     const currentWidth = isSidebarCollapsed ? collapsedWidth : drawerWidth;
     const currentRole = user?.role || 'user';
+    const canAccessInstallments = user?.role === 'super_admin' || Boolean(app?.installmentsEnabled && user?.installmentAccess);
 
     const menuItems = [
         { text: 'Dashboard', icon: <LayoutDashboard size={20} />, path: '/', roles: ['super_admin', 'admin', 'user'] },
@@ -60,7 +62,7 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onDrawerToggle }) => {
         { text: 'Order Desk', icon: <ClipboardList size={20} />, path: '/orders', roles: ['super_admin', 'admin', 'user'] },
         { text: 'Transactions', icon: <History size={20} />, path: '/transactions', roles: ['super_admin', 'admin', 'user'] },
         { text: 'Credit Customers', icon: <WalletCards size={20} />, path: '/credits', roles: ['super_admin', 'admin', 'user'] },
-        { text: 'Installments', icon: <CalendarClock size={20} />, path: '/installments', roles: ['super_admin', 'admin', 'user'] },
+        { text: 'Installments', icon: <CalendarClock size={20} />, path: '/installments', roles: ['super_admin', 'admin', 'user'], requiresInstallmentAccess: true },
         { text: 'Reports', icon: <BarChart3 size={20} />, path: '/reports', roles: ['super_admin', 'admin'] },
         { text: 'Team', icon: <Users size={20} />, path: '/team', roles: ['super_admin', 'admin'] },
         { text: 'Sticky Notes', icon: <Pin size={20} />, path: '/notes', roles: ['super_admin', 'admin', 'user'] },
@@ -149,7 +151,7 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onDrawerToggle }) => {
             >
                 <List sx={{ px: 0 }}>
                     {menuItems
-                        .filter(item => item.roles.includes(currentRole))
+                        .filter(item => item.roles.includes(currentRole) && (!item.requiresInstallmentAccess || canAccessInstallments))
                         .map((item) => {
                             const isActive = location.pathname === item.path;
                             return (

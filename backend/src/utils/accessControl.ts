@@ -33,6 +33,7 @@ export const serializeUser = (user: IUser) => ({
     photoUrl: user.avatar,
     isActive: user.isActive,
     isVisible: user.isVisible,
+    installmentAccess: normalizeRole(user.role) === 'super_admin' || Boolean(user.installmentAccess),
     userCreationLimit: user.userCreationLimit ?? 0,
 });
 

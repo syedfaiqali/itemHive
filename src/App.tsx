@@ -13,6 +13,7 @@ import ScrollToTop from './components/Common/ScrollToTop';
 import { useDispatch } from 'react-redux';
 import type { AppDispatch } from './store';
 import { fetchSettings } from './features/settings/settingsSlice';
+import { logout } from './features/auth/authSlice';
 
 // Lazy load pages for better performance
 import Login from './pages/Auth/Login';
@@ -44,6 +45,12 @@ const AppContent: React.FC = () => {
       dispatch(fetchSettings());
     }
   }, [dispatch, isAuthenticated]);
+
+  React.useEffect(() => {
+    const handleAuthExpired = () => dispatch(logout());
+    window.addEventListener('itemhive-auth-expired', handleAuthExpired);
+    return () => window.removeEventListener('itemhive-auth-expired', handleAuthExpired);
+  }, [dispatch]);
 
   return (
     <ThemeProvider theme={theme}>
@@ -91,7 +98,7 @@ const AppContent: React.FC = () => {
                 </ProtectedRoute>
               } />
               <Route path="installments" element={
-                <ProtectedRoute allowedRoles={['super_admin', 'admin', 'user']}>
+                <ProtectedRoute allowedRoles={['super_admin', 'admin', 'user']} requireInstallmentAccess>
                   <InstallmentsPage />
                 </ProtectedRoute>
               } />

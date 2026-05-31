@@ -26,6 +26,9 @@ import {
 import { Search, WalletCards } from 'lucide-react';
 import api from '../../api/axios';
 import useAppCurrency from '../../hooks/useAppCurrency';
+import { useSelector } from 'react-redux';
+import type { RootState } from '../../store';
+import { getRegionalIdLabel } from '../../lib/regional';
 
 interface CreditCustomer {
     customerName: string;
@@ -42,6 +45,8 @@ interface CreditCustomer {
 
 const CreditCustomersPage: React.FC = () => {
     const { formatCurrency, currencySymbol } = useAppCurrency();
+    const { country } = useSelector((state: RootState) => state.settings);
+    const regionalIdLabel = getRegionalIdLabel(country);
     const [customers, setCustomers] = useState<CreditCustomer[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -182,7 +187,7 @@ const CreditCustomersPage: React.FC = () => {
                     <Box sx={{ p: 2.5, borderBottom: '1px solid', borderColor: 'divider' }}>
                         <TextField
                             fullWidth
-                            placeholder="Search by customer name or CNIC..."
+                            placeholder={`Search by customer name or ${regionalIdLabel}...`}
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             InputProps={{
@@ -200,7 +205,7 @@ const CreditCustomersPage: React.FC = () => {
                             <TableHead>
                                 <TableRow>
                                     <TableCell sx={{ fontWeight: 700 }}>CUSTOMER</TableCell>
-                                    <TableCell sx={{ fontWeight: 700 }}>CNIC</TableCell>
+                                    <TableCell sx={{ fontWeight: 700 }}>{regionalIdLabel.toUpperCase()}</TableCell>
                                     <TableCell sx={{ fontWeight: 700 }}>INVOICES</TableCell>
                                     <TableCell sx={{ fontWeight: 700 }}>CREDIT ISSUED</TableCell>
                                     <TableCell sx={{ fontWeight: 700 }}>RECOVERED</TableCell>

@@ -6,6 +6,22 @@ interface NotificationSettings {
     lowStockAlerts: boolean;
 }
 
+export interface AppSettings {
+    salesTaxRate: number;
+    shopName: string;
+    shopPhone: string;
+    shopAddress: string;
+    installmentsEnabled: boolean;
+}
+
+export const DEFAULT_APP_SETTINGS: AppSettings = {
+    salesTaxRate: 0,
+    shopName: 'ItemHive POS',
+    shopPhone: '',
+    shopAddress: '',
+    installmentsEnabled: false,
+};
+
 export type CurrencyCode = 'USD' | 'EUR' | 'GBP' | 'CHF' | 'CDF' | 'XAF' | 'PKR' | 'INR' | 'AED';
 export type CountryCode = 'PK' | 'US' | 'DE' | 'GB' | 'CH' | 'CD' | 'CG' | 'IN' | 'AE';
 
@@ -25,6 +41,7 @@ interface SettingsState {
     notifications: NotificationSettings;
     country: CountryCode;
     currency: CurrencyCode;
+    app: AppSettings;
     loading: boolean;
     error: string | null;
 }
@@ -36,6 +53,7 @@ const initialState: SettingsState = {
     },
     country: 'PK',
     currency: 'PKR',
+    app: DEFAULT_APP_SETTINGS,
     loading: false,
     error: null,
 };
@@ -49,6 +67,7 @@ export const fetchSettings = createAsyncThunk(
                 country: CountryCode;
                 currency: CurrencyCode;
                 notifications: NotificationSettings;
+                app: AppSettings;
             };
         } catch (error: any) {
             return rejectWithValue(error.response?.data?.message || 'Failed to fetch settings');
@@ -63,6 +82,7 @@ export const saveSettings = createAsyncThunk(
             country: CountryCode;
             currency: CurrencyCode;
             notifications: NotificationSettings;
+            app: AppSettings;
         },
         { rejectWithValue }
     ) => {
@@ -72,6 +92,7 @@ export const saveSettings = createAsyncThunk(
                 country: CountryCode;
                 currency: CurrencyCode;
                 notifications: NotificationSettings;
+                app: AppSettings;
             };
         } catch (error: any) {
             return rejectWithValue(error.response?.data?.message || 'Failed to save settings');
@@ -111,6 +132,7 @@ const settingsSlice = createSlice({
                 state.country = action.payload.country;
                 state.currency = action.payload.currency;
                 state.notifications = action.payload.notifications;
+                state.app = action.payload.app;
             })
             .addCase(fetchSettings.rejected, (state, action: PayloadAction<any>) => {
                 state.loading = false;
@@ -125,6 +147,7 @@ const settingsSlice = createSlice({
                 state.country = action.payload.country;
                 state.currency = action.payload.currency;
                 state.notifications = action.payload.notifications;
+                state.app = action.payload.app;
             })
             .addCase(saveSettings.rejected, (state, action: PayloadAction<any>) => {
                 state.loading = false;

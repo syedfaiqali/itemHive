@@ -101,12 +101,20 @@ export const settingsSchema = Joi.object({
         orderUpdates: Joi.boolean().required(),
         lowStockAlerts: Joi.boolean().required(),
     }).required(),
+    app: Joi.object({
+        salesTaxRate: Joi.number().min(0).max(100).required(),
+        shopName: Joi.string().allow('').max(120).required(),
+        shopPhone: Joi.string().allow('').max(60).required(),
+        shopAddress: Joi.string().allow('').max(240).required(),
+        installmentsEnabled: Joi.boolean().required(),
+    }).optional(),
 });
 
 export const updateUserStatusSchema = Joi.object({
     isActive: Joi.boolean().optional(),
     isVisible: Joi.boolean().optional(),
-}).or('isActive', 'isVisible');
+    installmentAccess: Joi.boolean().optional(),
+}).or('isActive', 'isVisible', 'installmentAccess');
 
 export const updateAdminLimitSchema = Joi.object({
     userCreationLimit: Joi.number().integer().min(0).required(),

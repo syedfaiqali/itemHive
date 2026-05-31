@@ -8,13 +8,11 @@ export interface CartItem extends Product {
 
 interface POSState {
     cart: CartItem[];
-    taxRate: number; // e.g., 0.1 for 10%
     activeDiscount: number; // Flat discount on whole cart
 }
 
 const initialState: POSState = {
     cart: [],
-    taxRate: 0.10, // Default 10% tax
     activeDiscount: 0,
 };
 

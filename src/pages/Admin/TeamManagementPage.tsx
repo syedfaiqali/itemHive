@@ -57,7 +57,7 @@ const TeamManagementPage: React.FC = () => {
         loadUsers();
     }, [loadUsers]);
 
-    const handleStatusChange = async (target: User, updates: { isActive?: boolean; isVisible?: boolean }) => {
+    const handleStatusChange = async (target: User, updates: { isActive?: boolean; isVisible?: boolean; installmentAccess?: boolean }) => {
         setSavingId(target.id);
 
         try {
@@ -182,6 +182,20 @@ const TeamManagementPage: React.FC = () => {
                                                     <Switch
                                                         checked={Boolean(teamUser.isVisible)}
                                                         onChange={(_, checked) => handleStatusChange(teamUser, { isVisible: checked })}
+                                                        disabled={isBusy}
+                                                    />
+                                                </Box>
+
+                                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                    <Box>
+                                                        <Typography variant="subtitle2" fontWeight={700}>Installment access</Typography>
+                                                        <Typography variant="caption" color="text.secondary">
+                                                            Allow this account to create and manage installment plans.
+                                                        </Typography>
+                                                    </Box>
+                                                    <Switch
+                                                        checked={Boolean(teamUser.installmentAccess)}
+                                                        onChange={(_, checked) => handleStatusChange(teamUser, { installmentAccess: checked })}
                                                         disabled={isBusy}
                                                     />
                                                 </Box>

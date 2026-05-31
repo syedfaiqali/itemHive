@@ -60,12 +60,15 @@ import {
     addMonths
 } from 'date-fns';
 import useAppCurrency from '../../hooks/useAppCurrency';
+import { getRegionalIdLabel } from '../../lib/regional';
 
 const TransactionHistory: React.FC = () => {
     const theme = useTheme();
     const dispatch = useDispatch<AppDispatch>();
     const { transactions, loading, error } = useSelector((state: RootState) => state.transactions || { transactions: [], loading: false, error: null });
+    const { country } = useSelector((state: RootState) => state.settings);
     const { formatCurrency } = useAppCurrency();
+    const regionalIdLabel = getRegionalIdLabel(country);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
     const [datePickerAnchorEl, setDatePickerAnchorEl] = useState<HTMLElement | null>(null);
@@ -143,7 +146,7 @@ const TransactionHistory: React.FC = () => {
 
     const exportToCSV = () => {
         setExportingCsv(true);
-        const headers = ['TX ID', 'Timestamp', 'Product', 'User', 'Customer', 'CNIC', 'Payment Method', 'Paid Now', 'Remaining Due', 'Type', 'Quantity', 'Unit Price', 'Value', 'Profit/Loss'];
+        const headers = ['TX ID', 'Timestamp', 'Product', 'User', 'Customer', regionalIdLabel, 'Payment Method', 'Paid Now', 'Remaining Due', 'Type', 'Quantity', 'Unit Price', 'Value', 'Profit/Loss'];
         const rows = filteredTransactions.map(t => [
             t.id,
             t.timestamp,
@@ -318,7 +321,7 @@ const TransactionHistory: React.FC = () => {
                                                     {tx.customerName || 'Walk-in Customer'}
                                                 </Typography>
                                                 <Typography variant="caption" color="text.secondary">
-                                                    {tx.customerCnic || 'No CNIC'}
+                                                    {tx.customerCnic || `No ${regionalIdLabel}`}
                                                 </Typography>
                                             </TableCell>
                                             <TableCell>
@@ -564,7 +567,7 @@ const TransactionHistory: React.FC = () => {
                                     <Typography>{selectedTx.customerName || 'Walk-in Customer'}</Typography>
                                 </Box>
                                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                                    <Typography fontWeight={700}>CNIC:</Typography>
+                                    <Typography fontWeight={700}>{regionalIdLabel}:</Typography>
                                     <Typography>{selectedTx.customerCnic || '-'}</Typography>
                                 </Box>
                                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>

@@ -48,6 +48,8 @@ import type { AppDispatch } from '../../store';
 import { motion, AnimatePresence } from 'framer-motion';
 import useAppCurrency from '../../hooks/useAppCurrency';
 import api from '../../api/axios';
+import { getRegionalIdLabel } from '../../lib/regional';
+import { DEFAULT_APP_SETTINGS } from '../../features/settings/settingsSlice';
 
 const categories = ['All', ...PRODUCT_CATEGORIES];
 type CheckoutMethod = 'cash' | 'card' | 'credit' | 'installment';
@@ -113,9 +115,15 @@ const POSTerminal: React.FC = () => {
 
     const { user } = useSelector((state: RootState) => state.auth);
     const { products } = useSelector((state: RootState) => state.inventory);
-    const { cart, taxRate, activeDiscount } = useSelector((state: RootState) => state.pos);
+    const { cart, activeDiscount } = useSelector((state: RootState) => state.pos);
+    const { app, country } = useSelector((state: RootState) => state.settings);
+    const appSettings = app || DEFAULT_APP_SETTINGS;
     const { formatCurrency, currencySymbol } = useAppCurrency();
     const canOverridePrice = user?.role === 'super_admin' || user?.role === 'admin';
+    const canAccessInstallments = user?.role === 'super_admin' || Boolean(appSettings.installmentsEnabled && user?.installmentAccess);
+    const regionalIdLabel = getRegionalIdLabel(country);
+    const taxRate = Number(appSettings.salesTaxRate || 0) / 100;
+    const taxLabel = `Tax (${Number(appSettings.salesTaxRate || 0).toLocaleString()}%)`;
 
     const [searchTerm, setSearchTerm] = useState('');
     const [activeTab, setActiveTab] = useState(0);
@@ -184,16 +192,18 @@ const POSTerminal: React.FC = () => {
                 ? `INSTALLMENT (${installmentMonths} MONTHS)`
                 : method.toUpperCase();
         const pdfTotal = method === 'installment' ? draftInstallmentTotal : total;
-        const pdfProfit = method === 'installment' ? draftInstallmentProfit : projectedProfit;
         const lines = [
             'ITEMHIVE PAYMENT SLIP',
+            appSettings.shopName || 'ItemHive POS',
+            appSettings.shopPhone ? `Phone: ${appSettings.shopPhone}` : '',
+            appSettings.shopAddress ? `Address: ${appSettings.shopAddress}` : '',
             receiptDivider,
             padReceiptLine('Slip No.', id),
             padReceiptLine('Date', dateLabel),
             padReceiptLine('Cashier', user?.name || 'Staff'),
             padReceiptLine('Payment', paymentLabel),
             method === 'credit' ? `Customer: ${creditCustomerName}` : method === 'installment' ? `Customer: ${installmentCustomerName}` : '',
-            method === 'credit' ? `CNIC: ${creditCustomerCnic}` : method === 'installment' ? `CNIC: ${installmentCustomerCnic}` : '',
+            method === 'credit' ? `${regionalIdLabel}: ${creditCustomerCnic}` : method === 'installment' ? `${regionalIdLabel}: ${installmentCustomerCnic}` : '',
             receiptDivider,
             'ITEMS',
             ...cart.map((item) => {
@@ -203,7 +213,7 @@ const POSTerminal: React.FC = () => {
             receiptDivider,
             'SUMMARY',
             padReceiptLine('Subtotal', formatCurrency(subtotal)),
-            padReceiptLine('Tax (10%)', formatCurrency(tax)),
+            method !== 'installment' ? padReceiptLine(taxLabel, formatCurrency(tax)) : '',
             activeDiscount > 0 ? padReceiptLine('Discount', `-${formatCurrency(activeDiscount)}`) : '',
             method === 'credit' ? padReceiptLine('Paid Now', formatCurrency(creditPaidNow)) : '',
             method === 'credit' ? padReceiptLine('Remaining Due', formatCurrency(creditDue)) : '',
@@ -211,7 +221,6 @@ const POSTerminal: React.FC = () => {
             method === 'installment' ? padReceiptLine('EMI Balance', formatCurrency(draftInstallmentRemaining)) : '',
             method === 'installment' ? padReceiptLine('Monthly EMI', formatCurrency(draftMonthlyInstallment)) : '',
             padReceiptLine(method === 'installment' ? 'Installment Total' : method === 'credit' ? 'Order Total' : 'Total Paid', formatCurrency(pdfTotal)),
-            padReceiptLine('Profit/Loss', formatCurrency(pdfProfit)),
             receiptDivider,
             'Thank you for shopping with us.',
             'Please keep this slip for your record.'
@@ -260,6 +269,10 @@ const POSTerminal: React.FC = () => {
     };
 
     const handleOpenInstallment = () => {
+        if (!canAccessInstallments) {
+            setStockToast({ open: true, message: 'Installment access has not been enabled for this account.' });
+            return;
+        }
         if (cart.length !== 1) {
             setStockToast({ open: true, message: 'Installment sale currently supports one product at a time.' });
             return;
@@ -284,7 +297,7 @@ const POSTerminal: React.FC = () => {
 
     const handleContinueCredit = () => {
         if (!creditCustomerName.trim() || !creditCustomerCnic.trim()) {
-            setStockToast({ open: true, message: 'Customer name and CNIC are required for credit sales.' });
+            setStockToast({ open: true, message: `Customer name and ${regionalIdLabel} are required for credit sales.` });
             return;
         }
         if (draftCreditDue <= 0) {
@@ -300,11 +313,11 @@ const POSTerminal: React.FC = () => {
 
     const handleContinueInstallment = () => {
         if (!installmentCustomerName.trim() || !installmentCustomerCnic.trim() || !installmentCustomerPhone.trim() || !installmentCustomerAddress.trim()) {
-            setStockToast({ open: true, message: 'Customer name, CNIC, phone, and address are required for installment sales.' });
+            setStockToast({ open: true, message: `Customer name, ${regionalIdLabel}, phone, and address are required for installment sales.` });
             return;
         }
         if (!witnessOneName.trim() || !witnessOneCnic.trim() || !witnessOneAddress.trim() || !witnessTwoName.trim() || !witnessTwoCnic.trim() || !witnessTwoAddress.trim()) {
-            setStockToast({ open: true, message: 'Both witness names, CNICs, and addresses are required.' });
+            setStockToast({ open: true, message: `Both witness names, ${regionalIdLabel} values, and addresses are required.` });
             return;
         }
         if (draftInstallmentTotal <= 0) {
@@ -856,7 +869,7 @@ const POSTerminal: React.FC = () => {
                             <Typography variant="body2" fontWeight={700}>{formatCurrency(subtotal)}</Typography>
                         </Box>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <Typography variant="body2" color="text.secondary">Tax (10%)</Typography>
+                            <Typography variant="body2" color="text.secondary">{taxLabel}</Typography>
                             <Typography variant="body2" fontWeight={700}>{formatCurrency(tax)}</Typography>
                         </Box>
                         {activeDiscount > 0 && (
@@ -881,7 +894,7 @@ const POSTerminal: React.FC = () => {
                     </Stack>
 
                     <Grid container spacing={1}>
-                        <Grid size={{ xs: 3 }}>
+                        <Grid size={{ xs: canAccessInstallments ? 3 : 4 }}>
                             <Button
                                 fullWidth
                                 variant="outlined"
@@ -893,7 +906,7 @@ const POSTerminal: React.FC = () => {
                                 Cash
                             </Button>
                         </Grid>
-                        <Grid size={{ xs: 3 }}>
+                        <Grid size={{ xs: canAccessInstallments ? 3 : 4 }}>
                             <Button
                                 fullWidth
                                 variant="outlined"
@@ -905,7 +918,7 @@ const POSTerminal: React.FC = () => {
                                 Card
                             </Button>
                         </Grid>
-                        <Grid size={{ xs: 3 }}>
+                        <Grid size={{ xs: canAccessInstallments ? 3 : 4 }}>
                             <Button
                                 fullWidth
                                 variant="outlined"
@@ -917,7 +930,7 @@ const POSTerminal: React.FC = () => {
                                 Credit
                             </Button>
                         </Grid>
-                        <Grid size={{ xs: 3 }}>
+                        {canAccessInstallments && <Grid size={{ xs: 3 }}>
                             <Button
                                 fullWidth
                                 variant="outlined"
@@ -928,7 +941,7 @@ const POSTerminal: React.FC = () => {
                             >
                                 EMI
                             </Button>
-                        </Grid>
+                        </Grid>}
                         <Grid size={{ xs: 6 }}>
                             <Button
                                 fullWidth
@@ -1000,10 +1013,10 @@ const POSTerminal: React.FC = () => {
                     />
                     <TextField
                         fullWidth
-                        label="Customer CNIC"
+                        label={`Customer ${regionalIdLabel}`}
                         value={creditCustomerCnic}
                         onChange={(e) => setCreditCustomerCnic(e.target.value)}
-                        placeholder="35202-1234567-1"
+                        placeholder={country === 'PK' ? '35202-1234567-1' : `Enter ${regionalIdLabel}`}
                         sx={{ mb: 2 }}
                     />
                     <Grid container spacing={1} sx={{ mb: 2 }}>
@@ -1051,14 +1064,14 @@ const POSTerminal: React.FC = () => {
                 <DialogTitle sx={{ fontWeight: 800 }}>Installment Sale</DialogTitle>
                 <DialogContent>
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                        Capture customer details, witness CNICs, set the installment sale price, and create EMI after any advance payment.
+                        Capture customer details, witness IDs, set the installment sale price, and create EMI after any advance payment.
                     </Typography>
                     <Grid container spacing={2}>
                         <Grid size={{ xs: 12, md: 6 }}>
                             <TextField fullWidth label="Customer Name" value={installmentCustomerName} onChange={(e) => setInstallmentCustomerName(e.target.value)} />
                         </Grid>
                         <Grid size={{ xs: 12, md: 6 }}>
-                            <TextField fullWidth label="Customer CNIC" value={installmentCustomerCnic} onChange={(e) => setInstallmentCustomerCnic(e.target.value)} />
+                            <TextField fullWidth label={`Customer ${regionalIdLabel}`} value={installmentCustomerCnic} onChange={(e) => setInstallmentCustomerCnic(e.target.value)} />
                         </Grid>
                         <Grid size={{ xs: 12, md: 6 }}>
                             <TextField fullWidth label="Customer Phone" value={installmentCustomerPhone} onChange={(e) => setInstallmentCustomerPhone(e.target.value)} />
@@ -1078,7 +1091,7 @@ const POSTerminal: React.FC = () => {
                             <TextField fullWidth label="Witness 1 Name" value={witnessOneName} onChange={(e) => setWitnessOneName(e.target.value)} />
                         </Grid>
                         <Grid size={{ xs: 12, md: 6 }}>
-                            <TextField fullWidth label="Witness 1 CNIC" value={witnessOneCnic} onChange={(e) => setWitnessOneCnic(e.target.value)} />
+                            <TextField fullWidth label={`Witness 1 ${regionalIdLabel}`} value={witnessOneCnic} onChange={(e) => setWitnessOneCnic(e.target.value)} />
                         </Grid>
                         <Grid size={{ xs: 12, md: 6 }}>
                             <TextField fullWidth label="Witness 1 Address" value={witnessOneAddress} onChange={(e) => setWitnessOneAddress(e.target.value)} />
@@ -1087,7 +1100,7 @@ const POSTerminal: React.FC = () => {
                             <TextField fullWidth label="Witness 2 Name" value={witnessTwoName} onChange={(e) => setWitnessTwoName(e.target.value)} />
                         </Grid>
                         <Grid size={{ xs: 12, md: 6 }}>
-                            <TextField fullWidth label="Witness 2 CNIC" value={witnessTwoCnic} onChange={(e) => setWitnessTwoCnic(e.target.value)} />
+                            <TextField fullWidth label={`Witness 2 ${regionalIdLabel}`} value={witnessTwoCnic} onChange={(e) => setWitnessTwoCnic(e.target.value)} />
                         </Grid>
                         <Grid size={{ xs: 12, md: 6 }}>
                             <TextField fullWidth label="Witness 2 Address" value={witnessTwoAddress} onChange={(e) => setWitnessTwoAddress(e.target.value)} />
@@ -1164,7 +1177,7 @@ const POSTerminal: React.FC = () => {
                         {pendingMethod === 'credit' && (
                             <Box sx={{ mt: 1 }}>
                                 <Typography variant="body2">Customer: <strong>{creditCustomerName}</strong></Typography>
-                                <Typography variant="body2">CNIC: <strong>{creditCustomerCnic}</strong></Typography>
+                                <Typography variant="body2">{regionalIdLabel}: <strong>{creditCustomerCnic}</strong></Typography>
                                 <Typography variant="body2" fontWeight={700}>Paid via {creditPaidVia.toUpperCase()}: {formatCurrency(creditPaidNow)}</Typography>
                                 <Typography variant="body2" fontWeight={900} color="warning.main">Due Later: {formatCurrency(creditDue)}</Typography>
                             </Box>
@@ -1172,7 +1185,7 @@ const POSTerminal: React.FC = () => {
                         {pendingMethod === 'installment' && (
                             <Box sx={{ mt: 1 }}>
                                 <Typography variant="body2">Customer: <strong>{installmentCustomerName}</strong></Typography>
-                                <Typography variant="body2">CNIC: <strong>{installmentCustomerCnic}</strong></Typography>
+                                <Typography variant="body2">{regionalIdLabel}: <strong>{installmentCustomerCnic}</strong></Typography>
                                 <Typography variant="body2">Phone: <strong>{installmentCustomerPhone}</strong></Typography>
                                 <Typography variant="body2" fontWeight={700}>Plan: <strong>{installmentMonths} months</strong></Typography>
                                 <Typography variant="body2" fontWeight={700}>Sale Total: <strong>{formatCurrency(draftInstallmentTotal)}</strong></Typography>
@@ -1244,8 +1257,10 @@ const POSTerminal: React.FC = () => {
                                 Payment Slip
                             </Typography>
                             <Typography variant="h5" fontWeight={900} sx={{ lineHeight: 1.1 }}>
-                                ItemHive POS
+                                {appSettings.shopName || 'ItemHive POS'}
                             </Typography>
+                            {appSettings.shopPhone && <Typography variant="body2" sx={{ mt: 0.75, opacity: 0.9 }}>{appSettings.shopPhone}</Typography>}
+                            {appSettings.shopAddress && <Typography variant="caption" sx={{ display: 'block', opacity: 0.82 }}>{appSettings.shopAddress}</Typography>}
                             <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" sx={{ mt: 1.5 }}>
                                 <Chip size="small" label={`Order #${receiptId}`} sx={{ bgcolor: alpha('#fff', 0.16), color: 'common.white' }} />
                                 <Chip size="small" label={`Method: ${paymentMethod?.toUpperCase()}`} sx={{ bgcolor: alpha('#fff', 0.16), color: 'common.white' }} />
@@ -1263,7 +1278,7 @@ const POSTerminal: React.FC = () => {
                                 <Grid size={{ xs: 12, sm: 6 }}>
                                     <Box sx={{ p: 1.5, borderRadius: 2.5, bgcolor: alpha(theme.palette.primary.main, 0.06) }}>
                                         <Typography variant="caption" color="text.secondary">Issued At</Typography>
-                                        <Typography variant="body2" fontWeight={800}>{new Date().toLocaleString()}</Typography>
+                                        <Typography variant="body2" fontWeight={800}>{receiptTime ? new Date(receiptTime).toLocaleString() : '-'}</Typography>
                                     </Box>
                                 </Grid>
                                 {(paymentMethod === 'credit' || paymentMethod === 'installment') && (
@@ -1278,7 +1293,7 @@ const POSTerminal: React.FC = () => {
                                         </Grid>
                                         <Grid size={{ xs: 12, sm: 6 }}>
                                             <Box sx={{ p: 1.5, borderRadius: 2.5, bgcolor: alpha(theme.palette.info.main, 0.06) }}>
-                                                <Typography variant="caption" color="text.secondary">Customer CNIC</Typography>
+                                                <Typography variant="caption" color="text.secondary">Customer {regionalIdLabel}</Typography>
                                                 <Typography variant="body2" fontWeight={800}>
                                                     {paymentMethod === 'credit' ? creditCustomerCnic : installmentCustomerCnic}
                                                 </Typography>
@@ -1350,10 +1365,12 @@ const POSTerminal: React.FC = () => {
                                                 <Typography variant="caption">Subtotal</Typography>
                                                 <Typography variant="caption" fontWeight={700}>{formatCurrency(subtotal)}</Typography>
                                             </Box>
-                                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                                <Typography variant="caption">Tax (10%)</Typography>
-                                                <Typography variant="caption" fontWeight={700}>{formatCurrency(tax)}</Typography>
-                                            </Box>
+                                            {paymentMethod !== 'installment' && (
+                                                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                    <Typography variant="caption">{taxLabel}</Typography>
+                                                    <Typography variant="caption" fontWeight={700}>{formatCurrency(tax)}</Typography>
+                                                </Box>
+                                            )}
                                             {paymentMethod === 'credit' && (
                                                 <>
                                                     <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -1401,7 +1418,7 @@ const POSTerminal: React.FC = () => {
                                     Please keep this payment slip for your record
                                 </Typography>
                                 <Typography variant="body2" sx={{ mt: 0.8, fontWeight: 700 }}>
-                                    Thank you for shopping with ItemHive
+                                    Thank you for shopping with {appSettings.shopName || 'ItemHive'}
                                 </Typography>
                             </Box>
                         </Box>

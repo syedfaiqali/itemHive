@@ -12,6 +12,7 @@ export interface User {
     photoUrl?: string;
     isActive?: boolean;
     isVisible?: boolean;
+    installmentAccess?: boolean;
     userCreationLimit?: number;
     preferences?: {
         country: 'PK' | 'US' | 'DE' | 'GB' | 'CH' | 'CD' | 'CG' | 'IN' | 'AE';
@@ -147,6 +148,9 @@ const authSlice = createSlice({
                 state.user = normalizeUser(persistedAuth.user ?? state.user);
                 state.token = persistedAuth.token ?? state.token;
                 state.isAuthenticated = Boolean(persistedAuth.token ?? state.token);
+                if (state.token) {
+                    localStorage.setItem('token', state.token);
+                }
             });
     }
 });
