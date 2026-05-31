@@ -19,10 +19,11 @@ export interface ITransaction extends Document {
     unitPrice?: number;
     grossProfit?: number;
     installmentPlanId?: string;
+    businessId?: mongoose.Types.ObjectId;
 }
 
 const TransactionSchema: Schema = new Schema({
-    id: { type: String, required: true, unique: true, index: true },
+    id: { type: String, required: true, index: true },
     timestamp: { type: Date, default: Date.now, index: true },
     productId: { type: String, required: true, index: true },
     productName: { type: String, required: true },
@@ -38,9 +39,11 @@ const TransactionSchema: Schema = new Schema({
     customerCnic: { type: String, default: '' },
     unitCost: { type: Number, default: 0 },
     unitPrice: { type: Number, default: 0 },
-    grossProfit: { type: Number, default: 0 }
-    ,
-    installmentPlanId: { type: String, default: '', index: true }
+    grossProfit: { type: Number, default: 0 },
+    installmentPlanId: { type: String, default: '', index: true },
+    businessId: { type: Schema.Types.ObjectId, ref: 'Business', default: null, index: true }
 }, { timestamps: true });
+
+TransactionSchema.index({ businessId: 1, id: 1 }, { unique: true });
 
 export default mongoose.model<ITransaction>('Transaction', TransactionSchema);

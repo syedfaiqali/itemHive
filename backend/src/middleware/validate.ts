@@ -37,6 +37,7 @@ export const registerSchema = Joi.object({
     email: Joi.string().email().required(),
     password: Joi.string().min(6).required(),
     role: Joi.string().valid(...USER_ROLES).optional(),
+    businessName: Joi.string().min(2).max(120).optional(),
 });
 
 export const productSchema = Joi.object({
@@ -118,6 +119,12 @@ export const updateUserStatusSchema = Joi.object({
 
 export const updateAdminLimitSchema = Joi.object({
     userCreationLimit: Joi.number().integer().min(0).required(),
+});
+
+export const updateUserAccountSchema = Joi.object({
+    name: Joi.string().min(2).required(),
+    email: Joi.string().email().required(),
+    password: Joi.string().min(6).allow('').optional(),
 });
 
 export const inventoryRequestDecisionSchema = Joi.object({

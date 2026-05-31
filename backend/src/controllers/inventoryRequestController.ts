@@ -4,6 +4,7 @@ import InventoryRequest from '../models/InventoryRequest';
 import Product from '../models/Product';
 import type { AuthRequest } from '../middleware/auth';
 import { normalizeRole } from '../utils/accessControl';
+import { buildTenantFilter, getTenantObjectId } from '../utils/tenancy';
 
 const buildProductPayload = (body: Record<string, any>) => ({
     id: String(body.id),
@@ -25,7 +26,9 @@ const buildProductPayload = (body: Record<string, any>) => ({
 export const getInventoryRequests = async (req: AuthRequest, res: Response) => {
     try {
         const actorRole = normalizeRole(req.user?.role);
-        const query = actorRole === 'user' ? { requestedBy: req.user?.id } : {};
+        const query = actorRole === 'user'
+            ? { requestedBy: req.user?.id, ...buildTenantFilter(req.user!) }
+            : buildTenantFilter(req.user!);
 
         const requests = await InventoryRequest.find(query).sort({ createdAt: -1 });
         return res.json(requests);
@@ -44,6 +47,7 @@ export const createInventoryRequest = async (req: AuthRequest, res: Response) =>
             requestedBy: req.user.id,
             'productData.sku': String(req.body.sku).toUpperCase(),
             status: 'pending',
+            ...buildTenantFilter(req.user),
         });
 
         if (duplicatePending) {
@@ -55,6 +59,7 @@ export const createInventoryRequest = async (req: AuthRequest, res: Response) =>
             requestedByName: req.user.name,
             requestedByEmail: req.user.email,
             productData: buildProductPayload(req.body),
+            businessId: getTenantObjectId(req.user),
         });
 
         await request.save();
@@ -73,7 +78,7 @@ export const reviewInventoryRequest = async (req: AuthRequest, res: Response) =>
     session.startTransaction();
 
     try {
-        const request = await InventoryRequest.findById(req.params.id).session(session);
+        const request = await InventoryRequest.findOne({ _id: req.params.id, ...buildTenantFilter(req.user!) }).session(session);
 
         if (!request) {
             throw new Error('Inventory request not found');
@@ -89,12 +94,12 @@ export const reviewInventoryRequest = async (req: AuthRequest, res: Response) =>
         request.status = req.body.status;
 
         if (req.body.status === 'approved') {
-            const skuExists = await Product.findOne({ sku: request.productData.sku }).session(session);
+            const skuExists = await Product.findOne({ sku: request.productData.sku, ...buildTenantFilter(req.user!) }).session(session);
             if (skuExists) {
                 throw new Error('A product with this SKU already exists');
             }
 
-            const productIdExists = await Product.findOne({ id: request.productData.id }).session(session);
+            const productIdExists = await Product.findOne({ id: request.productData.id, ...buildTenantFilter(req.user!) }).session(session);
             if (productIdExists) {
                 throw new Error('A product with this ID already exists');
             }
@@ -102,6 +107,7 @@ export const reviewInventoryRequest = async (req: AuthRequest, res: Response) =>
             const product = new Product({
                 ...request.productData,
                 price: request.productData.salePrice ?? request.productData.price,
+                businessId: getTenantObjectId(req.user!),
             });
 
             await product.save({ session });

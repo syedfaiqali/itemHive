@@ -27,6 +27,7 @@ export interface IInventoryRequest extends Document {
     reviewedBy?: mongoose.Types.ObjectId;
     reviewedByName?: string;
     approvedProductId?: string;
+    businessId?: mongoose.Types.ObjectId;
 }
 
 const InventoryRequestSchema = new Schema<IInventoryRequest>({
@@ -54,6 +55,7 @@ const InventoryRequestSchema = new Schema<IInventoryRequest>({
     reviewedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     reviewedByName: { type: String, default: '' },
     approvedProductId: { type: String, default: '' },
+    businessId: { type: Schema.Types.ObjectId, ref: 'Business', default: null, index: true },
 }, { timestamps: true });
 
 export default mongoose.model<IInventoryRequest>('InventoryRequest', InventoryRequestSchema);

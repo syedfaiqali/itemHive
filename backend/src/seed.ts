@@ -5,6 +5,7 @@ import path from 'path';
 import Product from './models/Product';
 import User from './models/User';
 import connectDB from './config/db';
+import { ensureLegacyBusiness } from './utils/tenancy';
 
 dotenv.config();
 
@@ -15,13 +16,15 @@ const seedData = async () => {
         // Clear existing data
         await Product.deleteMany({});
         await User.deleteMany({});
+        const legacyBusiness = await ensureLegacyBusiness();
 
         // Seed Super Admin User
         const admin = new User({
             name: 'Super Admin',
             email: 'admin@itemhive.com',
             password: 'admin123', // Will be hashed by pre-save hook
-            role: 'super_admin'
+            role: 'super_admin',
+            businessId: legacyBusiness._id,
         });
         await admin.save();
 
@@ -58,7 +61,8 @@ const seedData = async () => {
                     description: `Imported on ${date}`,
                     batchNumber: `B-${1000 + index}`,
                     expiryDate: '2026-12-31',
-                    supplier: 'Global Trade Co.'
+                    supplier: 'Global Trade Co.',
+                    businessId: legacyBusiness._id,
                 };
             });
 

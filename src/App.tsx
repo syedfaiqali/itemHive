@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material/styles';
 import { Provider } from 'react-redux';
@@ -40,13 +40,13 @@ const AppContent: React.FC = () => {
   const { isAuthenticated } = useSelector((state: RootState) => state.auth);
   const theme = React.useMemo(() => getAppTheme(mode), [mode]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (isAuthenticated) {
       dispatch(fetchSettings());
     }
   }, [dispatch, isAuthenticated]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     const handleAuthExpired = () => dispatch(logout());
     window.addEventListener('itemhive-auth-expired', handleAuthExpired);
     return () => window.removeEventListener('itemhive-auth-expired', handleAuthExpired);

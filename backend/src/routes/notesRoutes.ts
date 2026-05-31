@@ -5,9 +5,9 @@ import { noteCreateSchema, noteUpdateSchema, validate } from '../middleware/vali
 
 const router = Router();
 
-router.get('/', protect, authorize('admin', 'cashier'), getNotes);
-router.post('/', protect, authorize('admin', 'cashier'), validate(noteCreateSchema), createNote);
-router.patch('/:id', protect, authorize('admin', 'cashier'), validate(noteUpdateSchema), updateNote);
-router.delete('/:id', protect, authorize('admin', 'cashier'), deleteNote);
+router.get('/', protect, authorize('super_admin', 'admin', 'user'), getNotes);
+router.post('/', protect, authorize('super_admin', 'admin', 'user'), validate(noteCreateSchema), createNote);
+router.patch('/:id', protect, authorize('super_admin', 'admin', 'user'), validate(noteUpdateSchema), updateNote);
+router.delete('/:id', protect, authorize('super_admin', 'admin', 'user'), deleteNote);
 
 export default router;

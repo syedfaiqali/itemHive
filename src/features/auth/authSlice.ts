@@ -14,6 +14,7 @@ export interface User {
     isVisible?: boolean;
     installmentAccess?: boolean;
     userCreationLimit?: number;
+    businessId?: string;
     preferences?: {
         country: 'PK' | 'US' | 'DE' | 'GB' | 'CH' | 'CD' | 'CG' | 'IN' | 'AE';
         currency: 'USD' | 'EUR' | 'GBP' | 'CHF' | 'CDF' | 'XAF' | 'PKR' | 'INR' | 'AED';
@@ -86,7 +87,7 @@ export const loginUser = createAsyncThunk(
 export const registerUser = createAsyncThunk(
     'auth/register',
     async (
-        payload: { name: string; email: string; password: string; role: UserRole },
+        payload: { name: string; email: string; password: string; role: UserRole; businessName?: string },
         { rejectWithValue }
     ) => {
         try {

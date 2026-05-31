@@ -5,6 +5,7 @@ import Product from '../models/Product';
 import Transaction from '../models/Transaction';
 import type { AuthRequest } from '../middleware/auth';
 import { normalizeRole } from '../utils/accessControl';
+import { buildTenantFilter, getTenantObjectId } from '../utils/tenancy';
 
 const round2 = (value: number) => Math.round(value * 100) / 100;
 
@@ -50,9 +51,9 @@ const refreshInstallmentStatus = (plan: any) => {
     plan.status = plan.remainingAmount <= 0 ? 'cleared' : 'active';
 };
 
-export const getInstallmentPlans = async (_req: Request, res: Response) => {
+export const getInstallmentPlans = async (req: AuthRequest, res: Response) => {
     try {
-        const plans = await InstallmentPlan.find().sort({ createdAt: -1 });
+        const plans = await InstallmentPlan.find(buildTenantFilter(req.user!)).sort({ createdAt: -1 });
         res.json(plans);
     } catch (error: any) {
         res.status(500).json({ message: error.message || 'Failed to fetch installment plans' });
@@ -82,7 +83,7 @@ export const createInstallmentPlan = async (req: AuthRequest, res: Response) => 
             userName,
         } = req.body;
 
-        const product = await Product.findOne({ id: productId }).session(session);
+        const product = await Product.findOne({ id: productId, ...buildTenantFilter(req.user!) }).session(session);
         if (!product) {
             throw new Error('Product not found');
         }
@@ -135,6 +136,7 @@ export const createInstallmentPlan = async (req: AuthRequest, res: Response) => 
             unitPrice: resolvedUnitPrice,
             grossProfit: (resolvedUnitPrice - (product.purchasePrice ?? 0)) * Number(amount || 0),
             installmentPlanId: planId,
+            businessId: getTenantObjectId(req.user!),
         });
         await transaction.save({ session });
 
@@ -162,6 +164,7 @@ export const createInstallmentPlan = async (req: AuthRequest, res: Response) => 
             status: 'active',
             createdBy: req.user?.id || userName || 'Staff',
             schedule,
+            businessId: getTenantObjectId(req.user!),
         });
 
         await plan.save({ session });
@@ -177,9 +180,9 @@ export const createInstallmentPlan = async (req: AuthRequest, res: Response) => 
     }
 };
 
-export const payInstallment = async (req: Request, res: Response) => {
+export const payInstallment = async (req: AuthRequest, res: Response) => {
     try {
-        const plan = await InstallmentPlan.findOne({ planCode: req.params.id });
+        const plan = await InstallmentPlan.findOne({ planCode: req.params.id, ...buildTenantFilter(req.user!) });
         if (!plan) {
             return res.status(404).json({ message: 'Installment plan not found' });
         }

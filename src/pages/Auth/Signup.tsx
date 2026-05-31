@@ -29,6 +29,7 @@ const Signup: React.FC = () => {
     const [success, setSuccess] = useState(false);
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
+    const [businessName, setBusinessName] = useState('');
     const isSuperAdmin = user?.role === 'super_admin';
     const [role, setRole] = useState<'super_admin' | 'admin' | 'user'>(isSuperAdmin ? 'admin' : 'user');
     const [password, setPassword] = useState('');
@@ -56,7 +57,13 @@ const Signup: React.FC = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        const result = await dispatch(registerUser({ name, email, password, role }));
+        const result = await dispatch(registerUser({
+            name,
+            email,
+            password,
+            role,
+            businessName: isSuperAdmin && role === 'admin' ? businessName : undefined,
+        }));
         if (registerUser.fulfilled.match(result)) {
             setSuccess(true);
         }
@@ -215,6 +222,20 @@ const Signup: React.FC = () => {
                                 {isSuperAdmin && <MenuItem value="super_admin">Super Admin</MenuItem>}
                                 <MenuItem value="user">User</MenuItem>
                             </TextField>
+                            {isSuperAdmin && role === 'admin' && (
+                                <TextField
+                                    fullWidth
+                                    label="Shop Name"
+                                    variant="outlined"
+                                    margin="dense"
+                                    value={businessName}
+                                    onChange={(e) => setBusinessName(e.target.value)}
+                                    required
+                                    disabled={loading || success}
+                                    helperText="A separate workspace will be created for this shop."
+                                    sx={{ mb: 0.25 }}
+                                />
+                            )}
                             <TextField
                                 fullWidth
                                 label="Password"

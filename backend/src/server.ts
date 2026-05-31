@@ -16,6 +16,7 @@ import userRoutes from './routes/userRoutes';
 import inventoryRequestRoutes from './routes/inventoryRequestRoutes';
 import notesRoutes from './routes/notesRoutes';
 import { errorHandler, notFound } from './middleware/errorHandler';
+import { ensureTenantIndexes } from './utils/tenantIndexes';
 
 // Environmental variables
 dotenv.config();
@@ -110,6 +111,7 @@ app.use(errorHandler);
 const startServer = async () => {
     try {
         await connectDB();
+        await ensureTenantIndexes();
     } catch (error) {
         console.error('❌ Server database init failed:', error);
     }

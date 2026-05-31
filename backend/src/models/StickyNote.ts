@@ -8,6 +8,7 @@ export interface IStickyNote extends Document {
     pinned: boolean;
     createdAt: Date;
     updatedAt: Date;
+    businessId?: mongoose.Types.ObjectId;
 }
 
 const StickyNoteSchema: Schema = new Schema(
@@ -17,6 +18,7 @@ const StickyNoteSchema: Schema = new Schema(
         body: { type: String, default: '' },
         color: { type: String, default: '#FDE68A' },
         pinned: { type: Boolean, default: false },
+        businessId: { type: Schema.Types.ObjectId, ref: 'Business', default: null, index: true },
     },
     { timestamps: true }
 );

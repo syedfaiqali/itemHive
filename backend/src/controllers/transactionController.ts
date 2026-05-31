@@ -4,10 +4,11 @@ import Product from '../models/Product';
 import mongoose from 'mongoose';
 import type { AuthRequest } from '../middleware/auth';
 import { normalizeRole } from '../utils/accessControl';
+import { buildTenantFilter, getTenantObjectId } from '../utils/tenancy';
 
-export const getTransactions = async (req: Request, res: Response) => {
+export const getTransactions = async (req: AuthRequest, res: Response) => {
     try {
-        const transactions = await Transaction.find().sort({ timestamp: -1 });
+        const transactions = await Transaction.find(buildTenantFilter(req.user!)).sort({ timestamp: -1 });
         res.json(transactions);
     } catch (error: any) {
         res.status(500).json({ message: error.message });
@@ -36,7 +37,7 @@ export const createTransaction = async (req: AuthRequest, res: Response) => {
             unitPrice,
         } = req.body;
 
-        const product = await Product.findOne({ id: productId }).session(session);
+        const product = await Product.findOne({ id: productId, ...buildTenantFilter(req.user!) }).session(session);
         if (!product) {
             throw new Error('Product not found');
         }
@@ -74,6 +75,7 @@ export const createTransaction = async (req: AuthRequest, res: Response) => {
             unitCost: resolvedUnitCost,
             unitPrice: resolvedUnitPrice,
             grossProfit: resolvedGrossProfit,
+            businessId: getTenantObjectId(req.user!),
         });
         await transaction.save({ session });
 

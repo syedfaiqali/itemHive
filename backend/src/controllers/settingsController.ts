@@ -1,15 +1,9 @@
 import { Response } from 'express';
 import User from '../models/User';
-import AppSetting from '../models/AppSetting';
 import type { AuthRequest } from '../middleware/auth';
 import { normalizeRole } from '../utils/accessControl';
 import type { IUser } from '../models/User';
-
-const getGlobalSettings = async () => AppSetting.findOneAndUpdate(
-    { key: 'global' },
-    { $setOnInsert: { key: 'global' } },
-    { new: true, upsert: true, setDefaultsOnInsert: true }
-);
+import { getAppSettingsForTenant } from '../utils/tenancy';
 
 const serializePreferences = (preferences: IUser['preferences']) => ({
     country: preferences.country,
@@ -24,7 +18,7 @@ export const getSettings = async (req: AuthRequest, res: Response) => {
     try {
         const [user, appSettings] = await Promise.all([
             User.findById(req.user?.id).select('preferences'),
-            getGlobalSettings(),
+            getAppSettingsForTenant(req.user!),
         ]);
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
@@ -63,7 +57,7 @@ export const updateSettings = async (req: AuthRequest, res: Response) => {
 
         await user.save();
 
-        const appSettings = await getGlobalSettings();
+        const appSettings = await getAppSettingsForTenant(req.user!);
         if (normalizeRole(req.user?.role) === 'super_admin' && req.body.app) {
             appSettings.salesTaxRate = req.body.app.salesTaxRate;
             appSettings.shopName = req.body.app.shopName;

@@ -2,15 +2,18 @@ import { Request, Response } from 'express';
 import Transaction from '../models/Transaction';
 import CreditPayment from '../models/CreditPayment';
 import type { AuthRequest } from '../middleware/auth';
+import { buildTenantFilter, getTenantObjectId, type TenantContext } from '../utils/tenancy';
 
 const buildCustomerKey = (customerName: string, customerCnic: string) =>
     `${customerName.trim().toLowerCase()}::${customerCnic.trim().toLowerCase()}`;
 
-const getOutstandingCreditCustomers = async () => {
+const getOutstandingCreditCustomers = async (tenant: TenantContext) => {
+    const tenantFilter = buildTenantFilter(tenant);
     const [creditSales, payments] = await Promise.all([
         Transaction.aggregate([
             {
                 $match: {
+                    ...tenantFilter,
                     paymentMethod: 'credit',
                     type: 'reduction',
                     dueAmount: { $gt: 0 },
@@ -33,6 +36,7 @@ const getOutstandingCreditCustomers = async () => {
             }
         ]),
         CreditPayment.aggregate([
+            { $match: tenantFilter },
             {
                 $group: {
                     _id: {
@@ -76,9 +80,9 @@ const getOutstandingCreditCustomers = async () => {
         .sort((a, b) => b.outstandingAmount - a.outstandingAmount);
 };
 
-export const getCreditCustomers = async (_req: Request, res: Response) => {
+export const getCreditCustomers = async (req: AuthRequest, res: Response) => {
     try {
-        const customers = await getOutstandingCreditCustomers();
+        const customers = await getOutstandingCreditCustomers(req.user!);
         res.json(customers);
     } catch (error: any) {
         res.status(500).json({ message: error.message || 'Failed to fetch credit customers' });
@@ -93,7 +97,7 @@ export const createCreditPayment = async (req: AuthRequest, res: Response) => {
         const paidVia = req.body.paidVia;
         const notes = String(req.body.notes || '').trim();
 
-        const customers = await getOutstandingCreditCustomers();
+        const customers = await getOutstandingCreditCustomers(req.user!);
         const customer = customers.find((entry) =>
             buildCustomerKey(entry.customerName, entry.customerCnic) === buildCustomerKey(customerName, customerCnic)
         );
@@ -119,6 +123,7 @@ export const createCreditPayment = async (req: AuthRequest, res: Response) => {
             paidVia,
             receivedBy: req.user?.id || 'unknown',
             notes,
+            businessId: getTenantObjectId(req.user!),
         });
 
         res.status(201).json(payment);

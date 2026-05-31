@@ -16,11 +16,12 @@ export interface IProduct extends Document {
     batchNumber?: string;
     expiryDate?: string;
     supplier?: string;
+    businessId?: mongoose.Types.ObjectId;
 }
 
 const ProductSchema: Schema<IProduct> = new Schema({
-    id: { type: String, required: true, unique: true, index: true },
-    sku: { type: String, required: true, unique: true, index: true },
+    id: { type: String, required: true, index: true },
+    sku: { type: String, required: true, index: true },
     name: { type: String, required: true, index: true },
     category: { type: String, required: true, index: true },
     purchasePrice: { type: Number, required: true, min: 0 },
@@ -33,8 +34,12 @@ const ProductSchema: Schema<IProduct> = new Schema({
     lastUpdated: { type: Date, default: Date.now },
     batchNumber: { type: String, default: '' },
     expiryDate: { type: String, default: '' },
-    supplier: { type: String, default: '' }
+    supplier: { type: String, default: '' },
+    businessId: { type: Schema.Types.ObjectId, ref: 'Business', default: null, index: true }
 }, { timestamps: true });
+
+ProductSchema.index({ businessId: 1, id: 1 }, { unique: true });
+ProductSchema.index({ businessId: 1, sku: 1 }, { unique: true });
 
 // Automatically update lastUpdated before saving
 ProductSchema.pre('save', function () {

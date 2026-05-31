@@ -37,6 +37,7 @@ export interface IInstallmentPlan extends Document {
     status: 'active' | 'cleared';
     createdBy: string;
     schedule: IInstallmentScheduleItem[];
+    businessId?: mongoose.Types.ObjectId;
 }
 
 const InstallmentWitnessSchema = new Schema<IInstallmentWitness>({
@@ -56,7 +57,7 @@ const InstallmentScheduleSchema = new Schema<IInstallmentScheduleItem>({
 }, { _id: false });
 
 const InstallmentPlanSchema: Schema<IInstallmentPlan> = new Schema({
-    planCode: { type: String, required: true, unique: true, index: true },
+    planCode: { type: String, required: true, index: true },
     productId: { type: String, required: true, index: true },
     productName: { type: String, required: true },
     customerName: { type: String, required: true, trim: true, index: true },
@@ -76,6 +77,9 @@ const InstallmentPlanSchema: Schema<IInstallmentPlan> = new Schema({
     status: { type: String, enum: ['active', 'cleared'], default: 'active', index: true },
     createdBy: { type: String, required: true },
     schedule: { type: [InstallmentScheduleSchema], required: true },
+    businessId: { type: Schema.Types.ObjectId, ref: 'Business', default: null, index: true },
 }, { timestamps: true });
+
+InstallmentPlanSchema.index({ businessId: 1, planCode: 1 }, { unique: true });
 
 export default mongoose.model<IInstallmentPlan>('InstallmentPlan', InstallmentPlanSchema);

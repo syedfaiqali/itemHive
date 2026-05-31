@@ -1,8 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import User from '../models/User';
-import AppSetting from '../models/AppSetting';
 import { normalizeRole } from '../utils/accessControl';
+import { ensureUserBusiness, getAppSettingsForTenant } from '../utils/tenancy';
 
 export interface AuthRequest extends Request {
     user?: {
@@ -14,6 +14,8 @@ export interface AuthRequest extends Request {
         isVisible: boolean;
         installmentAccess: boolean;
         userCreationLimit: number;
+        businessId: string;
+        businessIsLegacy: boolean;
     };
 }
 
@@ -35,13 +37,18 @@ const attachUserFromToken = async (req: AuthRequest) => {
     }
 
     const decoded: any = jwt.verify(token, process.env.JWT_SECRET || 'secret');
-    const user = await User.findById(decoded.id).select('name email role isActive isVisible installmentAccess userCreationLimit');
+    const user = await User.findById(decoded.id).select('name email role isActive isVisible installmentAccess userCreationLimit businessId');
 
     if (!user) {
         throw new Error('Not authorized, user not found');
     }
 
     const normalizedRole = normalizeRole(user.role);
+    const business = await ensureUserBusiness(user);
+    if (!business.isActive) {
+        throw new Error('Business workspace is inactive');
+    }
+
     req.user = {
         id: String(user._id),
         role: normalizedRole,
@@ -51,6 +58,8 @@ const attachUserFromToken = async (req: AuthRequest) => {
         isVisible: user.isVisible,
         installmentAccess: normalizedRole === 'super_admin' || Boolean(user.installmentAccess),
         userCreationLimit: user.userCreationLimit ?? 0,
+        businessId: String(business._id),
+        businessIsLegacy: business.isLegacy,
     };
 
     return true;
@@ -101,7 +110,11 @@ export const requireInstallmentAccess = async (req: AuthRequest, res: Response, 
         return;
     }
 
-    const appSettings = await AppSetting.findOne({ key: 'global' }).select('installmentsEnabled');
+    if (!req.user) {
+        return res.status(401).json({ message: 'Not authorized, no token' });
+    }
+
+    const appSettings = await getAppSettingsForTenant(req.user);
     if (!appSettings?.installmentsEnabled || !req.user?.installmentAccess) {
         return res.status(403).json({ message: 'Installment access has not been enabled for this account' });
     }

@@ -3,23 +3,49 @@ import {
     Alert,
     Box,
     Button,
-    Card,
-    CardContent,
     Chip,
     CircularProgress,
-    Grid,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
+    InputAdornment,
     Snackbar,
     Stack,
     Switch,
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TablePagination,
+    TableRow,
     TextField,
     Typography,
 } from '@mui/material';
-import { ShieldCheck, UserPlus, Users } from 'lucide-react';
+import { Edit3, Search, ShieldCheck, UserPlus, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../../store';
 import type { User } from '../../features/auth/authSlice';
 import api from '../../api/axios';
+
+interface UsersPage {
+    users: User[];
+    total: number;
+}
+
+type UsersResponse = UsersPage | User[];
+
+interface AccountDraft {
+    name: string;
+    email: string;
+    password: string;
+    userCreationLimit: string;
+}
+
+const roleLabel = (role: User['role']) =>
+    role === 'super_admin' ? 'Super Admin' : role === 'admin' ? 'Admin' : 'User';
 
 const TeamManagementPage: React.FC = () => {
     const navigate = useNavigate();
@@ -28,7 +54,12 @@ const TeamManagementPage: React.FC = () => {
     const [users, setUsers] = React.useState<User[]>([]);
     const [loading, setLoading] = React.useState(true);
     const [savingId, setSavingId] = React.useState('');
-    const [limitDrafts, setLimitDrafts] = React.useState<Record<string, string>>({});
+    const [search, setSearch] = React.useState('');
+    const [page, setPage] = React.useState(0);
+    const [rowsPerPage, setRowsPerPage] = React.useState(20);
+    const [total, setTotal] = React.useState(0);
+    const [editingUser, setEditingUser] = React.useState<User | null>(null);
+    const [draft, setDraft] = React.useState<AccountDraft>({ name: '', email: '', password: '', userCreationLimit: '0' });
     const [snack, setSnack] = React.useState('');
     const [error, setError] = React.useState('');
 
@@ -37,29 +68,26 @@ const TeamManagementPage: React.FC = () => {
         setError('');
 
         try {
-            const response = await api.get('/users');
-            const nextUsers = response.data as User[];
+            const response = await api.get<UsersResponse>('/users', {
+                params: { page: page + 1, limit: rowsPerPage, search: search.trim() || undefined },
+            });
+            const nextUsers = Array.isArray(response.data) ? response.data : response.data.users || [];
             setUsers(nextUsers);
-            setLimitDrafts(
-                nextUsers.reduce<Record<string, string>>((acc, teamUser) => {
-                    acc[teamUser.id] = String(teamUser.userCreationLimit ?? 0);
-                    return acc;
-                }, {})
-            );
+            setTotal(Array.isArray(response.data) ? nextUsers.length : response.data.total || 0);
         } catch (requestError: any) {
             setError(requestError?.response?.data?.message || 'Unable to load team members right now.');
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [page, rowsPerPage, search]);
 
     React.useEffect(() => {
-        loadUsers();
+        const timeoutId = window.setTimeout(loadUsers, 250);
+        return () => window.clearTimeout(timeoutId);
     }, [loadUsers]);
 
     const handleStatusChange = async (target: User, updates: { isActive?: boolean; isVisible?: boolean; installmentAccess?: boolean }) => {
         setSavingId(target.id);
-
         try {
             await api.patch(`/users/${target.id}/status`, updates);
             await loadUsers();
@@ -71,17 +99,36 @@ const TeamManagementPage: React.FC = () => {
         }
     };
 
-    const handleLimitSave = async (target: User) => {
-        setSavingId(target.id);
+    const openEditDialog = (target: User) => {
+        setEditingUser(target);
+        setDraft({
+            name: target.name,
+            email: target.email,
+            password: '',
+            userCreationLimit: String(target.userCreationLimit ?? 0),
+        });
+    };
 
+    const saveAccount = async () => {
+        if (!editingUser) return;
+
+        setSavingId(editingUser.id);
         try {
-            await api.patch(`/users/${target.id}/limit`, {
-                userCreationLimit: Number(limitDrafts[target.id] || 0),
+            await api.patch(`/users/${editingUser.id}/account`, {
+                name: draft.name,
+                email: draft.email,
+                password: draft.password,
             });
+            if (editingUser.role === 'admin') {
+                await api.patch(`/users/${editingUser.id}/limit`, {
+                    userCreationLimit: Number(draft.userCreationLimit || 0),
+                });
+            }
+            setEditingUser(null);
             await loadUsers();
-            setSnack('Admin user limit updated.');
+            setSnack('Account details updated successfully.');
         } catch (requestError: any) {
-            setError(requestError?.response?.data?.message || 'Unable to update this limit.');
+            setError(requestError?.response?.data?.message || requestError?.response?.data?.details || 'Unable to update this account.');
         } finally {
             setSavingId('');
         }
@@ -89,172 +136,131 @@ const TeamManagementPage: React.FC = () => {
 
     return (
         <Box>
-            <Snackbar
-                open={Boolean(snack)}
-                autoHideDuration={2600}
-                onClose={() => setSnack('')}
-                anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-            >
-                <Alert onClose={() => setSnack('')} severity="success" sx={{ width: '100%' }}>
-                    {snack}
-                </Alert>
+            <Snackbar open={Boolean(snack)} autoHideDuration={2600} onClose={() => setSnack('')} anchorOrigin={{ vertical: 'top', horizontal: 'right' }}>
+                <Alert onClose={() => setSnack('')} severity="success" sx={{ width: '100%' }}>{snack}</Alert>
             </Snackbar>
 
-            <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+            <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
                 <Box>
                     <Typography variant="h4" fontWeight={800}>Team Management</Typography>
                     <Typography variant="body2" color="text.secondary">
                         {isSuperAdmin
-                            ? 'Super admin can activate, deactivate, hide, show, and assign admin user limits.'
+                            ? 'Search and manage shop accounts from one scalable grid.'
                             : `You can create users up to your assigned limit of ${currentUser?.userCreationLimit ?? 0}.`}
                     </Typography>
                 </Box>
-                <Button
-                    variant="contained"
-                    startIcon={<UserPlus size={18} />}
-                    onClick={() => navigate('/signup')}
-                    sx={{ borderRadius: 2, fontWeight: 800 }}
-                >
+                <Button variant="contained" startIcon={<UserPlus size={18} />} onClick={() => navigate('/signup')} sx={{ borderRadius: 2, fontWeight: 800 }}>
                     {isSuperAdmin ? 'Create Account' : 'Add User'}
                 </Button>
             </Box>
 
-            {error && (
-                <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>
-                    {error}
-                </Alert>
-            )}
+            {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
 
-            {loading ? (
-                <Box sx={{ minHeight: 240, display: 'grid', placeItems: 'center' }}>
-                    <CircularProgress />
-                </Box>
-            ) : (
-                <Grid container spacing={3}>
-                    {users.map((teamUser) => {
-                        const isBusy = savingId === teamUser.id;
-                        const isManageable = teamUser.role !== 'super_admin';
+            <TextField
+                fullWidth
+                size="small"
+                value={search}
+                onChange={(event) => {
+                    setSearch(event.target.value);
+                    setPage(0);
+                }}
+                placeholder="Search by name, login email, or role"
+                InputProps={{ startAdornment: <InputAdornment position="start"><Search size={18} /></InputAdornment> }}
+                sx={{ mb: 2, maxWidth: 560 }}
+            />
 
-                        return (
-                            <Grid key={teamUser.id} size={{ xs: 12, md: 6 }}>
-                                <Card sx={{ borderRadius: 4, height: '100%' }}>
-                                    <CardContent sx={{ p: 3 }}>
-                                        <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2}>
-                                            <Box>
-                                                <Typography variant="h6" fontWeight={800}>{teamUser.name}</Typography>
-                                                <Typography variant="body2" color="text.secondary">{teamUser.email}</Typography>
-                                            </Box>
-                                            <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" justifyContent="flex-end">
-                                                <Chip
-                                                    icon={<ShieldCheck size={14} />}
-                                                    label={teamUser.role === 'super_admin' ? 'Super Admin' : teamUser.role === 'admin' ? 'Admin' : 'User'}
-                                                    color={teamUser.role === 'user' ? 'default' : 'primary'}
-                                                    size="small"
-                                                />
-                                                <Chip label={teamUser.isActive ? 'Active' : 'Inactive'} color={teamUser.isActive ? 'success' : 'error'} size="small" />
-                                                <Chip label={teamUser.isVisible ? 'Visible' : 'Hidden'} color={teamUser.isVisible ? 'info' : 'default'} size="small" />
-                                            </Stack>
-                                        </Stack>
-
-                                        {isSuperAdmin && isManageable && (
-                                            <Stack spacing={2} sx={{ mt: 3 }}>
-                                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                    <Box>
-                                                        <Typography variant="subtitle2" fontWeight={700}>Account active</Typography>
-                                                        <Typography variant="caption" color="text.secondary">
-                                                            Deactivated accounts cannot sign in.
-                                                        </Typography>
-                                                    </Box>
-                                                    <Switch
-                                                        checked={Boolean(teamUser.isActive)}
-                                                        onChange={(_, checked) => handleStatusChange(teamUser, { isActive: checked })}
-                                                        disabled={isBusy}
-                                                    />
-                                                </Box>
-
-                                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                    <Box>
-                                                        <Typography variant="subtitle2" fontWeight={700}>Show in management lists</Typography>
-                                                        <Typography variant="caption" color="text.secondary">
-                                                            Hidden accounts stay out of standard listings.
-                                                        </Typography>
-                                                    </Box>
-                                                    <Switch
-                                                        checked={Boolean(teamUser.isVisible)}
-                                                        onChange={(_, checked) => handleStatusChange(teamUser, { isVisible: checked })}
-                                                        disabled={isBusy}
-                                                    />
-                                                </Box>
-
-                                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                    <Box>
-                                                        <Typography variant="subtitle2" fontWeight={700}>Installment access</Typography>
-                                                        <Typography variant="caption" color="text.secondary">
-                                                            Allow this account to create and manage installment plans.
-                                                        </Typography>
-                                                    </Box>
-                                                    <Switch
-                                                        checked={Boolean(teamUser.installmentAccess)}
-                                                        onChange={(_, checked) => handleStatusChange(teamUser, { installmentAccess: checked })}
-                                                        disabled={isBusy}
-                                                    />
-                                                </Box>
-
-                                                {teamUser.role === 'admin' && (
-                                                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems={{ xs: 'stretch', sm: 'center' }}>
-                                                        <TextField
-                                                            label="User Limit"
-                                                            type="number"
-                                                            size="small"
-                                                            value={limitDrafts[teamUser.id] ?? '0'}
-                                                            onChange={(event) => setLimitDrafts((current) => ({
-                                                                ...current,
-                                                                [teamUser.id]: event.target.value,
-                                                            }))}
-                                                            inputProps={{ min: 0 }}
-                                                            sx={{ maxWidth: 180 }}
-                                                        />
-                                                        <Button
-                                                            variant="outlined"
-                                                            onClick={() => handleLimitSave(teamUser)}
-                                                            disabled={isBusy}
-                                                        >
-                                                            Save Limit
-                                                        </Button>
-                                                    </Stack>
-                                                )}
-                                            </Stack>
+            <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3 }}>
+                <Table size="small" sx={{ minWidth: 1060 }}>
+                    <TableHead>
+                        <TableRow>
+                            <TableCell>Account</TableCell>
+                            <TableCell>Role</TableCell>
+                            <TableCell align="center">Active</TableCell>
+                            <TableCell align="center">Visible</TableCell>
+                            <TableCell align="center">Installments</TableCell>
+                            <TableCell align="center">User Limit</TableCell>
+                            <TableCell align="right">Actions</TableCell>
+                        </TableRow>
+                    </TableHead>
+                    <TableBody>
+                        {loading && (
+                            <TableRow>
+                                <TableCell colSpan={7} align="center" sx={{ py: 8 }}><CircularProgress size={30} /></TableCell>
+                            </TableRow>
+                        )}
+                        {!loading && users.map((teamUser) => {
+                            const isBusy = savingId === teamUser.id;
+                            const isManageable = isSuperAdmin && teamUser.role !== 'super_admin';
+                            return (
+                                <TableRow key={teamUser.id} hover>
+                                    <TableCell>
+                                        <Typography variant="body2" fontWeight={800}>{teamUser.name}</Typography>
+                                        <Typography variant="caption" color="text.secondary">{teamUser.email}</Typography>
+                                    </TableCell>
+                                    <TableCell>
+                                        <Chip icon={<ShieldCheck size={14} />} label={roleLabel(teamUser.role)} color={teamUser.role === 'user' ? 'default' : 'primary'} size="small" />
+                                    </TableCell>
+                                    <TableCell align="center">
+                                        <Switch size="small" checked={Boolean(teamUser.isActive)} disabled={!isManageable || isBusy} onChange={(_, checked) => handleStatusChange(teamUser, { isActive: checked })} />
+                                    </TableCell>
+                                    <TableCell align="center">
+                                        <Switch size="small" checked={Boolean(teamUser.isVisible)} disabled={!isManageable || isBusy} onChange={(_, checked) => handleStatusChange(teamUser, { isVisible: checked })} />
+                                    </TableCell>
+                                    <TableCell align="center">
+                                        <Switch size="small" checked={Boolean(teamUser.installmentAccess)} disabled={!isManageable || isBusy} onChange={(_, checked) => handleStatusChange(teamUser, { installmentAccess: checked })} />
+                                    </TableCell>
+                                    <TableCell align="center">{teamUser.role === 'admin' ? teamUser.userCreationLimit ?? 0 : '-'}</TableCell>
+                                    <TableCell align="right">
+                                        {isManageable && (
+                                            <Button size="small" variant="outlined" startIcon={<Edit3 size={15} />} onClick={() => openEditDialog(teamUser)} disabled={isBusy}>
+                                                Edit
+                                            </Button>
                                         )}
+                                    </TableCell>
+                                </TableRow>
+                            );
+                        })}
+                        {!loading && !users.length && (
+                            <TableRow>
+                                <TableCell colSpan={7} align="center" sx={{ py: 8 }}>
+                                    <Users size={34} style={{ opacity: 0.45, marginBottom: 8 }} />
+                                    <Typography variant="body2" color="text.secondary">No matching accounts found.</Typography>
+                                </TableCell>
+                            </TableRow>
+                        )}
+                    </TableBody>
+                </Table>
+                <TablePagination
+                    component="div"
+                    count={total}
+                    page={page}
+                    onPageChange={(_, nextPage) => setPage(nextPage)}
+                    rowsPerPage={rowsPerPage}
+                    onRowsPerPageChange={(event) => {
+                        setRowsPerPage(Number(event.target.value));
+                        setPage(0);
+                    }}
+                    rowsPerPageOptions={[10, 20, 50, 100]}
+                />
+            </TableContainer>
 
-                                        {!isSuperAdmin && (
-                                            <Box sx={{ mt: 3, p: 2, borderRadius: 3, bgcolor: 'action.hover' }}>
-                                                <Typography variant="subtitle2" fontWeight={700}>Created users you manage</Typography>
-                                                <Typography variant="body2" color="text.secondary">
-                                                    You can add users from the create account screen until your assigned limit is reached.
-                                                </Typography>
-                                            </Box>
-                                        )}
-                                    </CardContent>
-                                </Card>
-                            </Grid>
-                        );
-                    })}
-
-                    {!users.length && (
-                        <Grid size={12}>
-                            <Card sx={{ borderRadius: 4 }}>
-                                <CardContent sx={{ p: 4, textAlign: 'center' }}>
-                                    <Users size={38} style={{ opacity: 0.45, marginBottom: 12 }} />
-                                    <Typography variant="h6" fontWeight={800}>No team accounts yet</Typography>
-                                    <Typography variant="body2" color="text.secondary">
-                                        Create the first account for your team from the button above.
-                                    </Typography>
-                                </CardContent>
-                            </Card>
-                        </Grid>
-                    )}
-                </Grid>
-            )}
+            <Dialog open={Boolean(editingUser)} onClose={() => setEditingUser(null)} fullWidth maxWidth="sm">
+                <DialogTitle>Edit Account</DialogTitle>
+                <DialogContent>
+                    <Stack spacing={2} sx={{ pt: 1 }}>
+                        <TextField label="Full Name" value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} required />
+                        <TextField label="Login Email / ID" type="email" value={draft.email} onChange={(event) => setDraft({ ...draft, email: event.target.value })} required />
+                        <TextField label="New Password" type="password" value={draft.password} onChange={(event) => setDraft({ ...draft, password: event.target.value })} helperText="Leave blank to keep the existing password." />
+                        {editingUser?.role === 'admin' && (
+                            <TextField label="User Creation Limit" type="number" value={draft.userCreationLimit} onChange={(event) => setDraft({ ...draft, userCreationLimit: event.target.value })} inputProps={{ min: 0 }} />
+                        )}
+                    </Stack>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setEditingUser(null)}>Cancel</Button>
+                    <Button variant="contained" onClick={saveAccount} disabled={savingId === editingUser?.id}>Save Changes</Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 };

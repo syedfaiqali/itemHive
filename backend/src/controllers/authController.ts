@@ -3,6 +3,8 @@ import jwt from 'jsonwebtoken';
 import User from '../models/User';
 import type { AuthRequest } from '../middleware/auth';
 import { isSuperAdminEmail, normalizeRole, serializeUser } from '../utils/accessControl';
+import Business from '../models/Business';
+import { ensureLegacyBusiness } from '../utils/tenancy';
 
 const signToken = (id: string, role: string) => jwt.sign(
     { id, role: normalizeRole(role) },
@@ -12,14 +14,14 @@ const signToken = (id: string, role: string) => jwt.sign(
 
 export const register = async (req: AuthRequest, res: Response) => {
     try {
-        const { name, email, password, role } = req.body;
+        const { name, email, password, role, businessName } = req.body;
         const normalizedEmail = String(email || '').trim().toLowerCase();
         const requestedRole = normalizeRole(role);
 
         const [existingUser, totalUsers, currentUser] = await Promise.all([
             User.findOne({ email: normalizedEmail }),
             User.countDocuments(),
-            req.user?.id ? User.findById(req.user.id).select('role userCreationLimit isActive') : null,
+            req.user?.id ? User.findById(req.user.id).select('role userCreationLimit isActive businessId') : null,
         ]);
 
         if (existingUser) {
@@ -39,9 +41,11 @@ export const register = async (req: AuthRequest, res: Response) => {
 
         let assignedRole = requestedRole;
         let createdBy = null;
+        let businessId = currentUser?.businessId || null;
 
         if (bootstrapSuperAdmin || isSuperAdminEmail(normalizedEmail)) {
             assignedRole = 'super_admin';
+            businessId = (await ensureLegacyBusiness())._id;
         } else if (req.user) {
             const actorRole = normalizeRole(req.user.role);
             createdBy = req.user.id;
@@ -58,9 +62,18 @@ export const register = async (req: AuthRequest, res: Response) => {
 
                 assignedRole = 'user';
             }
+
+            if (actorRole === 'super_admin' && assignedRole === 'admin') {
+                const business = await Business.create({
+                    name: String(businessName || `${name}'s Store`).trim(),
+                    slug: `store-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                    createdBy: req.user.id,
+                });
+                businessId = business._id;
+            }
         }
 
-        const user = new User({ name, email: normalizedEmail, password, role: assignedRole, createdBy });
+        const user = new User({ name, email: normalizedEmail, password, role: assignedRole, createdBy, businessId });
         await user.save();
 
         const token = signToken(String(user._id), user.role);

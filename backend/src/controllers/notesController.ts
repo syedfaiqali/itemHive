@@ -1,12 +1,13 @@
 import { Response } from 'express';
 import StickyNote from '../models/StickyNote';
 import type { AuthRequest } from '../middleware/auth';
+import { buildTenantFilter, getTenantObjectId } from '../utils/tenancy';
 
 const sanitizeText = (value: unknown) => String(value ?? '').trim();
 
 export const getNotes = async (req: AuthRequest, res: Response) => {
     try {
-        const notes = await StickyNote.find({ user: req.user?.id }).sort({ pinned: -1, updatedAt: -1 });
+        const notes = await StickyNote.find({ user: req.user?.id, ...buildTenantFilter(req.user!) }).sort({ pinned: -1, updatedAt: -1 });
         return res.json(notes);
     } catch (error: any) {
         return res.status(500).json({ message: error.message || 'Failed to fetch notes' });
@@ -29,6 +30,7 @@ export const createNote = async (req: AuthRequest, res: Response) => {
             body,
             color,
             pinned: Boolean(req.body.pinned),
+            businessId: getTenantObjectId(req.user!),
         });
 
         return res.status(201).json(note);
@@ -64,7 +66,7 @@ export const updateNote = async (req: AuthRequest, res: Response) => {
         }
 
         const note = await StickyNote.findOneAndUpdate(
-            { _id: id, user: req.user?.id },
+            { _id: id, user: req.user?.id, ...buildTenantFilter(req.user!) },
             { $set: updates },
             { new: true }
         );
@@ -82,7 +84,7 @@ export const updateNote = async (req: AuthRequest, res: Response) => {
 export const deleteNote = async (req: AuthRequest, res: Response) => {
     try {
         const { id } = req.params;
-        const note = await StickyNote.findOneAndDelete({ _id: id, user: req.user?.id });
+        const note = await StickyNote.findOneAndDelete({ _id: id, user: req.user?.id, ...buildTenantFilter(req.user!) });
         if (!note) {
             return res.status(404).json({ message: 'Note not found' });
         }

@@ -13,6 +13,7 @@ export interface IUser extends Document {
     installmentAccess: boolean;
     userCreationLimit: number;
     createdBy?: mongoose.Types.ObjectId;
+    businessId?: mongoose.Types.ObjectId;
     preferences: {
         country: 'PK' | 'US' | 'DE' | 'GB' | 'CH' | 'CD' | 'CG' | 'IN' | 'AE';
         currency: 'USD' | 'EUR' | 'GBP' | 'CHF' | 'CDF' | 'XAF' | 'PKR' | 'INR' | 'AED';
@@ -35,6 +36,7 @@ const UserSchema: Schema = new Schema({
     installmentAccess: { type: Boolean, default: false },
     userCreationLimit: { type: Number, default: 0, min: 0 },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+    businessId: { type: Schema.Types.ObjectId, ref: 'Business', default: null, index: true },
     preferences: {
         country: { type: String, enum: ['PK', 'US', 'DE', 'GB', 'CH', 'CD', 'CG', 'IN', 'AE'], default: 'PK' },
         currency: { type: String, enum: ['USD', 'EUR', 'GBP', 'CHF', 'CDF', 'XAF', 'PKR', 'INR', 'AED'], default: 'PKR' },

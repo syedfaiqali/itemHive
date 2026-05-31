@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
 import https from 'https';
 import Product from '../models/Product';
+import type { AuthRequest } from '../middleware/auth';
+import { buildTenantFilter, getTenantObjectId } from '../utils/tenancy';
 
 interface OpenFoodFactsProduct {
     code?: string;
@@ -405,18 +407,18 @@ const fetchSourceSuggestions = async (
         .filter((suggestion): suggestion is ProductImageSuggestion => Boolean(suggestion));
 };
 
-export const getProducts = async (req: Request, res: Response) => {
+export const getProducts = async (req: AuthRequest, res: Response) => {
     try {
-        const products = await Product.find().sort({ name: 1 });
+        const products = await Product.find(buildTenantFilter(req.user!)).sort({ name: 1 });
         res.json(products);
     } catch (error: any) {
         res.status(500).json({ message: error.message });
     }
 };
 
-export const getProductById = async (req: Request, res: Response) => {
+export const getProductById = async (req: AuthRequest, res: Response) => {
     try {
-        const product = await Product.findOne({ id: req.params.id });
+        const product = await Product.findOne({ id: req.params.id, ...buildTenantFilter(req.user!) });
         if (!product) return res.status(404).json({ message: 'Product not found' });
         res.json(product);
     } catch (error: any) {
@@ -483,11 +485,12 @@ export const getProductImageSuggestions = async (req: Request, res: Response) =>
     }
 };
 
-export const createProduct = async (req: Request, res: Response) => {
+export const createProduct = async (req: AuthRequest, res: Response) => {
     try {
         const product = new Product({
             ...req.body,
             price: req.body.salePrice ?? req.body.price,
+            businessId: getTenantObjectId(req.user!),
         });
         const savedProduct = await product.save();
         res.status(201).json(savedProduct);
@@ -496,10 +499,10 @@ export const createProduct = async (req: Request, res: Response) => {
     }
 };
 
-export const updateProduct = async (req: Request, res: Response) => {
+export const updateProduct = async (req: AuthRequest, res: Response) => {
     try {
         const updatedProduct = await Product.findOneAndUpdate(
-            { id: req.params.id },
+            { id: req.params.id, ...buildTenantFilter(req.user!) },
             {
                 ...req.body,
                 price: req.body.salePrice ?? req.body.price,
@@ -513,9 +516,9 @@ export const updateProduct = async (req: Request, res: Response) => {
     }
 };
 
-export const deleteProduct = async (req: Request, res: Response) => {
+export const deleteProduct = async (req: AuthRequest, res: Response) => {
     try {
-        const deletedProduct = await Product.findOneAndDelete({ id: req.params.id });
+        const deletedProduct = await Product.findOneAndDelete({ id: req.params.id, ...buildTenantFilter(req.user!) });
         if (!deletedProduct) return res.status(404).json({ message: 'Product not found' });
         res.json({ message: 'Product deleted successfully' });
     } catch (error: any) {

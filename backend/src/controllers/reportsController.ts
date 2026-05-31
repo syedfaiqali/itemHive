@@ -1,6 +1,8 @@
 import type { Request, Response } from 'express';
 import Transaction from '../models/Transaction';
 import Product from '../models/Product';
+import type { AuthRequest } from '../middleware/auth';
+import { buildTenantFilter } from '../utils/tenancy';
 
 const startOfDay = (value: Date) => {
     const date = new Date(value);
@@ -45,7 +47,7 @@ const resolveReportRange = (query: Request['query']) => {
     return { period, dateLimit, endDate: endOfDay(new Date()) };
 };
 
-export const getSalesTrend = async (req: Request, res: Response) => {
+export const getSalesTrend = async (req: AuthRequest, res: Response) => {
     try {
         const { period, dateLimit, endDate } = resolveReportRange(req.query);
         const groupFormat = period === 'yearly' ? '%Y-%m' : '%Y-%m-%d';
@@ -53,6 +55,7 @@ export const getSalesTrend = async (req: Request, res: Response) => {
         const stats = await Transaction.aggregate([
             {
                 $match: {
+                    ...buildTenantFilter(req.user!),
                     timestamp: { $gte: dateLimit, $lte: endDate },
                     type: 'reduction'
                 }
@@ -74,9 +77,10 @@ export const getSalesTrend = async (req: Request, res: Response) => {
     }
 };
 
-export const getCategoryValuation = async (req: Request, res: Response) => {
+export const getCategoryValuation = async (req: AuthRequest, res: Response) => {
     try {
         const valuation = await Product.aggregate([
+            { $match: buildTenantFilter(req.user!) },
             {
                 $group: {
                     _id: '$category',
@@ -92,12 +96,13 @@ export const getCategoryValuation = async (req: Request, res: Response) => {
     }
 };
 
-export const getTopSellingProducts = async (req: Request, res: Response) => {
+export const getTopSellingProducts = async (req: AuthRequest, res: Response) => {
     try {
         const { dateLimit, endDate } = resolveReportRange(req.query);
         const topSelling = await Transaction.aggregate([
             {
                 $match: {
+                    ...buildTenantFilter(req.user!),
                     type: 'reduction',
                     timestamp: { $gte: dateLimit, $lte: endDate }
                 }
