@@ -1,4 +1,5 @@
 import React from 'react';
+import axios from 'axios';
 import {
     Alert,
     Box,
@@ -9,7 +10,9 @@ import {
     DialogActions,
     DialogContent,
     DialogTitle,
+    IconButton,
     InputAdornment,
+    MenuItem,
     Snackbar,
     Stack,
     Switch,
@@ -23,11 +26,10 @@ import {
     TextField,
     Typography,
 } from '@mui/material';
-import { Edit3, Search, ShieldCheck, UserPlus, Users } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Edit3, Eye, EyeOff, Search, ShieldCheck, UserPlus, Users } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../../store';
-import type { User } from '../../features/auth/authSlice';
+import type { User, UserRole } from '../../features/auth/authSlice';
 import api from '../../api/axios';
 
 interface UsersPage {
@@ -37,6 +39,11 @@ interface UsersPage {
 
 type UsersResponse = UsersPage | User[];
 
+interface ApiErrorResponse {
+    message?: string;
+    details?: string;
+}
+
 interface AccountDraft {
     name: string;
     email: string;
@@ -44,11 +51,23 @@ interface AccountDraft {
     userCreationLimit: string;
 }
 
+interface CreateAccountDraft {
+    name: string;
+    email: string;
+    password: string;
+    role: UserRole;
+    businessName: string;
+}
+
 const roleLabel = (role: User['role']) =>
     role === 'super_admin' ? 'Super Admin' : role === 'admin' ? 'Admin' : 'User';
 
+const getApiErrorMessage = (error: unknown, fallback: string) => {
+    if (!axios.isAxiosError<ApiErrorResponse>(error)) return fallback;
+    return error.response?.data?.message || error.response?.data?.details || fallback;
+};
+
 const TeamManagementPage: React.FC = () => {
-    const navigate = useNavigate();
     const { user: currentUser } = useSelector((state: RootState) => state.auth);
     const isSuperAdmin = currentUser?.role === 'super_admin';
     const [users, setUsers] = React.useState<User[]>([]);
@@ -60,6 +79,17 @@ const TeamManagementPage: React.FC = () => {
     const [total, setTotal] = React.useState(0);
     const [editingUser, setEditingUser] = React.useState<User | null>(null);
     const [draft, setDraft] = React.useState<AccountDraft>({ name: '', email: '', password: '', userCreationLimit: '0' });
+    const [showPassword, setShowPassword] = React.useState(false);
+    const [createDialogOpen, setCreateDialogOpen] = React.useState(false);
+    const [createSaving, setCreateSaving] = React.useState(false);
+    const [showCreatePassword, setShowCreatePassword] = React.useState(false);
+    const [createDraft, setCreateDraft] = React.useState<CreateAccountDraft>({
+        name: '',
+        email: '',
+        password: '',
+        role: isSuperAdmin ? 'admin' : 'user',
+        businessName: '',
+    });
     const [snack, setSnack] = React.useState('');
     const [error, setError] = React.useState('');
 
@@ -74,8 +104,8 @@ const TeamManagementPage: React.FC = () => {
             const nextUsers = Array.isArray(response.data) ? response.data : response.data.users || [];
             setUsers(nextUsers);
             setTotal(Array.isArray(response.data) ? nextUsers.length : response.data.total || 0);
-        } catch (requestError: any) {
-            setError(requestError?.response?.data?.message || 'Unable to load team members right now.');
+        } catch (requestError: unknown) {
+            setError(getApiErrorMessage(requestError, 'Unable to load team members right now.'));
         } finally {
             setLoading(false);
         }
@@ -92,14 +122,15 @@ const TeamManagementPage: React.FC = () => {
             await api.patch(`/users/${target.id}/status`, updates);
             await loadUsers();
             setSnack('Account updated successfully.');
-        } catch (requestError: any) {
-            setError(requestError?.response?.data?.message || 'Unable to update this account.');
+        } catch (requestError: unknown) {
+            setError(getApiErrorMessage(requestError, 'Unable to update this account.'));
         } finally {
             setSavingId('');
         }
     };
 
     const openEditDialog = (target: User) => {
+        setShowPassword(false);
         setEditingUser(target);
         setDraft({
             name: target.name,
@@ -107,6 +138,41 @@ const TeamManagementPage: React.FC = () => {
             password: '',
             userCreationLimit: String(target.userCreationLimit ?? 0),
         });
+    };
+
+    const openCreateDialog = () => {
+        setShowCreatePassword(false);
+        setCreateDraft({
+            name: '',
+            email: '',
+            password: '',
+            role: isSuperAdmin ? 'admin' : 'user',
+            businessName: '',
+        });
+        setCreateDialogOpen(true);
+    };
+
+    const createAccount = async (event: React.FormEvent) => {
+        event.preventDefault();
+        setCreateSaving(true);
+        setError('');
+
+        try {
+            await api.post('/auth/register', {
+                name: createDraft.name,
+                email: createDraft.email,
+                password: createDraft.password,
+                role: createDraft.role,
+                businessName: isSuperAdmin && createDraft.role === 'admin' ? createDraft.businessName : undefined,
+            });
+            setCreateDialogOpen(false);
+            await loadUsers();
+            setSnack('Account created successfully.');
+        } catch (requestError: unknown) {
+            setError(getApiErrorMessage(requestError, 'Unable to create this account.'));
+        } finally {
+            setCreateSaving(false);
+        }
     };
 
     const saveAccount = async () => {
@@ -127,8 +193,8 @@ const TeamManagementPage: React.FC = () => {
             setEditingUser(null);
             await loadUsers();
             setSnack('Account details updated successfully.');
-        } catch (requestError: any) {
-            setError(requestError?.response?.data?.message || requestError?.response?.data?.details || 'Unable to update this account.');
+        } catch (requestError: unknown) {
+            setError(getApiErrorMessage(requestError, 'Unable to update this account.'));
         } finally {
             setSavingId('');
         }
@@ -149,7 +215,7 @@ const TeamManagementPage: React.FC = () => {
                             : `You can create users up to your assigned limit of ${currentUser?.userCreationLimit ?? 0}.`}
                     </Typography>
                 </Box>
-                <Button variant="contained" startIcon={<UserPlus size={18} />} onClick={() => navigate('/signup')} sx={{ borderRadius: 2, fontWeight: 800 }}>
+                <Button variant="contained" startIcon={<UserPlus size={18} />} onClick={openCreateDialog} sx={{ borderRadius: 2, fontWeight: 800 }}>
                     {isSuperAdmin ? 'Create Account' : 'Add User'}
                 </Button>
             </Box>
@@ -159,6 +225,9 @@ const TeamManagementPage: React.FC = () => {
             <TextField
                 fullWidth
                 size="small"
+                type="search"
+                name="team-account-search"
+                autoComplete="off"
                 value={search}
                 onChange={(event) => {
                     setSearch(event.target.value);
@@ -244,13 +313,118 @@ const TeamManagementPage: React.FC = () => {
                 />
             </TableContainer>
 
+            <Dialog open={createDialogOpen} onClose={() => !createSaving && setCreateDialogOpen(false)} fullWidth maxWidth="sm">
+                <DialogTitle>{isSuperAdmin ? 'Create Account' : 'Add User'}</DialogTitle>
+                <Box component="form" onSubmit={createAccount}>
+                    <DialogContent>
+                        <Stack spacing={2} sx={{ pt: 1 }}>
+                            <TextField
+                                label="Full Name"
+                                name="new-account-name"
+                                autoComplete="off"
+                                value={createDraft.name}
+                                onChange={(event) => setCreateDraft({ ...createDraft, name: event.target.value })}
+                                required
+                                disabled={createSaving}
+                            />
+                            <TextField
+                                label="Login Email / ID"
+                                name="new-account-email"
+                                type="email"
+                                autoComplete="off"
+                                value={createDraft.email}
+                                onChange={(event) => setCreateDraft({ ...createDraft, email: event.target.value })}
+                                required
+                                disabled={createSaving}
+                            />
+                            <TextField
+                                select
+                                label="Role"
+                                value={createDraft.role}
+                                onChange={(event) => setCreateDraft({ ...createDraft, role: event.target.value as UserRole })}
+                                required
+                                disabled={createSaving || !isSuperAdmin}
+                            >
+                                {isSuperAdmin && <MenuItem value="admin">Administrator</MenuItem>}
+                                {isSuperAdmin && <MenuItem value="super_admin">Super Admin</MenuItem>}
+                                <MenuItem value="user">User</MenuItem>
+                            </TextField>
+                            {isSuperAdmin && createDraft.role === 'admin' && (
+                                <TextField
+                                    label="Shop Name"
+                                    name="new-account-shop"
+                                    autoComplete="off"
+                                    value={createDraft.businessName}
+                                    onChange={(event) => setCreateDraft({ ...createDraft, businessName: event.target.value })}
+                                    helperText="A separate workspace will be created for this shop."
+                                    required
+                                    disabled={createSaving}
+                                />
+                            )}
+                            <TextField
+                                label="Password"
+                                name="new-account-password"
+                                type={showCreatePassword ? 'text' : 'password'}
+                                autoComplete="new-password"
+                                value={createDraft.password}
+                                onChange={(event) => setCreateDraft({ ...createDraft, password: event.target.value })}
+                                required
+                                disabled={createSaving}
+                                InputProps={{
+                                    endAdornment: (
+                                        <InputAdornment position="end">
+                                            <IconButton
+                                                onClick={() => setShowCreatePassword((visible) => !visible)}
+                                                edge="end"
+                                                size="small"
+                                                aria-label={showCreatePassword ? 'Hide password' : 'Show password'}
+                                            >
+                                                {showCreatePassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                            </IconButton>
+                                        </InputAdornment>
+                                    ),
+                                }}
+                            />
+                        </Stack>
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={() => setCreateDialogOpen(false)} disabled={createSaving}>Cancel</Button>
+                        <Button type="submit" variant="contained" disabled={createSaving}>
+                            {createSaving ? 'Creating...' : 'Create Account'}
+                        </Button>
+                    </DialogActions>
+                </Box>
+            </Dialog>
+
             <Dialog open={Boolean(editingUser)} onClose={() => setEditingUser(null)} fullWidth maxWidth="sm">
                 <DialogTitle>Edit Account</DialogTitle>
                 <DialogContent>
                     <Stack spacing={2} sx={{ pt: 1 }}>
-                        <TextField label="Full Name" value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} required />
-                        <TextField label="Login Email / ID" type="email" value={draft.email} onChange={(event) => setDraft({ ...draft, email: event.target.value })} required />
-                        <TextField label="New Password" type="password" value={draft.password} onChange={(event) => setDraft({ ...draft, password: event.target.value })} helperText="Leave blank to keep the existing password." />
+                        <TextField label="Full Name" name="account-name" autoComplete="off" value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} required />
+                        <TextField label="Login Email / ID" name="account-email" type="email" autoComplete="off" value={draft.email} onChange={(event) => setDraft({ ...draft, email: event.target.value })} required />
+                        <TextField
+                            label="New Password"
+                            name="new-password"
+                            type={showPassword ? 'text' : 'password'}
+                            autoComplete="new-password"
+                            value={draft.password}
+                            onChange={(event) => setDraft({ ...draft, password: event.target.value })}
+                            helperText="Leave blank to keep the existing password."
+                            InputProps={{
+                                endAdornment: (
+                                    <InputAdornment position="end">
+                                        <IconButton
+                                            onClick={() => setShowPassword((visible) => !visible)}
+                                            edge="end"
+                                            size="small"
+                                            aria-label={showPassword ? 'Hide password' : 'Show password'}
+                                        >
+                                            {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                        </IconButton>
+                                    </InputAdornment>
+                                ),
+                            }}
+                        />
                         {editingUser?.role === 'admin' && (
                             <TextField label="User Creation Limit" type="number" value={draft.userCreationLimit} onChange={(event) => setDraft({ ...draft, userCreationLimit: event.target.value })} inputProps={{ min: 0 }} />
                         )}

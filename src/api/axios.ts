@@ -1,7 +1,11 @@
 import axios from 'axios';
 
+const defaultApiUrl = import.meta.env.DEV
+    ? 'http://localhost:5050/api'
+    : 'https://itemhive-8552.onrender.com/api';
+
 const api = axios.create({
-    baseURL: import.meta.env.VITE_API_URL || 'https://itemhive-8552.onrender.com/api',
+    baseURL: import.meta.env.VITE_API_URL || defaultApiUrl,
     headers: {
         'Content-Type': 'application/json'
     }
