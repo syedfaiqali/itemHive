@@ -23,6 +23,7 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const deploymentCommit = process.env.RENDER_GIT_COMMIT || process.env.GIT_COMMIT || 'local';
 
 const configuredOrigins = process.env.CLIENT_URL
     ? process.env.CLIENT_URL.split(',').map((origin) => origin.trim()).filter(Boolean)
@@ -77,8 +78,9 @@ app.get('/', (_req: Request, res: Response) => {
         status: 'success',
         message: 'ItemHive Pro API is online 🚀',
         version: '1.0.0',
+        commit: deploymentCommit,
         environment: process.env.NODE_ENV || 'development',
-        endpoints: ['/api/auth', '/api/products', '/api/transactions', '/api/reports']
+        endpoints: ['/api/auth', '/api/products', '/api/transactions', '/api/reports', '/api/users']
     });
 });
 
@@ -87,6 +89,7 @@ app.get('/health', (_req: Request, res: Response) => {
     res.status(200).json({
         status: 'healthy',
         database: dbStatus,
+        commit: deploymentCommit,
         timestamp: new Date().toISOString()
     });
 });
