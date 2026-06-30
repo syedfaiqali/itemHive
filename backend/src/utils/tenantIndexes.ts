@@ -7,6 +7,7 @@ import InventoryRequest from '../models/InventoryRequest';
 import StickyNote from '../models/StickyNote';
 import User from '../models/User';
 import AppSetting from '../models/AppSetting';
+import Business from '../models/Business';
 import { ensureLegacyBusiness } from './tenancy';
 
 const dropLegacyIndex = async (model: Model<unknown>, indexName: string) => {
@@ -36,6 +37,19 @@ export const ensureTenantIndexes = async () => {
         User.updateMany(missingBusiness, legacyBusinessUpdate),
         AppSetting.updateMany(missingBusiness, legacyBusinessUpdate),
     ]);
+
+    const businesses = await Business.find().select('_id name');
+    await Promise.all(
+        businesses.map((business) =>
+            Product.updateMany(
+                {
+                    businessId: business._id,
+                    $or: [{ businessName: { $exists: false } }, { businessName: '' }, { businessName: null }],
+                },
+                { $set: { businessName: business.name } }
+            )
+        )
+    );
 
     await dropLegacyIndex(Product, 'id_1');
     await dropLegacyIndex(Product, 'sku_1');

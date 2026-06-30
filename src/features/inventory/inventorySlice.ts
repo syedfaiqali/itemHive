@@ -18,6 +18,7 @@ export interface Product {
     batchNumber?: string;
     expiryDate?: string;
     supplier?: string;
+    businessName?: string;
 }
 
 export interface ProductImageSuggestion {

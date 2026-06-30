@@ -15,6 +15,9 @@ export interface User {
     installmentAccess?: boolean;
     userCreationLimit?: number;
     businessId?: string;
+    businessName?: string;
+    createdBy?: string;
+    visiblePassword?: string;
     preferences?: {
         country: 'PK' | 'US' | 'DE' | 'GB' | 'CH' | 'CD' | 'CG' | 'IN' | 'AE';
         currency: 'USD' | 'EUR' | 'GBP' | 'CHF' | 'CDF' | 'XAF' | 'PKR' | 'INR' | 'AED';

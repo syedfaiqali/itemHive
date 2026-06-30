@@ -491,6 +491,7 @@ export const createProduct = async (req: AuthRequest, res: Response) => {
             ...req.body,
             price: req.body.salePrice ?? req.body.price,
             businessId: getTenantObjectId(req.user!),
+            businessName: req.user?.businessName || '',
         });
         const savedProduct = await product.save();
         res.status(201).json(savedProduct);

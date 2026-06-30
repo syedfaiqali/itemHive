@@ -26,7 +26,7 @@ import {
     TextField,
     Typography,
 } from '@mui/material';
-import { Edit3, Eye, EyeOff, Search, ShieldCheck, UserPlus, Users } from 'lucide-react';
+import { Edit3, Eye, EyeOff, Search, ShieldCheck, Trash2, UserPlus, Users } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../../store';
 import type { User, UserRole } from '../../features/auth/authSlice';
@@ -48,6 +48,8 @@ interface AccountDraft {
     name: string;
     email: string;
     password: string;
+    role: UserRole;
+    businessId: string;
     userCreationLimit: string;
 }
 
@@ -56,7 +58,14 @@ interface CreateAccountDraft {
     email: string;
     password: string;
     role: UserRole;
+    businessId: string;
     businessName: string;
+}
+
+interface BusinessOption {
+    id: string;
+    name: string;
+    isLegacy?: boolean;
 }
 
 const roleLabel = (role: User['role']) =>
@@ -71,6 +80,7 @@ const TeamManagementPage: React.FC = () => {
     const { user: currentUser } = useSelector((state: RootState) => state.auth);
     const isSuperAdmin = currentUser?.role === 'super_admin';
     const [users, setUsers] = React.useState<User[]>([]);
+    const [businesses, setBusinesses] = React.useState<BusinessOption[]>([]);
     const [loading, setLoading] = React.useState(true);
     const [savingId, setSavingId] = React.useState('');
     const [search, setSearch] = React.useState('');
@@ -78,16 +88,19 @@ const TeamManagementPage: React.FC = () => {
     const [rowsPerPage, setRowsPerPage] = React.useState(20);
     const [total, setTotal] = React.useState(0);
     const [editingUser, setEditingUser] = React.useState<User | null>(null);
-    const [draft, setDraft] = React.useState<AccountDraft>({ name: '', email: '', password: '', userCreationLimit: '0' });
+    const [deletingUser, setDeletingUser] = React.useState<User | null>(null);
+    const [draft, setDraft] = React.useState<AccountDraft>({ name: '', email: '', password: '', role: 'user', businessId: '', userCreationLimit: '0' });
     const [showPassword, setShowPassword] = React.useState(false);
     const [createDialogOpen, setCreateDialogOpen] = React.useState(false);
     const [createSaving, setCreateSaving] = React.useState(false);
+    const [deleteSaving, setDeleteSaving] = React.useState(false);
     const [showCreatePassword, setShowCreatePassword] = React.useState(false);
     const [createDraft, setCreateDraft] = React.useState<CreateAccountDraft>({
         name: '',
         email: '',
         password: '',
         role: isSuperAdmin ? 'admin' : 'user',
+        businessId: '',
         businessName: '',
     });
     const [snack, setSnack] = React.useState('');
@@ -116,6 +129,24 @@ const TeamManagementPage: React.FC = () => {
         return () => window.clearTimeout(timeoutId);
     }, [loadUsers]);
 
+    const loadBusinesses = React.useCallback(async () => {
+        if (!isSuperAdmin) {
+            setBusinesses([]);
+            return;
+        }
+
+        try {
+            const response = await api.get<BusinessOption[]>('/users/businesses');
+            setBusinesses(response.data || []);
+        } catch {
+            setBusinesses([]);
+        }
+    }, [isSuperAdmin]);
+
+    React.useEffect(() => {
+        loadBusinesses();
+    }, [loadBusinesses]);
+
     const handleStatusChange = async (target: User, updates: { isActive?: boolean; isVisible?: boolean; installmentAccess?: boolean }) => {
         setSavingId(target.id);
         try {
@@ -135,7 +166,9 @@ const TeamManagementPage: React.FC = () => {
         setDraft({
             name: target.name,
             email: target.email,
-            password: '',
+            password: target.visiblePassword || '',
+            role: target.role,
+            businessId: target.businessId || '',
             userCreationLimit: String(target.userCreationLimit ?? 0),
         });
     };
@@ -147,6 +180,7 @@ const TeamManagementPage: React.FC = () => {
             email: '',
             password: '',
             role: isSuperAdmin ? 'admin' : 'user',
+            businessId: '',
             businessName: '',
         });
         setCreateDialogOpen(true);
@@ -163,10 +197,13 @@ const TeamManagementPage: React.FC = () => {
                 email: createDraft.email,
                 password: createDraft.password,
                 role: createDraft.role,
-                businessName: isSuperAdmin && createDraft.role === 'admin' ? createDraft.businessName : undefined,
+                businessId: isSuperAdmin && createDraft.businessId !== '__new__' ? createDraft.businessId : undefined,
+                businessName: isSuperAdmin && createDraft.businessId === '__new__' ? createDraft.businessName : undefined,
             });
             setCreateDialogOpen(false);
             await loadUsers();
+            await loadBusinesses();
+            window.dispatchEvent(new Event('itemhive-team-updated'));
             setSnack('Account created successfully.');
         } catch (requestError: unknown) {
             setError(getApiErrorMessage(requestError, 'Unable to create this account.'));
@@ -184,19 +221,41 @@ const TeamManagementPage: React.FC = () => {
                 name: draft.name,
                 email: draft.email,
                 password: draft.password,
+                role: draft.role,
+                businessId: draft.businessId,
             });
-            if (editingUser.role === 'admin') {
+            if (draft.role === 'admin') {
                 await api.patch(`/users/${editingUser.id}/limit`, {
                     userCreationLimit: Number(draft.userCreationLimit || 0),
                 });
             }
             setEditingUser(null);
             await loadUsers();
+            window.dispatchEvent(new Event('itemhive-team-updated'));
             setSnack('Account details updated successfully.');
         } catch (requestError: unknown) {
             setError(getApiErrorMessage(requestError, 'Unable to update this account.'));
         } finally {
             setSavingId('');
+        }
+    };
+
+    const deleteAccount = async () => {
+        if (!deletingUser) return;
+
+        setDeleteSaving(true);
+        setError('');
+
+        try {
+            await api.delete(`/users/${deletingUser.id}`);
+            setDeletingUser(null);
+            await loadUsers();
+            window.dispatchEvent(new Event('itemhive-team-updated'));
+            setSnack('Account deleted successfully.');
+        } catch (requestError: unknown) {
+            setError(getApiErrorMessage(requestError, 'Unable to delete this account.'));
+        } finally {
+            setDeleteSaving(false);
         }
     };
 
@@ -243,6 +302,7 @@ const TeamManagementPage: React.FC = () => {
                     <TableHead>
                         <TableRow>
                             <TableCell>Account</TableCell>
+                            <TableCell>Business</TableCell>
                             <TableCell>Role</TableCell>
                             <TableCell align="center">Active</TableCell>
                             <TableCell align="center">Visible</TableCell>
@@ -254,17 +314,25 @@ const TeamManagementPage: React.FC = () => {
                     <TableBody>
                         {loading && (
                             <TableRow>
-                                <TableCell colSpan={7} align="center" sx={{ py: 8 }}><CircularProgress size={30} /></TableCell>
+                                <TableCell colSpan={8} align="center" sx={{ py: 8 }}><CircularProgress size={30} /></TableCell>
                             </TableRow>
                         )}
                         {!loading && users.map((teamUser) => {
                             const isBusy = savingId === teamUser.id;
                             const isManageable = isSuperAdmin && teamUser.role !== 'super_admin';
+                            const canDelete = teamUser.id !== currentUser?.id && (
+                                isSuperAdmin
+                                    ? teamUser.role !== 'super_admin'
+                                    : teamUser.role === 'user'
+                            );
                             return (
                                 <TableRow key={teamUser.id} hover>
                                     <TableCell>
                                         <Typography variant="body2" fontWeight={800}>{teamUser.name}</Typography>
                                         <Typography variant="caption" color="text.secondary">{teamUser.email}</Typography>
+                                    </TableCell>
+                                    <TableCell>
+                                        <Typography variant="body2" fontWeight={800}>{teamUser.businessName || '-'}</Typography>
                                     </TableCell>
                                     <TableCell>
                                         <Chip icon={<ShieldCheck size={14} />} label={roleLabel(teamUser.role)} color={teamUser.role === 'user' ? 'default' : 'primary'} size="small" />
@@ -280,18 +348,32 @@ const TeamManagementPage: React.FC = () => {
                                     </TableCell>
                                     <TableCell align="center">{teamUser.role === 'admin' ? teamUser.userCreationLimit ?? 0 : '-'}</TableCell>
                                     <TableCell align="right">
-                                        {isManageable && (
-                                            <Button size="small" variant="outlined" startIcon={<Edit3 size={15} />} onClick={() => openEditDialog(teamUser)} disabled={isBusy}>
-                                                Edit
-                                            </Button>
-                                        )}
+                                        <Stack direction="row" spacing={1} justifyContent="flex-end">
+                                            {isManageable && (
+                                                <Button size="small" variant="outlined" startIcon={<Edit3 size={15} />} onClick={() => openEditDialog(teamUser)} disabled={isBusy}>
+                                                    Edit
+                                                </Button>
+                                            )}
+                                            {canDelete && (
+                                                <Button
+                                                    size="small"
+                                                    color="error"
+                                                    variant="outlined"
+                                                    startIcon={<Trash2 size={15} />}
+                                                    onClick={() => setDeletingUser(teamUser)}
+                                                    disabled={deleteSaving}
+                                                >
+                                                    Delete
+                                                </Button>
+                                            )}
+                                        </Stack>
                                     </TableCell>
                                 </TableRow>
                             );
                         })}
                         {!loading && !users.length && (
                             <TableRow>
-                                <TableCell colSpan={7} align="center" sx={{ py: 8 }}>
+                                <TableCell colSpan={8} align="center" sx={{ py: 8 }}>
                                     <Users size={34} style={{ opacity: 0.45, marginBottom: 8 }} />
                                     <Typography variant="body2" color="text.secondary">No matching accounts found.</Typography>
                                 </TableCell>
@@ -341,7 +423,7 @@ const TeamManagementPage: React.FC = () => {
                                 select
                                 label="Role"
                                 value={createDraft.role}
-                                onChange={(event) => setCreateDraft({ ...createDraft, role: event.target.value as UserRole })}
+                                onChange={(event) => setCreateDraft({ ...createDraft, role: event.target.value as UserRole, businessId: '' })}
                                 required
                                 disabled={createSaving || !isSuperAdmin}
                             >
@@ -349,7 +431,25 @@ const TeamManagementPage: React.FC = () => {
                                 {isSuperAdmin && <MenuItem value="super_admin">Super Admin</MenuItem>}
                                 <MenuItem value="user">User</MenuItem>
                             </TextField>
-                            {isSuperAdmin && createDraft.role === 'admin' && (
+                            {isSuperAdmin && createDraft.role !== 'super_admin' && (
+                                <TextField
+                                    select
+                                    label="Business"
+                                    value={createDraft.businessId}
+                                    onChange={(event) => setCreateDraft({ ...createDraft, businessId: event.target.value })}
+                                    helperText="Choose which shop/workspace this account belongs to."
+                                    required
+                                    disabled={createSaving}
+                                >
+                                    {createDraft.role === 'admin' && <MenuItem value="__new__">Create new business</MenuItem>}
+                                    {businesses.map((business) => (
+                                        <MenuItem key={business.id} value={business.id}>
+                                            {business.name}{business.isLegacy ? ' (Default)' : ''}
+                                        </MenuItem>
+                                    ))}
+                                </TextField>
+                            )}
+                            {isSuperAdmin && createDraft.businessId === '__new__' && (
                                 <TextField
                                     label="Shop Name"
                                     name="new-account-shop"
@@ -403,13 +503,40 @@ const TeamManagementPage: React.FC = () => {
                         <TextField label="Full Name" name="account-name" autoComplete="off" value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} required />
                         <TextField label="Login Email / ID" name="account-email" type="email" autoComplete="off" value={draft.email} onChange={(event) => setDraft({ ...draft, email: event.target.value })} required />
                         <TextField
-                            label="New Password"
+                            select
+                            label="Role"
+                            value={draft.role}
+                            onChange={(event) => setDraft({ ...draft, role: event.target.value as UserRole })}
+                            required
+                        >
+                            <MenuItem value="super_admin">Super Admin</MenuItem>
+                            <MenuItem value="admin">Administrator</MenuItem>
+                            <MenuItem value="user">User</MenuItem>
+                        </TextField>
+                        {draft.role !== 'super_admin' && (
+                            <TextField
+                                select
+                                label="Business"
+                                value={draft.businessId}
+                                onChange={(event) => setDraft({ ...draft, businessId: event.target.value })}
+                                helperText="Move this account to an existing shop/workspace."
+                                required
+                            >
+                                {businesses.map((business) => (
+                                    <MenuItem key={business.id} value={business.id}>
+                                        {business.name}{business.isLegacy ? ' (Default)' : ''}
+                                    </MenuItem>
+                                ))}
+                            </TextField>
+                        )}
+                        <TextField
+                            label="Password"
                             name="new-password"
                             type={showPassword ? 'text' : 'password'}
                             autoComplete="new-password"
                             value={draft.password}
                             onChange={(event) => setDraft({ ...draft, password: event.target.value })}
-                            helperText="Leave blank to keep the existing password."
+                            helperText={editingUser?.visiblePassword ? 'Use the eye icon to view or update this password.' : 'Old password is not available. Enter a new password to reset it.'}
                             InputProps={{
                                 endAdornment: (
                                     <InputAdornment position="end">
@@ -425,7 +552,7 @@ const TeamManagementPage: React.FC = () => {
                                 ),
                             }}
                         />
-                        {editingUser?.role === 'admin' && (
+                        {draft.role === 'admin' && (
                             <TextField label="User Creation Limit" type="number" value={draft.userCreationLimit} onChange={(event) => setDraft({ ...draft, userCreationLimit: event.target.value })} inputProps={{ min: 0 }} />
                         )}
                     </Stack>
@@ -433,6 +560,21 @@ const TeamManagementPage: React.FC = () => {
                 <DialogActions>
                     <Button onClick={() => setEditingUser(null)}>Cancel</Button>
                     <Button variant="contained" onClick={saveAccount} disabled={savingId === editingUser?.id}>Save Changes</Button>
+                </DialogActions>
+            </Dialog>
+
+            <Dialog open={Boolean(deletingUser)} onClose={() => !deleteSaving && setDeletingUser(null)} fullWidth maxWidth="xs">
+                <DialogTitle>Delete Account</DialogTitle>
+                <DialogContent>
+                    <Typography variant="body2" color="text.secondary">
+                        Delete {deletingUser?.name}? This account will no longer be able to log in.
+                    </Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setDeletingUser(null)} disabled={deleteSaving}>Cancel</Button>
+                    <Button color="error" variant="contained" onClick={deleteAccount} disabled={deleteSaving}>
+                        {deleteSaving ? 'Deleting...' : 'Delete'}
+                    </Button>
                 </DialogActions>
             </Dialog>
         </Box>

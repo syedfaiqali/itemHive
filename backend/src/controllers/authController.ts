@@ -14,7 +14,7 @@ const signToken = (id: string, role: string) => jwt.sign(
 
 export const register = async (req: AuthRequest, res: Response) => {
     try {
-        const { name, email, password, role, businessName } = req.body;
+        const { name, email, password, role, businessName, businessId: requestedBusinessId } = req.body;
         const normalizedEmail = String(email || '').trim().toLowerCase();
         const requestedRole = normalizeRole(role);
 
@@ -63,7 +63,13 @@ export const register = async (req: AuthRequest, res: Response) => {
                 assignedRole = 'user';
             }
 
-            if (actorRole === 'super_admin' && assignedRole === 'admin') {
+            if (actorRole === 'super_admin' && requestedBusinessId) {
+                const business = await Business.findById(requestedBusinessId);
+                if (!business || !business.isActive) {
+                    return res.status(400).json({ message: 'Selected business was not found or is inactive' });
+                }
+                businessId = business._id;
+            } else if (actorRole === 'super_admin' && assignedRole === 'admin') {
                 const business = await Business.create({
                     name: String(businessName || `${name}'s Store`).trim(),
                     slug: `store-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -73,7 +79,7 @@ export const register = async (req: AuthRequest, res: Response) => {
             }
         }
 
-        const user = new User({ name, email: normalizedEmail, password, role: assignedRole, createdBy, businessId });
+        const user = new User({ name, email: normalizedEmail, password, visiblePassword: password, role: assignedRole, createdBy, businessId });
         await user.save();
 
         const token = signToken(String(user._id), user.role);

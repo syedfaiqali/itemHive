@@ -18,6 +18,10 @@ api.interceptors.request.use(
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }
+        const selectedWorkspaceId = localStorage.getItem('itemhive-workspace-id');
+        if (selectedWorkspaceId) {
+            config.headers['x-itemhive-workspace-id'] = selectedWorkspaceId;
+        }
         return config;
     },
     (error) => {

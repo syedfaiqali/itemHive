@@ -10,7 +10,9 @@ import {
     MenuItem,
     Tooltip,
     Badge,
-    Button
+    Button,
+    TextField,
+    Chip
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import {
@@ -22,22 +24,37 @@ import {
     Settings,
     LogOut,
     Sparkles,
-    ChevronRight
+    ChevronRight,
+    Building2
 } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState } from '../../store';
 import { logout } from '../../features/auth/authSlice';
 import { toggleDarkMode, setDarkMode } from '../../features/theme/themeSlice';
+import { fetchProducts } from '../../features/inventory/inventorySlice';
 import { useLocation, useNavigate } from 'react-router-dom';
 import api from '../../api/axios';
 import { buildNotifications, type InstallmentNotificationPlan, type NotificationItem } from '../../lib/notifications';
+import type { AppDispatch } from '../../store';
 
 interface NavbarProps {
     onMenuClick: () => void;
 }
 
+interface WorkspaceOption {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+    businessId: string;
+    businessName?: string;
+}
+
+const formatRoleLabel = (role?: string) =>
+    role === 'super_admin' ? 'Super Admin' : role === 'admin' ? 'Administrator' : 'Team User';
+
 const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
-    const dispatch = useDispatch();
+    const dispatch = useDispatch<AppDispatch>();
     const navigate = useNavigate();
     const location = useLocation();
     const theme = useTheme();
@@ -51,11 +68,9 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
     const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
     const [notifAnchorEl, setNotifAnchorEl] = React.useState<null | HTMLElement>(null);
     const [installmentPlans, setInstallmentPlans] = React.useState<InstallmentNotificationPlan[]>([]);
-    const roleLabel = user?.role === 'super_admin'
-        ? 'Super Admin'
-        : user?.role === 'admin'
-            ? 'Administrator'
-            : 'Team User';
+    const [workspaceOptions, setWorkspaceOptions] = React.useState<WorkspaceOption[]>([]);
+    const [selectedWorkspaceId, setSelectedWorkspaceId] = React.useState(() => localStorage.getItem('itemhive-workspace-id') || '');
+    const roleLabel = formatRoleLabel(user?.role);
 
     const drawerWidth = 260;
     const collapsedWidth = 80;
@@ -95,6 +110,43 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
         window.addEventListener('itemhive-installments-updated', loadInstallmentNotifications);
         return () => window.removeEventListener('itemhive-installments-updated', loadInstallmentNotifications);
     }, [canAccessInstallments, location.pathname]);
+
+    React.useEffect(() => {
+        const loadWorkspaceOptions = async () => {
+            if (user?.role !== 'super_admin') {
+                setWorkspaceOptions([]);
+                return;
+            }
+
+            try {
+                const response = await api.get('/users', { params: { page: 1, limit: 100 } });
+                const users = Array.isArray(response.data) ? response.data : response.data.users || [];
+                setWorkspaceOptions(users.filter((entry: WorkspaceOption) => Boolean(entry.businessId)));
+            } catch {
+                setWorkspaceOptions([]);
+            }
+        };
+
+        loadWorkspaceOptions();
+        window.addEventListener('itemhive-team-updated', loadWorkspaceOptions);
+        return () => window.removeEventListener('itemhive-team-updated', loadWorkspaceOptions);
+    }, [user?.role]);
+
+    const selectedWorkspace = React.useMemo(
+        () => workspaceOptions.find((option) => option.businessId === selectedWorkspaceId),
+        [selectedWorkspaceId, workspaceOptions]
+    );
+
+    const handleWorkspaceChange = (businessId: string) => {
+        setSelectedWorkspaceId(businessId);
+        if (businessId) {
+            localStorage.setItem('itemhive-workspace-id', businessId);
+        } else {
+            localStorage.removeItem('itemhive-workspace-id');
+        }
+        window.dispatchEvent(new Event('itemhive-workspace-changed'));
+        dispatch(fetchProducts());
+    };
 
     const allNotifications = React.useMemo(
         () =>
@@ -231,6 +283,100 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
                 </Box>
 
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    {user?.role === 'super_admin' && (
+                        <Box
+                            sx={{
+                                display: { xs: 'none', lg: 'flex' },
+                                alignItems: 'center',
+                                gap: 1,
+                                px: 1,
+                                py: 0.6,
+                                borderRadius: 999,
+                                border: '1px solid',
+                                borderColor: alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.34 : 0.18),
+                                bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.12 : 0.05),
+                                boxShadow: theme.palette.mode === 'dark'
+                                    ? `inset 0 1px 0 ${alpha('#fff', 0.04)}`
+                                    : `0 10px 28px -22px ${alpha(theme.palette.primary.dark, 0.45)}`,
+                            }}
+                        >
+                            <Building2 size={17} color={theme.palette.primary.main} />
+                            <TextField
+                                select
+                                size="small"
+                                value={workspaceOptions.some((option) => option.businessId === selectedWorkspaceId) ? selectedWorkspaceId : ''}
+                                onChange={(event) => handleWorkspaceChange(event.target.value)}
+                                variant="standard"
+                                InputProps={{ disableUnderline: true }}
+                                SelectProps={{
+                                    displayEmpty: true,
+                                    renderValue: (value) => {
+                                        const option = workspaceOptions.find((entry) => entry.businessId === value);
+                                        return (
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0 }}>
+                                                <Typography variant="caption" sx={{ fontWeight: 900, color: 'text.secondary' }}>
+                                                    Viewing
+                                                </Typography>
+                                                <Typography
+                                                    variant="body2"
+                                                    sx={{
+                                                        fontWeight: 900,
+                                                        maxWidth: 160,
+                                                        overflow: 'hidden',
+                                                        textOverflow: 'ellipsis',
+                                                        whiteSpace: 'nowrap',
+                                                    }}
+                                                >
+                                                    {option?.businessName || option?.name || 'Own workspace'}
+                                                </Typography>
+                                            </Box>
+                                        );
+                                    },
+                                }}
+                                sx={{
+                                    minWidth: 230,
+                                    '& .MuiInputBase-root': {
+                                        fontWeight: 800,
+                                        fontSize: 14,
+                                    },
+                                }}
+                            >
+                                <MenuItem value="">
+                                    <Box sx={{ py: 0.3 }}>
+                                        <Typography variant="body2" fontWeight={900}>Own workspace</Typography>
+                                        <Typography variant="caption" color="text.secondary">Default super admin view</Typography>
+                                    </Box>
+                                </MenuItem>
+                                {workspaceOptions.map((option) => (
+                                    <MenuItem key={`${option.id}-${option.businessId}`} value={option.businessId}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, width: '100%' }}>
+                                            <Avatar sx={{ width: 28, height: 28, bgcolor: 'primary.main', fontSize: 12, fontWeight: 900 }}>
+                                                {option.name.charAt(0).toUpperCase()}
+                                            </Avatar>
+                                            <Box sx={{ minWidth: 0, flexGrow: 1 }}>
+                                                <Typography variant="body2" fontWeight={900} noWrap>{option.businessName || option.name}</Typography>
+                                                <Typography variant="caption" color="text.secondary" noWrap>{option.name} - {option.email}</Typography>
+                                            </Box>
+                                            <Chip size="small" label={formatRoleLabel(option.role)} sx={{ height: 22, fontWeight: 800 }} />
+                                        </Box>
+                                    </MenuItem>
+                                ))}
+                            </TextField>
+                            {selectedWorkspace && (
+                                <Chip
+                                    size="small"
+                                    label={formatRoleLabel(selectedWorkspace.role)}
+                                    sx={{
+                                        height: 24,
+                                        fontWeight: 900,
+                                        bgcolor: alpha(theme.palette.primary.main, 0.12),
+                                        color: 'primary.main',
+                                    }}
+                                />
+                            )}
+                        </Box>
+                    )}
+
                     <Box
                         sx={{
                             display: { xs: 'none', md: 'flex' },

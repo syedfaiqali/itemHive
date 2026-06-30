@@ -58,7 +58,7 @@ const corsOptions: cors.CorsOptions = {
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'x-itemhive-workspace-id'],
     optionsSuccessStatus: 204
 };
 
@@ -80,7 +80,7 @@ app.get('/', (_req: Request, res: Response) => {
         version: '1.0.0',
         commit: deploymentCommit,
         environment: process.env.NODE_ENV || 'development',
-        endpoints: ['/api/auth', '/api/products', '/api/transactions', '/api/reports', '/api/users']
+        endpoints: ['/api/auth', '/api/products', '/api/transactions', '/api/reports', '/api/credits', '/api/users']
     });
 });
 
@@ -99,6 +99,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/credits', creditRoutes);
 app.use('/api/credit', creditRoutes);
 app.use('/api/installments', installmentRoutes);
 app.use('/api/settings', settingsRoutes);

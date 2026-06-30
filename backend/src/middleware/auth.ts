@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
+import mongoose from 'mongoose';
 import jwt from 'jsonwebtoken';
 import User from '../models/User';
+import Business from '../models/Business';
 import { normalizeRole } from '../utils/accessControl';
 import { ensureUserBusiness, getAppSettingsForTenant } from '../utils/tenancy';
 
@@ -15,6 +17,7 @@ export interface AuthRequest extends Request {
         installmentAccess: boolean;
         userCreationLimit: number;
         businessId: string;
+        businessName: string;
         businessIsLegacy: boolean;
     };
 }
@@ -27,6 +30,28 @@ const resolveToken = (req: AuthRequest) => {
     }
 
     return token;
+};
+
+const resolveSuperAdminWorkspace = async (req: AuthRequest, fallbackBusiness: any, role: string) => {
+    if (normalizeRole(role) !== 'super_admin') {
+        return fallbackBusiness;
+    }
+
+    const workspaceId = String(req.headers['x-itemhive-workspace-id'] || '').trim();
+    if (!workspaceId) {
+        return fallbackBusiness;
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(workspaceId)) {
+        return fallbackBusiness;
+    }
+
+    const selectedBusiness = await Business.findById(workspaceId);
+    if (!selectedBusiness || !selectedBusiness.isActive) {
+        return fallbackBusiness;
+    }
+
+    return selectedBusiness;
 };
 
 const attachUserFromToken = async (req: AuthRequest) => {
@@ -44,7 +69,8 @@ const attachUserFromToken = async (req: AuthRequest) => {
     }
 
     const normalizedRole = normalizeRole(user.role);
-    const business = await ensureUserBusiness(user);
+    const defaultBusiness = await ensureUserBusiness(user);
+    const business = await resolveSuperAdminWorkspace(req, defaultBusiness, normalizedRole);
     if (!business.isActive) {
         throw new Error('Business workspace is inactive');
     }
@@ -59,6 +85,7 @@ const attachUserFromToken = async (req: AuthRequest) => {
         installmentAccess: normalizedRole === 'super_admin' || Boolean(user.installmentAccess),
         userCreationLimit: user.userCreationLimit ?? 0,
         businessId: String(business._id),
+        businessName: business.name,
         businessIsLegacy: business.isLegacy,
     };
 

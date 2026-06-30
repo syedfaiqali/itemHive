@@ -108,6 +108,7 @@ export const reviewInventoryRequest = async (req: AuthRequest, res: Response) =>
                 ...request.productData,
                 price: request.productData.salePrice ?? request.productData.price,
                 businessId: getTenantObjectId(req.user!),
+                businessName: req.user?.businessName || '',
             });
 
             await product.save({ session });

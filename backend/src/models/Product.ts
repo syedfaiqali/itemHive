@@ -17,6 +17,7 @@ export interface IProduct extends Document {
     expiryDate?: string;
     supplier?: string;
     businessId?: mongoose.Types.ObjectId;
+    businessName?: string;
 }
 
 const ProductSchema: Schema<IProduct> = new Schema({
@@ -35,7 +36,8 @@ const ProductSchema: Schema<IProduct> = new Schema({
     batchNumber: { type: String, default: '' },
     expiryDate: { type: String, default: '' },
     supplier: { type: String, default: '' },
-    businessId: { type: Schema.Types.ObjectId, ref: 'Business', default: null, index: true }
+    businessId: { type: Schema.Types.ObjectId, ref: 'Business', default: null, index: true },
+    businessName: { type: String, default: '', index: true }
 }, { timestamps: true });
 
 ProductSchema.index({ businessId: 1, id: 1 }, { unique: true });

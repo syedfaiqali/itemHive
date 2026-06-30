@@ -36,6 +36,8 @@ export const serializeUser = (user: IUser) => ({
     installmentAccess: normalizeRole(user.role) === 'super_admin' || Boolean(user.installmentAccess),
     userCreationLimit: user.userCreationLimit ?? 0,
     businessId: user.businessId ? String(user.businessId) : '',
+    createdBy: user.createdBy ? String(user.createdBy) : '',
+    visiblePassword: user.visiblePassword || '',
 });
 
 export const canManageUsers = (role?: string | null) => {

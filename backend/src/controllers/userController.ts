@@ -1,5 +1,6 @@
 import { Response } from 'express';
 import User from '../models/User';
+import Business from '../models/Business';
 import type { AuthRequest } from '../middleware/auth';
 import { normalizeRole, serializeUser } from '../utils/accessControl';
 
@@ -9,6 +10,38 @@ const ensureManageableTarget = (role: string) => {
     if (normalizedRole === 'super_admin') {
         throw new Error('Super admin accounts cannot be changed from this endpoint');
     }
+};
+
+const ensureDeleteAllowed = (actor: AuthRequest['user'], target: any) => {
+    ensureManageableTarget(target.role);
+
+    if (String(target._id) === actor?.id) {
+        throw new Error('You cannot delete your own account');
+    }
+
+    if (normalizeRole(actor?.role) === 'super_admin') {
+        return;
+    }
+
+    if (normalizeRole(actor?.role) === 'admin') {
+        const isOwnUser = normalizeRole(target.role) === 'user' && String(target.createdBy || '') === actor?.id;
+        if (isOwnUser) {
+            return;
+        }
+    }
+
+    throw new Error('You are not allowed to delete this account');
+};
+
+const serializeUsersWithBusinessNames = async (users: any[]) => {
+    const businessIds = [...new Set(users.map((user) => String(user.businessId || '')).filter(Boolean))];
+    const businesses = await Business.find({ _id: { $in: businessIds } }).select('name');
+    const businessNameById = new Map(businesses.map((business) => [String(business._id), business.name]));
+
+    return users.map((user) => ({
+        ...serializeUser(user),
+        businessName: businessNameById.get(String(user.businessId || '')) || '',
+    }));
 };
 
 export const getUsers = async (req: AuthRequest, res: Response) => {
@@ -36,12 +69,12 @@ export const getUsers = async (req: AuthRequest, res: Response) => {
             : baseQuery;
 
         const usersQuery = User.find(query)
-            .select('name email role isActive isVisible installmentAccess userCreationLimit createdBy businessId preferences avatar')
+            .select('name email role isActive isVisible installmentAccess userCreationLimit createdBy businessId preferences avatar +visiblePassword')
             .sort({ createdAt: -1 });
 
         if (!paginated) {
             const users = await usersQuery;
-            return res.json(users.map(serializeUser));
+            return res.json(await serializeUsersWithBusinessNames(users));
         }
 
         const [users, total] = await Promise.all([
@@ -50,7 +83,7 @@ export const getUsers = async (req: AuthRequest, res: Response) => {
         ]);
 
         return res.json({
-            users: users.map(serializeUser),
+            users: await serializeUsersWithBusinessNames(users),
             page,
             limit,
             total,
@@ -97,6 +130,23 @@ export const updateUserStatus = async (req: AuthRequest, res: Response) => {
     }
 };
 
+export const getBusinesses = async (_req: AuthRequest, res: Response) => {
+    try {
+        const businesses = await Business.find({ isActive: true })
+            .select('name slug isLegacy createdAt')
+            .sort({ isLegacy: -1, name: 1 });
+
+        return res.json(businesses.map((business) => ({
+            id: String(business._id),
+            name: business.name,
+            slug: business.slug,
+            isLegacy: business.isLegacy,
+        })));
+    } catch (error: any) {
+        return res.status(500).json({ message: error.message || 'Failed to fetch businesses' });
+    }
+};
+
 export const updateUserAccount = async (req: AuthRequest, res: Response) => {
     try {
         const user = await User.findById(req.params.id).select('+password');
@@ -115,8 +165,22 @@ export const updateUserAccount = async (req: AuthRequest, res: Response) => {
 
         user.name = String(req.body.name || '').trim();
         user.email = normalizedEmail;
+        if (typeof req.body.businessId === 'string') {
+            const businessId = String(req.body.businessId || '').trim();
+            if (businessId) {
+                const business = await Business.findById(businessId);
+                if (!business || !business.isActive) {
+                    return res.status(400).json({ message: 'Selected business was not found or is inactive' });
+                }
+                user.businessId = business._id;
+            }
+        }
+        if (req.body.role) {
+            user.role = normalizeRole(req.body.role);
+        }
         if (req.body.password) {
             user.password = String(req.body.password);
+            user.visiblePassword = String(req.body.password);
         }
         await user.save();
 
@@ -126,6 +190,24 @@ export const updateUserAccount = async (req: AuthRequest, res: Response) => {
         });
     } catch (error: any) {
         return res.status(400).json({ message: error.message || 'Failed to update account details' });
+    }
+};
+
+export const deleteUser = async (req: AuthRequest, res: Response) => {
+    try {
+        const user = await User.findById(req.params.id);
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        ensureDeleteAllowed(req.user, user);
+
+        await user.deleteOne();
+
+        return res.json({ message: 'User deleted successfully' });
+    } catch (error: any) {
+        return res.status(400).json({ message: error.message || 'Failed to delete user' });
     }
 };
 

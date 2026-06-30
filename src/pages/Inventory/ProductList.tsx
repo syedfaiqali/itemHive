@@ -153,7 +153,13 @@ const ProductList: React.FC = () => {
     const location = useLocation();
 
     React.useEffect(() => {
-        dispatch(fetchProducts());
+        const loadProducts = () => {
+            dispatch(fetchProducts());
+        };
+
+        loadProducts();
+        window.addEventListener('itemhive-workspace-changed', loadProducts);
+        return () => window.removeEventListener('itemhive-workspace-changed', loadProducts);
     }, [dispatch]);
 
     React.useEffect(() => {
@@ -275,9 +281,10 @@ const ProductList: React.FC = () => {
     };
 
     const exportToCSV = () => {
-        const headers = ['ID', 'Name', 'Category', 'Purchase Price', 'Sale Price', 'Stock', 'Min Stock', 'Last Updated'];
+        const headers = ['ID', 'Business', 'Name', 'Category', 'Purchase Price', 'Sale Price', 'Stock', 'Min Stock', 'Last Updated'];
         const rows = products.map(p => [
             p.id,
+            p.businessName || '',
             p.name,
             p.category,
             p.purchasePrice,
@@ -463,6 +470,11 @@ const ProductList: React.FC = () => {
                                                 <Box>
                                                     <Typography variant="subtitle2" fontWeight={700}>{product.name}</Typography>
                                                     <Typography variant="caption" color="text.secondary">ID: {product.id}</Typography>
+                                                    {product.businessName && (
+                                                        <Typography variant="caption" color="primary.main" display="block" fontWeight={800}>
+                                                            {product.businessName}
+                                                        </Typography>
+                                                    )}
                                                 </Box>
                                             </Box>
                                         </TableCell>
