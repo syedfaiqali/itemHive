@@ -9,7 +9,9 @@ import {
     Alert,
     Container,
     Paper,
-    CircularProgress
+    CircularProgress,
+    Chip,
+    Stack
 } from '@mui/material';
 import { Mail, Lock, Eye, EyeOff, LogIn, ArrowRight, ShieldCheck, Sparkles, Smartphone, Tablet, Package, ScanLine, Boxes, ShoppingCart, Barcode } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
@@ -25,6 +27,7 @@ const Login: React.FC = () => {
     const navigate = useNavigate();
     const { loading, error, isAuthenticated } = useSelector((state: RootState) => state.auth);
     const [showPassword, setShowPassword] = useState(false);
+    const [activeTab, setActiveTab] = useState<'signin' | 'pricing'>('signin');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
 
@@ -68,6 +71,30 @@ const Login: React.FC = () => {
         e.preventDefault();
         dispatch(loginUser({ email, password }));
     };
+
+    const plans = [
+        {
+            id: 'free_trial',
+            name: 'Free Trial',
+            price: 'Free',
+            tag: '2 months',
+            features: ['Inventory + POS basics', 'Product and stock tracking', 'Starter reports', 'Expires after 2 months'],
+        },
+        {
+            id: 'starter',
+            name: 'Starter',
+            price: 'Monthly',
+            tag: 'Core',
+            features: ['Unlimited daily sales', 'Inventory requests', 'Transactions + reports', 'Team access controls'],
+        },
+        {
+            id: 'pro',
+            name: 'Pro',
+            price: 'Monthly',
+            tag: 'Best',
+            features: ['Everything in Starter', 'Credit customers', 'Installments workflow', 'Workspace switching'],
+        },
+    ];
 
     return (
         <Box
@@ -207,11 +234,28 @@ const Login: React.FC = () => {
                                     ItemHive
                                 </Typography>
                                 <Typography variant="body2" color="text.secondary">
-                                    Welcome back. Sign in to continue.
+                                    {activeTab === 'signin' ? 'Welcome back. Sign in to continue.' : 'Simple plans for growing retail teams.'}
                                 </Typography>
                             </Box>
 
-                            {error && (
+                            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0.75, mb: 1.5, p: 0.4, bgcolor: 'action.hover', borderRadius: 2 }}>
+                                <Button
+                                    variant={activeTab === 'signin' ? 'contained' : 'text'}
+                                    onClick={() => setActiveTab('signin')}
+                                    sx={{ borderRadius: 1.5, fontWeight: 900, textTransform: 'none' }}
+                                >
+                                    Sign In
+                                </Button>
+                                <Button
+                                    variant={activeTab === 'pricing' ? 'contained' : 'text'}
+                                    onClick={() => setActiveTab('pricing')}
+                                    sx={{ borderRadius: 1.5, fontWeight: 900, textTransform: 'none' }}
+                                >
+                                    Pricing
+                                </Button>
+                            </Box>
+
+                            {activeTab === 'signin' && error && (
                                 <Alert
                                     severity="error"
                                     sx={{
@@ -224,7 +268,9 @@ const Login: React.FC = () => {
                                 </Alert>
                             )}
 
-                            <form onSubmit={handleLogin}>
+                            {activeTab === 'signin' ? (
+                                <>
+                                    <form onSubmit={handleLogin}>
                                 <TextField
                                     fullWidth
                                     label="Email Address"
@@ -293,21 +339,62 @@ const Login: React.FC = () => {
                                 >
                                     {loading ? 'Signing In...' : 'Sign In'}
                                 </Button>
-                            </form>
+                                    </form>
 
-                            <Box sx={{ mt: 1.5, textAlign: 'center' }}>
-                                <Typography variant="body2" color="text.secondary">
-                                    Don&apos;t have an account?{' '}
-                                    <Button
-                                        variant="text"
-                                        size="small"
-                                        onClick={() => navigate('/signup')}
-                                        sx={{ fontWeight: 700, textTransform: 'none' }}
-                                    >
-                                        Sign Up
-                                    </Button>
-                                </Typography>
-                            </Box>
+                                    <Box sx={{ mt: 1.5, textAlign: 'center' }}>
+                                        <Typography variant="body2" color="text.secondary">
+                                            Don&apos;t have an account?{' '}
+                                            <Button
+                                                variant="text"
+                                                size="small"
+                                                onClick={() => navigate('/signup')}
+                                                sx={{ fontWeight: 700, textTransform: 'none' }}
+                                            >
+                                                Sign Up
+                                            </Button>
+                                        </Typography>
+                                    </Box>
+                                </>
+                            ) : (
+                                <Stack spacing={1.2}>
+                                    {plans.map((plan) => (
+                                        <Box
+                                            key={plan.id}
+                                            sx={{
+                                                p: 1.35,
+                                                borderRadius: 3,
+                                                border: '1px solid',
+                                                borderColor: plan.id === 'pro' ? 'primary.main' : 'divider',
+                                                bgcolor: plan.id === 'pro' ? alpha(theme.palette.primary.main, 0.08) : 'background.paper',
+                                            }}
+                                        >
+                                            <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
+                                                <Box>
+                                                    <Typography variant="subtitle1" fontWeight={900}>{plan.name}</Typography>
+                                                    <Typography variant="caption" color="text.secondary">{plan.price}</Typography>
+                                                </Box>
+                                                <Chip label={plan.tag} color={plan.id === 'pro' ? 'primary' : 'default'} size="small" sx={{ fontWeight: 900 }} />
+                                            </Stack>
+                                            <Box sx={{ display: 'grid', gap: 0.35, mt: 0.9 }}>
+                                                {plan.features.map((feature) => (
+                                                    <Typography key={feature} variant="caption" color="text.secondary">
+                                                        - {feature}
+                                                    </Typography>
+                                                ))}
+                                            </Box>
+                                            <Button
+                                                fullWidth
+                                                variant={plan.id === 'pro' ? 'contained' : 'outlined'}
+                                                size="small"
+                                                onClick={() => navigate(`/signup?plan=${plan.id}`)}
+                                                sx={{ mt: 1, borderRadius: 2, fontWeight: 900, textTransform: 'none' }}
+                                            >
+                                                Choose {plan.name}
+                                            </Button>
+                                        </Box>
+                                    ))}
+                                </Stack>
+                            )}
                         </Box>
                     </Paper>
                 </motion.div>

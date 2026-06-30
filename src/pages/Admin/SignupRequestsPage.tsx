@@ -28,6 +28,7 @@ interface SignupRequest {
     fullName: string;
     email: string;
     businessName: string;
+    packageName?: string;
     country?: string;
     currency?: string;
     businessType?: string;
@@ -146,6 +147,9 @@ const SignupRequestsPage: React.FC = () => {
                                         <Typography variant="body2" fontWeight={800}>{request.businessName}</Typography>
                                     </Stack>
                                     <Typography variant="caption" color="text.secondary">{request.businessType || 'Business type not specified'}</Typography>
+                                    <Typography variant="caption" color="primary.main" display="block" fontWeight={800}>
+                                        {request.packageName || 'No package'}
+                                    </Typography>
                                     <Typography variant="caption" color="text.secondary" display="block">
                                         {request.country || 'No country'} {request.currency ? `- ${request.currency}` : ''}
                                     </Typography>

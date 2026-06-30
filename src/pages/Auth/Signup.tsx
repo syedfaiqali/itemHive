@@ -14,7 +14,7 @@ import {
 } from '@mui/material';
 import { Mail, Lock, Eye, EyeOff, UserPlus, User, Smartphone, Tablet, Package, ScanLine, Boxes, ShoppingCart, Barcode } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { alpha, useTheme } from '@mui/material/styles';
 import { clearError, registerUser } from '../../features/auth/authSlice';
@@ -34,16 +34,24 @@ const countryOptions: Array<{ value: CountryCode; label: string }> = [
     { value: 'AE', label: 'United Arab Emirates' },
 ];
 
+const packageOptions = [
+    { id: 'free_trial', name: 'Free Trial', detail: '2 months free access' },
+    { id: 'starter', name: 'Starter Monthly', detail: 'Inventory, POS, reports' },
+    { id: 'pro', name: 'Pro Monthly', detail: 'Everything plus credits, installments, team controls' },
+];
+
 const Signup: React.FC = () => {
     const theme = useTheme();
     const dispatch = useDispatch<AppDispatch>();
     const navigate = useNavigate();
+    const location = useLocation();
     const { loading, error, user } = useSelector((state: RootState) => state.auth);
     const [showPassword, setShowPassword] = useState(false);
     const [success, setSuccess] = useState(false);
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [businessName, setBusinessName] = useState('');
+    const [packageId, setPackageId] = useState('free_trial');
     const [country, setCountry] = useState<CountryCode>('PK');
     const [businessType, setBusinessType] = useState('');
     const [phone, setPhone] = useState('');
@@ -58,6 +66,13 @@ const Signup: React.FC = () => {
     useEffect(() => {
         setRole(isSuperAdmin ? 'admin' : 'user');
     }, [isSuperAdmin]);
+
+    useEffect(() => {
+        const queryPlan = new URLSearchParams(location.search).get('plan');
+        if (queryPlan && packageOptions.some((plan) => plan.id === queryPlan)) {
+            setPackageId(queryPlan);
+        }
+    }, [location.search]);
     const floatingWidgets = [
         { icon: <Smartphone size={20} />, left: '12%', top: '20%', rotate: -7 },
         { icon: <Tablet size={20} />, left: '30%', top: '42%', rotate: 6 },
@@ -86,6 +101,8 @@ const Signup: React.FC = () => {
                     email,
                     password,
                     businessName,
+                    packageId,
+                    packageName: packageOptions.find((plan) => plan.id === packageId)?.name || 'Free Trial',
                     country,
                     currency: countryCurrencyMap[country],
                     businessType,
@@ -300,6 +317,25 @@ const Signup: React.FC = () => {
                                     disabled={loading || success}
                                     helperText={user ? 'A separate workspace will be created for this shop.' : 'Tell us which business this account is for.'}
                                 />
+                            )}
+                            {!user && (
+                                <TextField
+                                    select
+                                    fullWidth
+                                    label="Package"
+                                    variant="outlined"
+                                    margin="dense"
+                                    value={packageId}
+                                    onChange={(e) => setPackageId(e.target.value)}
+                                    required
+                                    disabled={loading || success}
+                                >
+                                    {packageOptions.map((plan) => (
+                                        <MenuItem key={plan.id} value={plan.id}>
+                                            {plan.name} - {plan.detail}
+                                        </MenuItem>
+                                    ))}
+                                </TextField>
                             )}
                             {!user && (
                                 <>

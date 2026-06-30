@@ -5,6 +5,8 @@ export interface ISignupRequest extends Document {
     email: string;
     password?: string;
     businessName: string;
+    packageId: 'free_trial' | 'starter' | 'pro';
+    packageName: string;
     country: 'PK' | 'US' | 'DE' | 'GB' | 'CH' | 'CD' | 'CG' | 'IN' | 'AE';
     currency: 'USD' | 'EUR' | 'GBP' | 'CHF' | 'CDF' | 'XAF' | 'PKR' | 'INR' | 'AED';
     businessType: string;
@@ -26,6 +28,8 @@ const SignupRequestSchema: Schema<ISignupRequest> = new Schema({
     email: { type: String, required: true, trim: true, lowercase: true, index: true },
     password: { type: String, required: true, select: false },
     businessName: { type: String, required: true, trim: true, index: true },
+    packageId: { type: String, enum: ['free_trial', 'starter', 'pro'], default: 'free_trial' },
+    packageName: { type: String, default: 'Free Trial' },
     country: { type: String, enum: ['PK', 'US', 'DE', 'GB', 'CH', 'CD', 'CG', 'IN', 'AE'], default: 'PK' },
     currency: { type: String, enum: ['USD', 'EUR', 'GBP', 'CHF', 'CDF', 'XAF', 'PKR', 'INR', 'AED'], default: 'PKR' },
     businessType: { type: String, default: '', trim: true },

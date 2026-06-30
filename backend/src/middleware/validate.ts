@@ -46,6 +46,8 @@ export const signupRequestSchema = Joi.object({
     email: Joi.string().email().required(),
     password: Joi.string().min(6).required(),
     businessName: Joi.string().min(2).max(120).required(),
+    packageId: Joi.string().valid('free_trial', 'starter', 'pro').required(),
+    packageName: Joi.string().min(2).max(80).required(),
     country: Joi.string().valid('PK', 'US', 'DE', 'GB', 'CH', 'CD', 'CG', 'IN', 'AE').required(),
     currency: Joi.string().valid('USD', 'EUR', 'GBP', 'CHF', 'CDF', 'XAF', 'PKR', 'INR', 'AED').required(),
     businessType: Joi.string().allow('').max(120).optional(),
