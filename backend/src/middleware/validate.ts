@@ -41,6 +41,25 @@ export const registerSchema = Joi.object({
     businessId: Joi.string().allow('').optional(),
 });
 
+export const signupRequestSchema = Joi.object({
+    fullName: Joi.string().min(2).max(120).required(),
+    email: Joi.string().email().required(),
+    password: Joi.string().min(6).required(),
+    businessName: Joi.string().min(2).max(120).required(),
+    country: Joi.string().valid('PK', 'US', 'DE', 'GB', 'CH', 'CD', 'CG', 'IN', 'AE').required(),
+    currency: Joi.string().valid('USD', 'EUR', 'GBP', 'CHF', 'CDF', 'XAF', 'PKR', 'INR', 'AED').required(),
+    businessType: Joi.string().allow('').max(120).optional(),
+    phone: Joi.string().allow('').max(60).optional(),
+    employeeCount: Joi.number().integer().min(1).max(100000).required(),
+    address: Joi.string().allow('').max(240).optional(),
+    notes: Joi.string().allow('').max(600).optional(),
+});
+
+export const signupRequestDecisionSchema = Joi.object({
+    status: Joi.string().valid('approved', 'rejected').required(),
+    decisionNote: Joi.string().allow('').max(600).optional(),
+});
+
 export const productSchema = Joi.object({
     id: Joi.string().required(),
     sku: Joi.string().required(),

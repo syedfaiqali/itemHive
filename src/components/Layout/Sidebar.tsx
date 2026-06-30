@@ -25,6 +25,7 @@ import {
     CalendarClock,
     Pin,
     Users,
+    UserPlus,
     ClipboardCheck,
     ChevronLeft,
     ChevronRight
@@ -65,6 +66,7 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onDrawerToggle }) => {
         { text: 'Installments', icon: <CalendarClock size={20} />, path: '/installments', roles: ['super_admin', 'admin', 'user'], requiresInstallmentAccess: true },
         { text: 'Reports', icon: <BarChart3 size={20} />, path: '/reports', roles: ['super_admin', 'admin'] },
         { text: 'Team', icon: <Users size={20} />, path: '/team', roles: ['super_admin', 'admin'] },
+        { text: 'Signup Requests', icon: <UserPlus size={20} />, path: '/signup-requests', roles: ['super_admin'] },
         { text: 'Sticky Notes', icon: <Pin size={20} />, path: '/notes', roles: ['super_admin', 'admin', 'user'] },
     ];
 

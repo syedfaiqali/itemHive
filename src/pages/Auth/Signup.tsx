@@ -19,6 +19,20 @@ import { motion } from 'framer-motion';
 import { alpha, useTheme } from '@mui/material/styles';
 import { clearError, registerUser } from '../../features/auth/authSlice';
 import type { AppDispatch, RootState } from '../../store';
+import api from '../../api/axios';
+import { countryCurrencyMap, type CountryCode } from '../../features/settings/settingsSlice';
+
+const countryOptions: Array<{ value: CountryCode; label: string }> = [
+    { value: 'PK', label: 'Pakistan' },
+    { value: 'US', label: 'United States' },
+    { value: 'DE', label: 'Germany' },
+    { value: 'GB', label: 'United Kingdom' },
+    { value: 'CH', label: 'Switzerland' },
+    { value: 'CD', label: 'DR Congo' },
+    { value: 'CG', label: 'Congo' },
+    { value: 'IN', label: 'India' },
+    { value: 'AE', label: 'United Arab Emirates' },
+];
 
 const Signup: React.FC = () => {
     const theme = useTheme();
@@ -30,6 +44,13 @@ const Signup: React.FC = () => {
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [businessName, setBusinessName] = useState('');
+    const [country, setCountry] = useState<CountryCode>('PK');
+    const [businessType, setBusinessType] = useState('');
+    const [phone, setPhone] = useState('');
+    const [employeeCount, setEmployeeCount] = useState('1');
+    const [address, setAddress] = useState('');
+    const [notes, setNotes] = useState('');
+    const [requestError, setRequestError] = useState('');
     const isSuperAdmin = user?.role === 'super_admin';
     const [role, setRole] = useState<'super_admin' | 'admin' | 'user'>(isSuperAdmin ? 'admin' : 'user');
     const [password, setPassword] = useState('');
@@ -56,6 +77,29 @@ const Signup: React.FC = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        if (!user) {
+            setRequestError('');
+            try {
+                await api.post('/signup-requests', {
+                    fullName: name,
+                    email,
+                    password,
+                    businessName,
+                    country,
+                    currency: countryCurrencyMap[country],
+                    businessType,
+                    phone,
+                    employeeCount: Number(employeeCount || 1),
+                    address,
+                    notes,
+                });
+                setSuccess(true);
+            } catch (error: any) {
+                setRequestError(error.response?.data?.message || 'Unable to submit signup request.');
+            }
+            return;
+        }
 
         const result = await dispatch(registerUser({
             name,
@@ -91,11 +135,12 @@ const Signup: React.FC = () => {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                overflow: 'hidden',
+                overflow: 'auto',
                 background: theme.palette.mode === 'light'
                     ? 'radial-gradient(circle at 15% 10%, rgba(14, 165, 165, 0.2), transparent 45%), radial-gradient(circle at 85% 0%, rgba(37, 99, 235, 0.14), transparent 45%), linear-gradient(180deg, #eef6f7 0%, #e8eff7 100%)'
                     : 'radial-gradient(circle at 15% 10%, rgba(45, 212, 191, 0.2), transparent 45%), radial-gradient(circle at 85% 0%, rgba(59, 130, 246, 0.18), transparent 45%), linear-gradient(180deg, #0b1220 0%, #0f172a 100%)',
-                p: { xs: 0.75, md: 1.25 }
+                p: { xs: 1, md: 2 },
+                py: { xs: 1.5, md: 2 }
             }}
         >
             {floatingWidgets.map((item, index) => (
@@ -132,7 +177,7 @@ const Signup: React.FC = () => {
                     </Box>
                 </motion.div>
             ))}
-            <Container maxWidth="sm">
+            <Container maxWidth="md" sx={{ position: 'relative', zIndex: 1 }}>
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -142,34 +187,58 @@ const Signup: React.FC = () => {
                         elevation={24}
                         sx={{
                             borderRadius: { xs: 4, md: 5 },
-                            p: { xs: 1.5, md: 2.25 },
+                            p: 0,
                             border: '1px solid',
                             borderColor: 'divider',
-                            maxHeight: { xs: 'none', md: '84dvh' }
+                            maxHeight: { xs: 'calc(100dvh - 24px)', md: 'calc(100dvh - 48px)' },
+                            maxWidth: 760,
+                            mx: 'auto',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            overflow: 'hidden'
                         }}
                     >
-                        <Box sx={{ mb: 1.25, textAlign: 'center' }}>
-                            <Typography variant="h4" fontWeight={800} color="primary.main">
+                        <Box sx={{ px: { xs: 2, md: 3 }, pt: { xs: 2, md: 2.5 }, pb: 1, textAlign: 'center', flexShrink: 0 }}>
+                            <Typography variant="h4" fontWeight={800} color="primary.main" sx={{ fontSize: { xs: '1.7rem', md: '2.05rem' } }}>
                                 Join ItemHive
                             </Typography>
                             <Typography variant="body2" color="text.secondary">
-                                {user ? 'Create a new workspace account.' : 'Create the first workspace account.'}
+                                {user ? 'Create a new workspace account.' : 'Request a new business workspace.'}
                             </Typography>
                         </Box>
 
-                        {success && (
-                            <Alert severity="success" sx={{ mb: 1.25, borderRadius: 2 }}>
-                                Account created successfully! Redirecting to login...
-                            </Alert>
-                        )}
+                        <Box
+                            component="form"
+                            onSubmit={handleSubmit}
+                            sx={{
+                                px: { xs: 2, md: 3 },
+                                pb: { xs: 2, md: 2.5 },
+                                flexGrow: 1,
+                                minHeight: 0,
+                                overflowY: 'auto',
+                                display: 'grid',
+                                gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' },
+                                columnGap: 1.5,
+                                rowGap: 0.75,
+                                '& .MuiTextField-root': { mb: 0 },
+                                '&::-webkit-scrollbar': { width: 6 },
+                                '&::-webkit-scrollbar-thumb': {
+                                    backgroundColor: alpha(theme.palette.primary.main, 0.35),
+                                    borderRadius: 8,
+                                },
+                            }}
+                        >
+                            {success && (
+                                <Alert severity="success" sx={{ borderRadius: 2, gridColumn: '1 / -1' }}>
+                                    {user ? 'Account created successfully! Redirecting to login...' : 'Request submitted successfully. We will email you after review.'}
+                                </Alert>
+                            )}
 
-                        {error && (
-                            <Alert severity="error" sx={{ mb: 1.25, borderRadius: 2 }}>
-                                {error}
-                            </Alert>
-                        )}
-
-                        <form onSubmit={handleSubmit}>
+                            {(error || requestError) && (
+                                <Alert severity="error" sx={{ borderRadius: 2, gridColumn: '1 / -1' }}>
+                                    {error || requestError}
+                                </Alert>
+                            )}
                             <TextField
                                 fullWidth
                                 label="Full Name"
@@ -186,7 +255,6 @@ const Signup: React.FC = () => {
                                         </InputAdornment>
                                     ),
                                 }}
-                                sx={{ mb: 0.25 }}
                             />
                             <TextField
                                 fullWidth
@@ -204,7 +272,6 @@ const Signup: React.FC = () => {
                                         </InputAdornment>
                                     ),
                                 }}
-                                sx={{ mb: 0.25 }}
                             />
                             <TextField
                                 select
@@ -216,25 +283,97 @@ const Signup: React.FC = () => {
                                 onChange={(e) => setRole(e.target.value as 'super_admin' | 'admin' | 'user')}
                                 required
                                 disabled={loading || success}
-                                sx={{ mb: 0.25 }}
                             >
                                 {isSuperAdmin && <MenuItem value="admin">Administrator</MenuItem>}
                                 {isSuperAdmin && <MenuItem value="super_admin">Super Admin</MenuItem>}
                                 <MenuItem value="user">User</MenuItem>
                             </TextField>
-                            {isSuperAdmin && role === 'admin' && (
+                            {(!user || (isSuperAdmin && role === 'admin')) && (
                                 <TextField
                                     fullWidth
-                                    label="Shop Name"
+                                    label="Business / Shop Name"
                                     variant="outlined"
                                     margin="dense"
                                     value={businessName}
                                     onChange={(e) => setBusinessName(e.target.value)}
                                     required
                                     disabled={loading || success}
-                                    helperText="A separate workspace will be created for this shop."
-                                    sx={{ mb: 0.25 }}
+                                    helperText={user ? 'A separate workspace will be created for this shop.' : 'Tell us which business this account is for.'}
                                 />
+                            )}
+                            {!user && (
+                                <>
+                                    <TextField
+                                        select
+                                        fullWidth
+                                        label="Country"
+                                        variant="outlined"
+                                        margin="dense"
+                                        value={country}
+                                        onChange={(e) => setCountry(e.target.value as CountryCode)}
+                                        required
+                                        disabled={loading || success}
+                                    >
+                                        {countryOptions.map((option) => (
+                                            <MenuItem key={option.value} value={option.value}>
+                                                {option.label} ({countryCurrencyMap[option.value]})
+                                            </MenuItem>
+                                        ))}
+                                    </TextField>
+                                    <TextField
+                                        fullWidth
+                                        label="Business Type"
+                                        variant="outlined"
+                                        margin="dense"
+                                        value={businessType}
+                                        onChange={(e) => setBusinessType(e.target.value)}
+                                        disabled={loading || success}
+                                        placeholder="Retail, grocery, pharmacy, electronics..."
+                                    />
+                                    <TextField
+                                        fullWidth
+                                        label="Phone / WhatsApp"
+                                        variant="outlined"
+                                        margin="dense"
+                                        value={phone}
+                                        onChange={(e) => setPhone(e.target.value)}
+                                        disabled={loading || success}
+                                    />
+                                    <TextField
+                                        fullWidth
+                                        label="Employees"
+                                        type="number"
+                                        variant="outlined"
+                                        margin="dense"
+                                        value={employeeCount}
+                                        onChange={(e) => setEmployeeCount(e.target.value)}
+                                        required
+                                        inputProps={{ min: 1 }}
+                                        disabled={loading || success}
+                                    />
+                                    <TextField
+                                        fullWidth
+                                        label="Business Address"
+                                        variant="outlined"
+                                        margin="dense"
+                                        value={address}
+                                        onChange={(e) => setAddress(e.target.value)}
+                                        disabled={loading || success}
+                                    />
+                                    <TextField
+                                        fullWidth
+                                        label="Notes"
+                                        variant="outlined"
+                                        margin="dense"
+                                        value={notes}
+                                        onChange={(e) => setNotes(e.target.value)}
+                                        disabled={loading || success}
+                                        multiline
+                                        minRows={2}
+                                        placeholder="Anything the team should know before approving?"
+                                        sx={{ gridColumn: { xs: 'auto', md: '1 / -1' } }}
+                                    />
+                                </>
                             )}
                             <TextField
                                 fullWidth
@@ -260,7 +399,6 @@ const Signup: React.FC = () => {
                                         </InputAdornment>
                                     ),
                                 }}
-                                sx={{ mb: 1.25 }}
                             />
 
                             <Button
@@ -271,6 +409,8 @@ const Signup: React.FC = () => {
                                 disabled={loading || success}
                                 startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <UserPlus size={20} />}
                                 sx={{
+                                    gridColumn: '1 / -1',
+                                    mt: 0.75,
                                     py: 1.05,
                                     borderRadius: 2,
                                     fontSize: '0.95rem',
@@ -278,11 +418,11 @@ const Signup: React.FC = () => {
                                     boxShadow: `0 12px 22px -12px ${alpha(theme.palette.primary.main, 0.8)}`
                                 }}
                             >
-                                {loading ? 'Creating Account...' : 'Create Account'}
+                                {loading ? 'Creating Account...' : user ? 'Create Account' : 'Submit Request'}
                             </Button>
-                        </form>
+                        </Box>
 
-                        <Box sx={{ mt: 1.5, textAlign: 'center' }}>
+                        <Box sx={{ px: { xs: 2, md: 3 }, py: 1.4, textAlign: 'center', flexShrink: 0, borderTop: '1px solid', borderColor: 'divider' }}>
                             <Typography variant="body2" color="text.secondary">
                                 Already have an account?{' '}
                                 <Button

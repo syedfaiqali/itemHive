@@ -7,7 +7,6 @@ import {
     InputAdornment,
     IconButton,
     Alert,
-    Divider,
     Container,
     Paper,
     CircularProgress
@@ -308,26 +307,6 @@ const Login: React.FC = () => {
                                         Sign Up
                                     </Button>
                                 </Typography>
-                            </Box>
-
-                            <Divider sx={{ my: 1.5 }}>
-                                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>DEMO ACCESS</Typography>
-                            </Divider>
-
-                            <Box
-                                sx={{
-                                    p: 1.25,
-                                    borderRadius: 3,
-                                    bgcolor: alpha(theme.palette.primary.main, 0.05),
-                                    border: `1px dashed ${alpha(theme.palette.primary.main, 0.26)}`
-                                }}
-                            >
-                                {/* <Typography variant="caption" color="text.secondary" display="block" align="center">
-                                    <strong>Super Admin:</strong> admin@itemhive.com / admin123
-                                </Typography>
-                                <Typography variant="caption" color="text.secondary" display="block" align="center">
-                                    <strong>Users:</strong> accounts are created by an admin or super admin
-                                </Typography> */}
                             </Box>
                         </Box>
                     </Paper>

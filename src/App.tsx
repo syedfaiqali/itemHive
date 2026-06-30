@@ -33,6 +33,7 @@ const InstallmentsPage = React.lazy(() => import('./pages/Installments/Installme
 const NotificationsPage = React.lazy(() => import('./pages/Notifications/NotificationsPage'));
 const StickyNotes = React.lazy(() => import('./pages/Notes/StickyNotes'));
 const TeamManagementPage = React.lazy(() => import('./pages/Admin/TeamManagementPage'));
+const SignupRequestsPage = React.lazy(() => import('./pages/Admin/SignupRequestsPage'));
 const InventoryRequestsPage = React.lazy(() => import('./pages/Inventory/InventoryRequestsPage'));
 const AppContent: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
@@ -111,6 +112,11 @@ const AppContent: React.FC = () => {
               <Route path="team" element={
                 <ProtectedRoute allowedRoles={['super_admin', 'admin']}>
                   <TeamManagementPage />
+                </ProtectedRoute>
+              } />
+              <Route path="signup-requests" element={
+                <ProtectedRoute allowedRoles={['super_admin']}>
+                  <SignupRequestsPage />
                 </ProtectedRoute>
               } />
               <Route path="settings" element={
