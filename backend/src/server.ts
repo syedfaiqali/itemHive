@@ -16,6 +16,7 @@ import userRoutes from './routes/userRoutes';
 import inventoryRequestRoutes from './routes/inventoryRequestRoutes';
 import notesRoutes from './routes/notesRoutes';
 import signupRequestRoutes from './routes/signupRequestRoutes';
+import customerRoutes from './routes/customerRoutes';
 import { errorHandler, notFound } from './middleware/errorHandler';
 import { ensureTenantIndexes } from './utils/tenantIndexes';
 
@@ -81,7 +82,7 @@ app.get('/', (_req: Request, res: Response) => {
         version: '1.0.0',
         commit: deploymentCommit,
         environment: process.env.NODE_ENV || 'development',
-        endpoints: ['/api/auth', '/api/products', '/api/transactions', '/api/reports', '/api/credits', '/api/users', '/api/signup-requests']
+        endpoints: ['/api/auth', '/api/products', '/api/transactions', '/api/reports', '/api/customers', '/api/credits', '/api/users', '/api/signup-requests']
     });
 });
 
@@ -100,6 +101,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/customers', customerRoutes);
 app.use('/api/credits', creditRoutes);
 app.use('/api/credit', creditRoutes);
 app.use('/api/installments', installmentRoutes);

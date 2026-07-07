@@ -72,6 +72,9 @@ export const productSchema = Joi.object({
     price: Joi.number().min(0).optional(),
     stock: Joi.number().min(0).required(),
     minStock: Joi.number().min(0).optional(),
+    productUnitCode: Joi.string().allow('').max(40).optional(),
+    productUnit: Joi.string().allow('').max(80).optional(),
+    productUnitUrdu: Joi.string().allow('').max(80).optional(),
     description: Joi.string().allow('').optional(),
     imageUrl: Joi.string().allow('').optional(),
     batchNumber: Joi.string().allow('').optional(),
@@ -85,6 +88,19 @@ export const creditPaymentSchema = Joi.object({
     amount: Joi.number().positive().required(),
     paidVia: Joi.string().valid('cash', 'card').required(),
     notes: Joi.string().allow('').optional(),
+});
+
+export const customerSchema = Joi.object({
+    fullName: Joi.string().min(2).max(120).required(),
+    cnic: Joi.string().min(5).max(40).required(),
+    phoneNumber: Joi.string().min(5).max(60).required(),
+    amount: Joi.number().min(0).required(),
+    email: Joi.string().email().allow('').max(120).optional(),
+    address: Joi.string().allow('').max(240).optional(),
+    city: Joi.string().allow('').max(80).optional(),
+    customerType: Joi.string().valid('regular', 'credit', 'installment', 'wholesale').required(),
+    status: Joi.string().valid('active', 'inactive').required(),
+    notes: Joi.string().allow('').max(600).optional(),
 });
 
 export const installmentPlanSchema = Joi.object({

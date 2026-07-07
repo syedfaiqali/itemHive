@@ -21,6 +21,7 @@ const Dashboard = React.lazy(() => import('./pages/Dashboard/Dashboard'));
 const ProductList = React.lazy(() => import('./pages/Inventory/ProductList'));
 const AddProduct = React.lazy(() => import('./pages/Inventory/AddProduct'));
 const ReduceStock = React.lazy(() => import('./pages/Inventory/ReduceStock'));
+const ProductUnitsPage = React.lazy(() => import('./pages/Inventory/ProductUnitsPage'));
 const POSTerminal = React.lazy(() => import('./pages/POS/POSTerminal'));
 const TransactionHistory = React.lazy(() => import('./pages/Transactions/TransactionHistory'));
 const ReportsPage = React.lazy(() => import('./pages/Reports/ReportsPage'));
@@ -28,6 +29,8 @@ const Signup = React.lazy(() => import('./pages/Auth/Signup'));
 const OrderDesk = React.lazy(() => import('./pages/Orders/OrderDesk'));
 const SettingsPage = React.lazy(() => import('./pages/Settings/SettingsPage'));
 const ProfilePage = React.lazy(() => import('./pages/Profile/ProfilePage'));
+const CustomersPage = React.lazy(() => import('./pages/Customers/CustomersPage'));
+const CustomerRecordsPage = React.lazy(() => import('./pages/Customers/CustomerRecordsPage'));
 const CreditCustomersPage = React.lazy(() => import('./pages/Credit/CreditCustomersPage'));
 const InstallmentsPage = React.lazy(() => import('./pages/Installments/InstallmentsPage'));
 const NotificationsPage = React.lazy(() => import('./pages/Notifications/NotificationsPage'));
@@ -70,6 +73,7 @@ const AppContent: React.FC = () => {
               <Route index element={<Dashboard />} />
               <Route path="inventory" element={<ProductList />} />
               <Route path="inventory/add" element={<AddProduct />} />
+              <Route path="inventory/units" element={<ProductUnitsPage />} />
               <Route path="inventory/requests" element={<InventoryRequestsPage />} />
               <Route path="inventory/reduce" element={
                 <ProtectedRoute allowedRoles={['super_admin', 'admin']}>
@@ -91,6 +95,16 @@ const AppContent: React.FC = () => {
               <Route path="notes" element={
                 <ProtectedRoute allowedRoles={['super_admin', 'admin', 'user']}>
                   <StickyNotes />
+                </ProtectedRoute>
+              } />
+              <Route path="customers" element={
+                <ProtectedRoute allowedRoles={['super_admin', 'admin', 'user']}>
+                  <CustomersPage />
+                </ProtectedRoute>
+              } />
+              <Route path="customer-records" element={
+                <ProtectedRoute allowedRoles={['super_admin', 'admin', 'user']}>
+                  <CustomerRecordsPage />
                 </ProtectedRoute>
               } />
               <Route path="credits" element={

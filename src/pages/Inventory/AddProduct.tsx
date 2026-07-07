@@ -35,8 +35,19 @@ import type { RootState } from '../../store';
 import { motion } from 'framer-motion';
 import useAppCurrency from '../../hooks/useAppCurrency';
 import api from '../../api/axios';
+import { DEFAULT_PRODUCT_UNIT, getProductUnit, PRODUCT_UNITS } from '../../lib/productUnits';
 
 const categories = PRODUCT_CATEGORIES;
+
+const getErrorMessage = (error: unknown, fallback: string) => {
+    if (typeof error === 'string') return error;
+    if (error instanceof Error && error.message) return error.message;
+    if (typeof error === 'object' && error !== null && 'response' in error) {
+        const maybeAxiosError = error as { response?: { data?: { message?: string } } };
+        return maybeAxiosError.response?.data?.message || fallback;
+    }
+    return fallback;
+};
 
 const AddProduct: React.FC = () => {
     const navigate = useNavigate();
@@ -64,6 +75,7 @@ const AddProduct: React.FC = () => {
         salePrice: '',
         stock: '',
         minStock: '',
+        productUnitCode: DEFAULT_PRODUCT_UNIT.code,
         description: '',
         imageUrl: ''
     });
@@ -71,6 +83,8 @@ const AddProduct: React.FC = () => {
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
+
+    const selectedUnit = getProductUnit(formData.productUnitCode);
 
     const applyImageUrl = (nextImageUrl: string, source: 'suggestion' | 'manual') => {
         setFormData((current) => ({ ...current, imageUrl: nextImageUrl }));
@@ -123,9 +137,9 @@ const AddProduct: React.FC = () => {
             if (suggestions.length === 0) {
                 setSuggestionError('No strong image matches were found. You can still upload a file or paste an image URL.');
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             setImageSuggestions([]);
-            setSuggestionError(error || 'Unable to fetch image suggestions right now.');
+            setSuggestionError(getErrorMessage(error, 'Unable to fetch image suggestions right now.'));
         } finally {
             setSuggestionsLoading(false);
         }
@@ -162,8 +176,8 @@ const AddProduct: React.FC = () => {
         try {
             const dataUrl = await readFileAsDataUrl(file);
             applyImageUrl(dataUrl, 'manual');
-        } catch (error: any) {
-            setImageError(error.message || 'Unable to read the image file.');
+        } catch (error: unknown) {
+            setImageError(getErrorMessage(error, 'Unable to read the image file.'));
         }
     };
 
@@ -204,6 +218,9 @@ const AddProduct: React.FC = () => {
             price: parseFloat(formData.salePrice),
             stock: parseInt(formData.stock),
             minStock: parseInt(formData.minStock),
+            productUnitCode: selectedUnit.code,
+            productUnit: selectedUnit.english,
+            productUnitUrdu: selectedUnit.urdu,
             description: formData.description,
             imageUrl: formData.imageUrl
         };
@@ -221,8 +238,8 @@ const AddProduct: React.FC = () => {
             setTimeout(() => {
                 navigate(canCreateDirectly ? '/inventory' : '/inventory/requests');
             }, 1500);
-        } catch (error: any) {
-            setSubmitError(error?.response?.data?.message || error?.message || 'Unable to submit this product right now.');
+        } catch (error: unknown) {
+            setSubmitError(getErrorMessage(error, 'Unable to submit this product right now.'));
         } finally {
             setSubmitting(false);
         }
@@ -317,6 +334,25 @@ const AddProduct: React.FC = () => {
                                     </TextField>
                                 </Grid>
 
+                                <Grid size={{ xs: 12, md: 6 }}>
+                                    <TextField
+                                        select
+                                        fullWidth
+                                        label="Selling Unit / فروخت کی اکائی"
+                                        name="productUnitCode"
+                                        required
+                                        value={formData.productUnitCode}
+                                        onChange={handleChange}
+                                        helperText={`Example display: 10 ${selectedUnit.english} / ${selectedUnit.urdu}`}
+                                    >
+                                        {PRODUCT_UNITS.map((unit) => (
+                                            <MenuItem key={unit.code} value={unit.code}>
+                                                {unit.english} / {unit.urdu}
+                                            </MenuItem>
+                                        ))}
+                                    </TextField>
+                                </Grid>
+
                                 <Grid size={12}>
                                     <TextField
                                         fullWidth
@@ -376,6 +412,7 @@ const AddProduct: React.FC = () => {
                                         required
                                         value={formData.stock}
                                         onChange={handleChange}
+                                        helperText={`Stock will be shown as ${formData.stock || 0} ${selectedUnit.english} / ${selectedUnit.urdu}`}
                                     />
                                 </Grid>
 

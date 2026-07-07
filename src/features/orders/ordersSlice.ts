@@ -1,16 +1,22 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 
 export type OrderStatus = 'pending' | 'fulfilled' | 'rejected';
+export type OrderPaymentMethod = 'cash' | 'card' | 'credit' | 'installment';
 
 export interface Order {
     id: string;
     productId: string;
     productName: string;
     quantity: number;
+    customerName?: string;
+    orderAmount?: number;
     requestedBy: string;
     status: OrderStatus;
     timestamp: string;
     notes?: string;
+    paymentMethod?: OrderPaymentMethod;
+    paidNow?: number;
+    dueAmount?: number;
 }
 
 interface OrdersState {

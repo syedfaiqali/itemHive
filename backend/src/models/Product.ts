@@ -10,6 +10,9 @@ export interface IProduct extends Document {
     price: number;
     stock: number;
     minStock: number;
+    productUnitCode?: string;
+    productUnit?: string;
+    productUnitUrdu?: string;
     description: string;
     imageUrl?: string;
     lastUpdated: Date;
@@ -30,6 +33,9 @@ const ProductSchema: Schema<IProduct> = new Schema({
     price: { type: Number, required: true },
     stock: { type: Number, required: true, default: 0 },
     minStock: { type: Number, required: true, default: 5 },
+    productUnitCode: { type: String, default: 'piece', trim: true },
+    productUnit: { type: String, default: 'Piece', trim: true },
+    productUnitUrdu: { type: String, default: 'عدد', trim: true },
     description: { type: String, default: '' },
     imageUrl: { type: String, default: '' },
     lastUpdated: { type: Date, default: Date.now },

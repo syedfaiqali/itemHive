@@ -10,6 +10,9 @@ export interface IInventoryRequestProductData {
     price: number;
     stock: number;
     minStock: number;
+    productUnitCode?: string;
+    productUnit?: string;
+    productUnitUrdu?: string;
     description?: string;
     imageUrl?: string;
     batchNumber?: string;
@@ -45,6 +48,9 @@ const InventoryRequestSchema = new Schema<IInventoryRequest>({
         price: { type: Number, required: true, min: 0 },
         stock: { type: Number, required: true, min: 0 },
         minStock: { type: Number, required: true, min: 0 },
+        productUnitCode: { type: String, default: 'piece' },
+        productUnit: { type: String, default: 'Piece' },
+        productUnitUrdu: { type: String, default: 'عدد' },
         description: { type: String, default: '' },
         imageUrl: { type: String, default: '' },
         batchNumber: { type: String, default: '' },

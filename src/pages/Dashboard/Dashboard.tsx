@@ -21,7 +21,11 @@ import {
     AlertTriangle,
     ArrowRight,
     DollarSign,
-    Monitor
+    Monitor,
+    Trophy,
+    UserRound,
+    CalendarDays,
+    BadgeDollarSign
 } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../../store';
@@ -44,6 +48,8 @@ import { useTheme } from '@mui/material/styles';
 import heroGraphic from '../../assets/Modern retail POS system setup.webp';
 import useAppCurrency from '../../hooks/useAppCurrency';
 
+type StatColor = 'primary' | 'success' | 'error' | 'warning';
+
 const Dashboard: React.FC = () => {
     const theme = useTheme();
     const navigate = useNavigate();
@@ -54,9 +60,44 @@ const Dashboard: React.FC = () => {
 
     const totalStock = products.reduce((acc, p) => acc + p.stock, 0);
     const lowStockItems = products.filter(p => p.stock <= p.minStock);
-    const totalValue = products.reduce((acc, p) => acc + (p.price * p.stock), 0);
-
     const recentTransactions = transactions.slice(0, 5);
+    const salesTransactions = transactions.filter((tx) => tx.type === 'reduction');
+    const totalRevenue = salesTransactions.reduce((acc, tx) => acc + Number(tx.totalPrice || 0), 0);
+    const formatActivityDate = (timestamp: string) => new Date(timestamp).toLocaleDateString('en-GB', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+    });
+    const topSoldProduct = Object.values(salesTransactions.reduce<Record<string, {
+        productName: string;
+        quantity: number;
+        amount: number;
+        latestCustomer: string;
+        latestAmount: number;
+        latestDate: string;
+    }>>((acc, tx) => {
+        const key = tx.productId || tx.productName;
+        const current = acc[key] || {
+            productName: tx.productName,
+            quantity: 0,
+            amount: 0,
+            latestCustomer: tx.customerName || 'Walk-in Customer',
+            latestAmount: tx.totalPrice || 0,
+            latestDate: tx.timestamp,
+        };
+        const txDate = new Date(tx.timestamp).getTime();
+        const currentDate = new Date(current.latestDate).getTime();
+
+        current.quantity += Number(tx.amount || 0);
+        current.amount += Number(tx.totalPrice || 0);
+        if (txDate >= currentDate) {
+            current.latestCustomer = tx.customerName || 'Walk-in Customer';
+            current.latestAmount = tx.totalPrice || 0;
+            current.latestDate = tx.timestamp;
+        }
+        acc[key] = current;
+        return acc;
+    }, {})).sort((a, b) => b.quantity - a.quantity || b.amount - a.amount)[0];
 
     // Dynamic Chart Data: Last 7 days movement
     const last7Days = [...Array(7)].map((_, i) => {
@@ -73,7 +114,7 @@ const Dashboard: React.FC = () => {
     });
 
     // Dynamic Category Data: Top 4 categories by value
-    const catMap = products.reduce((acc: any, p) => {
+    const catMap = products.reduce<Record<string, number>>((acc, p) => {
         acc[p.category] = (acc[p.category] || 0) + (p.stock * p.price);
         return acc;
     }, {});
@@ -93,7 +134,13 @@ const Dashboard: React.FC = () => {
         .sort((a, b) => b.value - a.value)
         .slice(0, 4);
 
-    const stats = [
+    const stats: Array<{
+        title: string;
+        value: React.ReactNode;
+        icon: React.ReactNode;
+        color: StatColor;
+        trend: string;
+    }> = [
         {
             title: 'Total Products',
             value: products.length,
@@ -116,11 +163,11 @@ const Dashboard: React.FC = () => {
             trend: `${lowStockItems.length} items need attention`
         },
         {
-            title: 'Inventory Value',
-            value: formatCurrency(totalValue, { minimumFractionDigits: 0, maximumFractionDigits: 0 }),
+            title: 'Revenue',
+            value: formatCurrency(totalRevenue, { minimumFractionDigits: 0, maximumFractionDigits: 0 }),
             icon: <DollarSign size={24} />,
             color: 'warning',
-            trend: 'Calculated current valuation'
+            trend: 'Total sales revenue'
         },
     ];
 
@@ -283,12 +330,12 @@ const Dashboard: React.FC = () => {
                                     <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
                                         <Avatar
                                             sx={{
-                                                bgcolor: alpha((theme.palette as any)[stat.color].main, 0.12),
-                                                color: (theme.palette as any)[stat.color].main,
+                                                bgcolor: alpha(theme.palette[stat.color].main, 0.12),
+                                                color: theme.palette[stat.color].main,
                                                 width: 48,
                                                 height: 48,
                                                 borderRadius: 2,
-                                                boxShadow: `0 6px 14px -10px ${alpha((theme.palette as any)[stat.color].main, 0.7)}`
+                                                boxShadow: `0 6px 14px -10px ${alpha(theme.palette[stat.color].main, 0.7)}`
                                             }}
                                         >
                                             {stat.icon}
@@ -306,6 +353,90 @@ const Dashboard: React.FC = () => {
                         </motion.div>
                     </Grid>
                 ))}
+
+                <Grid size={12} className="section-rise-delay">
+                    <Card
+                        sx={{
+                            borderRadius: '8px',
+                            border: '1px solid',
+                            borderColor: alpha(theme.palette.primary.main, 0.18),
+                            background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.11)}, ${alpha(theme.palette.warning.main, 0.08)} 42%, ${alpha(theme.palette.background.paper, 0.96)})`,
+                            boxShadow: `0 18px 45px ${alpha(theme.palette.common.black, 0.08)}`,
+                        }}
+                    >
+                        <CardContent sx={{ p: { xs: 2.5, md: 3 } }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap', alignItems: 'center', mb: 2.5 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                    <Avatar sx={{ bgcolor: alpha(theme.palette.warning.main, 0.16), color: 'warning.main', borderRadius: '8px' }}>
+                                        <Trophy size={22} />
+                                    </Avatar>
+                                    <Box>
+                                        <Typography variant="h6" fontWeight={900}>Best Seller Snapshot</Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                            Product with the highest sold quantity from stock-out transactions.
+                                        </Typography>
+                                    </Box>
+                                </Box>
+                                <Button size="small" endIcon={<ArrowRight size={16} />} onClick={() => navigate('/transactions')}>
+                                    View Sales
+                                </Button>
+                            </Box>
+
+                            {!topSoldProduct ? (
+                                <Box sx={{ textAlign: 'center', py: 3 }}>
+                                    <Typography color="text.secondary">No product sales yet.</Typography>
+                                </Box>
+                            ) : (
+                                <Grid container spacing={2}>
+                                    <Grid size={{ xs: 12, md: 4 }}>
+                                        <Box sx={{ p: 2, borderRadius: '8px', bgcolor: alpha(theme.palette.background.paper, 0.72), border: '1px solid', borderColor: 'divider', height: '100%' }}>
+                                            <Typography variant="caption" color="text.secondary" fontWeight={800}>MOST SOLD PRODUCT</Typography>
+                                            <Typography variant="h5" fontWeight={900} sx={{ mt: 0.75 }}>{topSoldProduct.productName}</Typography>
+                                            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                                                Total sold quantity: <Box component="span" sx={{ fontWeight: 900, color: 'primary.main' }}>{topSoldProduct.quantity}</Box>
+                                            </Typography>
+                                            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
+                                                Total sales amount: <Box component="span" sx={{ fontWeight: 900, color: 'warning.main' }}>{formatCurrency(topSoldProduct.amount, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</Box>
+                                            </Typography>
+                                        </Box>
+                                    </Grid>
+                                    <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+                                        <Box sx={{ p: 2, borderRadius: '8px', bgcolor: alpha(theme.palette.background.paper, 0.72), border: '1px solid', borderColor: 'divider', height: '100%' }}>
+                                            <UserRound size={18} color={theme.palette.primary.main} />
+                                            <Typography variant="caption" color="text.secondary" fontWeight={800} sx={{ display: 'block', mt: 1 }}>CUSTOMER</Typography>
+                                            <Typography variant="body2" fontWeight={900}>{topSoldProduct.latestCustomer}</Typography>
+                                        </Box>
+                                    </Grid>
+                                    <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+                                        <Box sx={{ p: 2, borderRadius: '8px', bgcolor: alpha(theme.palette.background.paper, 0.72), border: '1px solid', borderColor: 'divider', height: '100%' }}>
+                                            <Package size={18} color={theme.palette.success.main} />
+                                            <Typography variant="caption" color="text.secondary" fontWeight={800} sx={{ display: 'block', mt: 1 }}>QUANTITY</Typography>
+                                            <Typography variant="body2" fontWeight={900}>{topSoldProduct.quantity}</Typography>
+                                        </Box>
+                                    </Grid>
+                                    <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+                                        <Box sx={{ p: 2, borderRadius: '8px', bgcolor: alpha(theme.palette.background.paper, 0.72), border: '1px solid', borderColor: 'divider', height: '100%' }}>
+                                            <BadgeDollarSign size={18} color={theme.palette.warning.main} />
+                                            <Typography variant="caption" color="text.secondary" fontWeight={800} sx={{ display: 'block', mt: 1 }}>LATEST AMOUNT</Typography>
+                                            <Typography variant="body2" fontWeight={900}>
+                                                {formatCurrency(topSoldProduct.latestAmount, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                            </Typography>
+                                        </Box>
+                                    </Grid>
+                                    <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+                                        <Box sx={{ p: 2, borderRadius: '8px', bgcolor: alpha(theme.palette.background.paper, 0.72), border: '1px solid', borderColor: 'divider', height: '100%' }}>
+                                            <CalendarDays size={18} color={theme.palette.info.main} />
+                                            <Typography variant="caption" color="text.secondary" fontWeight={800} sx={{ display: 'block', mt: 1 }}>LATEST DATE</Typography>
+                                            <Typography variant="body2" fontWeight={900}>
+                                                {new Date(topSoldProduct.latestDate).toLocaleDateString()}
+                                            </Typography>
+                                        </Box>
+                                    </Grid>
+                                </Grid>
+                            )}
+                        </CardContent>
+                    </Card>
+                </Grid>
 
                 <Grid size={{ xs: 12, md: 8 }} className="section-rise-delay">
                     <Card sx={{ borderRadius: 4 }}>
@@ -361,7 +492,7 @@ const Dashboard: React.FC = () => {
                                         <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fill: theme.palette.text.secondary, fontSize: 12, fontWeight: 600 }} width={80} />
                                         <Tooltip
                                             cursor={{ fill: 'transparent' }}
-                                            formatter={(value: any) => [formatCurrency(value || 0, { minimumFractionDigits: 0, maximumFractionDigits: 0 }), 'Value']}
+                                            formatter={(value: unknown) => [formatCurrency(Number(value) || 0, { minimumFractionDigits: 0, maximumFractionDigits: 0 }), 'Value']}
                                         />
                                         <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={25}>
                                             {dynamicCategoryData.map((entry, index) => (
@@ -404,14 +535,16 @@ const Dashboard: React.FC = () => {
                             ) : (
                                 <Box>
                                     <TableContainer sx={{ overflowX: 'auto' }}>
-                                        <Table size="small" sx={{ minWidth: 520 }}>
+                                        <Table size="small" sx={{ minWidth: 860 }}>
                                             <TableHead>
                                                 <TableRow>
                                                     <TableCell sx={{ fontWeight: 700 }}>ID</TableCell>
                                                     <TableCell sx={{ fontWeight: 700 }}>Product</TableCell>
+                                                    <TableCell sx={{ fontWeight: 700 }}>Customer</TableCell>
                                                     <TableCell sx={{ fontWeight: 700 }}>Action</TableCell>
                                                     <TableCell sx={{ fontWeight: 700 }}>Quantity</TableCell>
                                                     <TableCell sx={{ fontWeight: 700 }}>Value</TableCell>
+                                                    <TableCell sx={{ fontWeight: 700 }}>Date</TableCell>
                                                 </TableRow>
                                             </TableHead>
                                             <TableBody>
@@ -419,6 +552,7 @@ const Dashboard: React.FC = () => {
                                                     <TableRow key={tx.id} hover>
                                                         <TableCell sx={{ fontWeight: 600 }}>#{tx.id}</TableCell>
                                                         <TableCell>{tx.productName}</TableCell>
+                                                        <TableCell sx={{ fontWeight: 600 }}>{tx.customerName?.trim() || 'Anonymous'}</TableCell>
                                                         <TableCell>
                                                             <Chip
                                                                 label={tx.type === 'addition' ? 'Stock In' : 'Stock Out'}
@@ -432,6 +566,7 @@ const Dashboard: React.FC = () => {
                                                         <TableCell sx={{ fontWeight: 700 }}>
                                                             {formatCurrency(tx.totalPrice || 0, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                                                         </TableCell>
+                                                        <TableCell sx={{ fontWeight: 600 }}>{formatActivityDate(tx.timestamp)}</TableCell>
                                                     </TableRow>
                                                 ))}
                                             </TableBody>

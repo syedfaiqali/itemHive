@@ -53,21 +53,9 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { alpha, useTheme, styled } from '@mui/material/styles';
 import { motion } from 'framer-motion';
 import useAppCurrency from '../../hooks/useAppCurrency';
+import { DEFAULT_PRODUCT_UNIT, getProductUnit, getProductUnitLabel, PRODUCT_UNITS } from '../../lib/productUnits';
 
-const AddProductDialogTransition = React.forwardRef<HTMLDivElement, any>((props, ref) => (
-    <motion.div
-        ref={ref}
-        initial={{ opacity: 0, scale: 0.9, y: 40 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.9, y: 40 }}
-        transition={{ duration: 0.4, type: 'spring', damping: 30, stiffness: 200 }}
-        {...props}
-    />
-));
-
-AddProductDialogTransition.displayName = 'AddProductDialogTransition';
-
-const IconContainer = styled(Box)(({ theme, color }: { theme?: any, color?: string }) => ({
+const IconContainer = styled(Box)<{ color?: string }>(({ theme, color }) => ({
     width: 44,
     height: 44,
     borderRadius: 12,
@@ -112,6 +100,7 @@ const PremiumDialog = styled(Dialog)(({ theme }) => ({
 }));
 
 const categories_list = PRODUCT_CATEGORIES;
+type InlineField = 'stock' | 'salePrice';
 
 const ProductList: React.FC = () => {
     const theme = useTheme();
@@ -127,6 +116,8 @@ const ProductList: React.FC = () => {
     const [deleteId, setDeleteId] = useState<string | null>(null);
     const [viewProduct, setViewProduct] = useState<Product | null>(null);
     const [editProduct, setEditProduct] = useState<Product | null>(null);
+    const [inlineEdit, setInlineEdit] = useState<{ id: string; field: InlineField; value: string } | null>(null);
+    const [inlineSaving, setInlineSaving] = useState<string | null>(null);
     const [snack, setSnack] = useState<{ open: boolean, message: string, severity: 'success' | 'error' | 'info' | 'warning' }>({
         open: false,
         message: '',
@@ -144,6 +135,7 @@ const ProductList: React.FC = () => {
         salePrice: '',
         stock: '',
         minStock: '',
+        productUnitCode: DEFAULT_PRODUCT_UNIT.code,
         description: '',
         batchNumber: '',
         expiryDate: '',
@@ -234,6 +226,58 @@ const ProductList: React.FC = () => {
         }
     };
 
+    const saveProductInline = (product: Product, message = 'Product updated successfully') => {
+        dispatch(updateProductApi(product))
+            .unwrap()
+            .then(() => showSnack(message, 'success'))
+            .catch((error) => showSnack(typeof error === 'string' ? error : 'Failed to update product', 'error'))
+            .finally(() => setInlineSaving(null));
+    };
+
+    const startInlineEdit = (product: Product, field: InlineField) => {
+        if (!isManager || inlineSaving) return;
+        setInlineEdit({
+            id: product.id,
+            field,
+            value: String(field === 'stock' ? product.stock : product.salePrice),
+        });
+    };
+
+    const cancelInlineEdit = () => {
+        setInlineEdit(null);
+    };
+
+    const commitInlineEdit = (product: Product) => {
+        if (!inlineEdit || inlineEdit.id !== product.id) return;
+
+        const numericValue = Number(inlineEdit.value);
+        if (!Number.isFinite(numericValue) || numericValue < 0) {
+            showSnack('Please enter a valid positive number', 'error');
+            return;
+        }
+
+        const updatedProduct: Product = inlineEdit.field === 'stock'
+            ? { ...product, stock: numericValue }
+            : { ...product, salePrice: numericValue, price: numericValue };
+
+        setInlineEdit(null);
+        setInlineSaving(`${product.id}-${inlineEdit.field}`);
+        saveProductInline(updatedProduct, inlineEdit.field === 'stock' ? 'Quantity updated successfully' : 'Price updated successfully');
+    };
+
+    const handleUnitUpdate = (product: Product, unitCode: string) => {
+        const unit = getProductUnit(unitCode);
+        if (!isManager || inlineSaving || product.productUnitCode === unit.code) return;
+
+        setInlineSaving(`${product.id}-unit`);
+        saveProductInline({
+            ...product,
+            productUnitCode: unit.code,
+            productUnit: unit.english,
+            productUnitUrdu: unit.urdu,
+        }, 'Product unit updated successfully');
+    };
+
     const handleAddChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setAddFormData({ ...addFormData, [e.target.name]: e.target.value });
     };
@@ -257,6 +301,9 @@ const ProductList: React.FC = () => {
             price: parseFloat(addFormData.salePrice),
             stock: parseInt(addFormData.stock),
             minStock: parseInt(addFormData.minStock),
+            productUnitCode: getProductUnit(addFormData.productUnitCode).code,
+            productUnit: getProductUnit(addFormData.productUnitCode).english,
+            productUnitUrdu: getProductUnit(addFormData.productUnitCode).urdu,
             description: addFormData.description,
             batchNumber: addFormData.batchNumber || `B-${Math.floor(Math.random() * 9000) + 1000}`,
             expiryDate: addFormData.expiryDate || new Date(Date.now() + 31536000000).toISOString().split('T')[0],
@@ -272,6 +319,7 @@ const ProductList: React.FC = () => {
             salePrice: '',
             stock: '',
             minStock: '',
+            productUnitCode: DEFAULT_PRODUCT_UNIT.code,
             description: '',
             batchNumber: '',
             expiryDate: '',
@@ -281,12 +329,14 @@ const ProductList: React.FC = () => {
     };
 
     const exportToCSV = () => {
-        const headers = ['ID', 'Business', 'Name', 'Category', 'Purchase Price', 'Sale Price', 'Stock', 'Min Stock', 'Last Updated'];
+        const headers = ['ID', 'Business', 'Name', 'Category', 'Unit', 'Unit Urdu', 'Purchase Price', 'Sale Price', 'Stock', 'Min Stock', 'Last Updated'];
         const rows = products.map(p => [
             p.id,
             p.businessName || '',
             p.name,
             p.category,
+            p.productUnit || getProductUnit(p.productUnitCode).english,
+            p.productUnitUrdu || getProductUnit(p.productUnitCode).urdu,
             p.purchasePrice,
             p.salePrice,
             p.stock,
@@ -429,12 +479,13 @@ const ProductList: React.FC = () => {
                     )}
 
                     <TableContainer component={Box} sx={{ overflowX: 'auto' }}>
-                        <Table sx={{ minWidth: 700 }}>
+                        <Table sx={{ minWidth: 980 }}>
                             <TableHead>
                                 <TableRow>
                                     <TableCell sx={{ fontWeight: 700 }}>PRODUCT NAME</TableCell>
                                     <TableCell sx={{ fontWeight: 700 }}>CATEGORY</TableCell>
-                                    <TableCell sx={{ fontWeight: 700 }}>STOCK LEVEL</TableCell>
+                                    <TableCell sx={{ fontWeight: 700 }}>QUANTITY</TableCell>
+                                    <TableCell sx={{ fontWeight: 700 }}>PRODUCT UNIT</TableCell>
                                     <TableCell sx={{ fontWeight: 700 }}>PRICE</TableCell>
                                     <TableCell sx={{ fontWeight: 700 }}>STATUS</TableCell>
                                     <TableCell align="right" sx={{ fontWeight: 700 }}>ACTIONS</TableCell>
@@ -486,11 +537,102 @@ const ProductList: React.FC = () => {
                                                 sx={{ fontWeight: 700 }}
                                             />
                                         </TableCell>
-                                        <TableCell>
-                                            <Typography variant="body2" fontWeight={600}>{product.stock} Units</Typography>
+                                        <TableCell
+                                            onClick={() => startInlineEdit(product, 'stock')}
+                                            sx={{ cursor: isManager ? 'pointer' : 'default', minWidth: 150 }}
+                                        >
+                                            {inlineEdit?.id === product.id && inlineEdit.field === 'stock' ? (
+                                                <TextField
+                                                    autoFocus
+                                                    size="small"
+                                                    type="number"
+                                                    value={inlineEdit.value}
+                                                    onChange={(e) => setInlineEdit({ ...inlineEdit, value: e.target.value })}
+                                                    onBlur={() => commitInlineEdit(product)}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter') {
+                                                            e.preventDefault();
+                                                            e.currentTarget.blur();
+                                                        }
+                                                        if (e.key === 'Escape') cancelInlineEdit();
+                                                    }}
+                                                    inputProps={{ min: 0, step: '0.01' }}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    sx={{ width: 110 }}
+                                                />
+                                            ) : (
+                                                <Stack spacing={0.25}>
+                                                    <Typography variant="body2" fontWeight={800}>
+                                                        {product.stock}
+                                                    </Typography>
+                                                    <Typography variant="caption" color="text.secondary">
+                                                        {inlineSaving === `${product.id}-stock` ? 'Saving...' : isManager ? '' : 'Quantity'}
+                                                    </Typography>
+                                                </Stack>
+                                            )}
                                         </TableCell>
-                                        <TableCell>
-                                            <Typography variant="body2" fontWeight={700}>{formatCurrency(product.price)}</Typography>
+                                        <TableCell sx={{ minWidth: 190 }}>
+                                            {isManager ? (
+                                                <TextField
+                                                    select
+                                                    size="small"
+                                                    value={product.productUnitCode || DEFAULT_PRODUCT_UNIT.code}
+                                                    onChange={(e) => handleUnitUpdate(product, e.target.value)}
+                                                    disabled={inlineSaving === `${product.id}-unit`}
+                                                    sx={{
+                                                        minWidth: 165,
+                                                        '& .MuiInputBase-root': {
+                                                            borderRadius: 2,
+                                                            fontWeight: 800,
+                                                        },
+                                                    }}
+                                                >
+                                                    {PRODUCT_UNITS.map((unit) => (
+                                                        <MenuItem key={unit.code} value={unit.code}>
+                                                            {unit.english} / {unit.urdu}
+                                                        </MenuItem>
+                                                    ))}
+                                                </TextField>
+                                            ) : (
+                                                <Typography variant="body2" fontWeight={700}>
+                                                    {getProductUnitLabel(product.productUnitCode, product.productUnit, product.productUnitUrdu)}
+                                                </Typography>
+                                            )}
+                                        </TableCell>
+                                        <TableCell
+                                            onClick={() => startInlineEdit(product, 'salePrice')}
+                                            sx={{ cursor: isManager ? 'pointer' : 'default', minWidth: 160 }}
+                                        >
+                                            {inlineEdit?.id === product.id && inlineEdit.field === 'salePrice' ? (
+                                                <TextField
+                                                    autoFocus
+                                                    size="small"
+                                                    type="number"
+                                                    value={inlineEdit.value}
+                                                    onChange={(e) => setInlineEdit({ ...inlineEdit, value: e.target.value })}
+                                                    onBlur={() => commitInlineEdit(product)}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter') {
+                                                            e.preventDefault();
+                                                            e.currentTarget.blur();
+                                                        }
+                                                        if (e.key === 'Escape') cancelInlineEdit();
+                                                    }}
+                                                    inputProps={{ min: 0, step: '0.01' }}
+                                                    InputProps={{
+                                                        startAdornment: <InputAdornment position="start">{currencySymbol}</InputAdornment>,
+                                                    }}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    sx={{ width: 135 }}
+                                                />
+                                            ) : (
+                                                <Stack spacing={0.25}>
+                                                    <Typography variant="body2" fontWeight={800}>{formatCurrency(product.price)}</Typography>
+                                                    <Typography variant="caption" color="text.secondary">
+                                                        {inlineSaving === `${product.id}-salePrice` ? 'Saving...' : isManager ? '' : 'Sale price'}
+                                                    </Typography>
+                                                </Stack>
+                                            )}
                                         </TableCell>
                                         <TableCell>
                                             {product.stock <= 0 ? (
@@ -537,16 +679,6 @@ const ProductList: React.FC = () => {
                 maxWidth="sm"
                 fullWidth
                 scroll="paper"
-                TransitionComponent={React.forwardRef((props: any, ref) => (
-                    <motion.div
-                        ref={ref}
-                        initial={{ opacity: 0, y: 30, scale: 0.95 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 30, scale: 0.95 }}
-                        transition={{ duration: 0.3, type: "spring", damping: 25, stiffness: 200 }}
-                        {...props}
-                    />
-                ))}
             >
                 <DialogTitle>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -616,8 +748,8 @@ const ProductList: React.FC = () => {
                                 {[
                                     { label: 'BUY', value: formatCurrency(viewProduct.purchasePrice), icon: <DollarSign size={18} />, color: '#f59e0b' },
                                     { label: 'SELL', value: formatCurrency(viewProduct.salePrice), icon: <DollarSign size={18} />, color: '#10b981' },
-                                    { label: 'STOCK', value: `${viewProduct.stock} Units`, icon: <TrendingUp size={18} />, color: '#6366f1' },
-                                    { label: 'MIN STOCK', value: `${viewProduct.minStock} Units`, icon: <ShieldCheck size={18} />, color: '#0ea5e9' },
+                                    { label: 'STOCK', value: `${viewProduct.stock} ${getProductUnitLabel(viewProduct.productUnitCode, viewProduct.productUnit, viewProduct.productUnitUrdu)}`, icon: <TrendingUp size={18} />, color: '#6366f1' },
+                                    { label: 'MIN STOCK', value: `${viewProduct.minStock} ${getProductUnitLabel(viewProduct.productUnitCode, viewProduct.productUnit, viewProduct.productUnitUrdu)}`, icon: <ShieldCheck size={18} />, color: '#0ea5e9' },
                                     { label: 'BATCH', value: viewProduct.batchNumber || 'N/A', icon: <Layers size={18} />, color: '#a855f7' },
                                     { label: 'EXPIRY', value: viewProduct.expiryDate || 'N/A', icon: <History size={18} />, color: '#ef4444' },
                                     { label: 'SUPPLIER', value: viewProduct.supplier || 'N/A', icon: <ShieldCheck size={18} />, color: '#0ea5e9' },
@@ -730,8 +862,32 @@ const ProductList: React.FC = () => {
                                         type="number"
                                         required
                                         value={editProduct.stock}
-                                        onChange={(e) => setEditProduct({ ...editProduct, stock: parseInt(e.target.value) })}
+                                        onChange={(e) => setEditProduct({ ...editProduct, stock: parseFloat(e.target.value) })}
                                     />
+                                </Grid>
+                                <Grid size={{ xs: 12, md: 4 }}>
+                                    <TextField
+                                        select
+                                        fullWidth
+                                        label="Selling Unit / فروخت کی اکائی"
+                                        required
+                                        value={editProduct.productUnitCode || DEFAULT_PRODUCT_UNIT.code}
+                                        onChange={(e) => {
+                                            const unit = getProductUnit(e.target.value);
+                                            setEditProduct({
+                                                ...editProduct,
+                                                productUnitCode: unit.code,
+                                                productUnit: unit.english,
+                                                productUnitUrdu: unit.urdu,
+                                            });
+                                        }}
+                                    >
+                                        {PRODUCT_UNITS.map((unit) => (
+                                            <MenuItem key={unit.code} value={unit.code}>
+                                                {unit.english} / {unit.urdu}
+                                            </MenuItem>
+                                        ))}
+                                    </TextField>
                                 </Grid>
                                 <Grid size={{ xs: 12, md: 4 }}>
                                     <TextField
@@ -811,7 +967,6 @@ const ProductList: React.FC = () => {
                     component: 'form',
                     onSubmit: handleAddSubmit
                 }}
-                TransitionComponent={AddProductDialogTransition}
             >
                 <DialogTitle>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -870,6 +1025,25 @@ const ProductList: React.FC = () => {
                                             {categories_list.map((option) => (
                                                 <MenuItem key={option} value={option} sx={{ fontWeight: 600 }}>
                                                     {option}
+                                                </MenuItem>
+                                            ))}
+                                    </TextField>
+                                </Grid>
+                                    <Grid size={12}>
+                                        <TextField
+                                            select
+                                            fullWidth
+                                            label="Selling Unit / فروخت کی اکائی"
+                                            name="productUnitCode"
+                                            required
+                                            value={addFormData.productUnitCode}
+                                            onChange={handleAddChange}
+                                            InputProps={{ sx: { borderRadius: 3 } }}
+                                            helperText="Choose how this product is sold: Bori, KG, Litre, Carton, etc."
+                                        >
+                                            {PRODUCT_UNITS.map((unit) => (
+                                                <MenuItem key={unit.code} value={unit.code} sx={{ fontWeight: 600 }}>
+                                                    {unit.english} / {unit.urdu}
                                                 </MenuItem>
                                             ))}
                                         </TextField>
@@ -966,6 +1140,7 @@ const ProductList: React.FC = () => {
                                         value={addFormData.stock}
                                         onChange={handleAddChange}
                                         InputProps={{ sx: { borderRadius: 3, bgcolor: 'background.paper' } }}
+                                        helperText={`Shown as ${addFormData.stock || 0} ${getProductUnitLabel(addFormData.productUnitCode)}`}
                                     />
                                     <TextField
                                         fullWidth
