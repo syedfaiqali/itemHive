@@ -89,6 +89,18 @@ export const getCreditCustomers = async (req: AuthRequest, res: Response) => {
     }
 };
 
+export const getCreditPayments = async (req: AuthRequest, res: Response) => {
+    try {
+        const payments = await CreditPayment.find(buildTenantFilter(req.user!))
+            .sort({ timestamp: -1 })
+            .lean();
+
+        res.json(payments);
+    } catch (error: any) {
+        res.status(500).json({ message: error.message || 'Failed to fetch received payments' });
+    }
+};
+
 export const createCreditPayment = async (req: AuthRequest, res: Response) => {
     try {
         const customerName = String(req.body.customerName || '').trim();
