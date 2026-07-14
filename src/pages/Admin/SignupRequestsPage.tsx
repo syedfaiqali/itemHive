@@ -36,6 +36,7 @@ interface SignupRequest {
     employeeCount: number;
     address?: string;
     notes?: string;
+    requestType?: 'new_signup' | 'duplicate_email';
     status: 'pending' | 'approved' | 'rejected';
     decisionNote?: string;
     createdAt: string;
@@ -150,6 +151,9 @@ const SignupRequestsPage: React.FC = () => {
                                     <Typography variant="caption" color="primary.main" display="block" fontWeight={800}>
                                         {request.packageName || 'No package'}
                                     </Typography>
+                                    {request.requestType === 'duplicate_email' && (
+                                        <Chip label="Duplicate email" size="small" color="info" sx={{ mt: 0.5, fontWeight: 800 }} />
+                                    )}
                                     <Typography variant="caption" color="text.secondary" display="block">
                                         {request.country || 'No country'} {request.currency ? `- ${request.currency}` : ''}
                                     </Typography>
@@ -196,11 +200,17 @@ const SignupRequestsPage: React.FC = () => {
             </TableContainer>
 
             <Dialog open={Boolean(decisionTarget)} onClose={() => !saving && setDecisionTarget(null)} fullWidth maxWidth="sm">
-                <DialogTitle>{decision === 'approved' ? 'Approve Request' : 'Reject Request'}</DialogTitle>
+                <DialogTitle>
+                    {decision === 'approved'
+                        ? decisionTarget?.requestType === 'duplicate_email' ? 'Approve Duplicate Email Review' : 'Approve Request'
+                        : 'Reject Request'}
+                </DialogTitle>
                 <DialogContent>
                     <Stack spacing={2} sx={{ pt: 1 }}>
                         <Typography variant="body2">
-                            {decisionTarget?.fullName} requested access for <strong>{decisionTarget?.businessName}</strong>.
+                            {decisionTarget?.requestType === 'duplicate_email'
+                                ? <>This email already has an account. Review the duplicate registration for <strong>{decisionTarget?.businessName}</strong>.</>
+                                : <>{decisionTarget?.fullName} requested access for <strong>{decisionTarget?.businessName}</strong>.</>}
                         </Typography>
                         <TextField
                             label="Decision note"
@@ -215,7 +225,9 @@ const SignupRequestsPage: React.FC = () => {
                 <DialogActions>
                     <Button onClick={() => setDecisionTarget(null)} disabled={saving}>Cancel</Button>
                     <Button color={decision === 'approved' ? 'primary' : 'error'} variant="contained" onClick={submitDecision} disabled={saving}>
-                        {saving ? 'Saving...' : decision === 'approved' ? 'Approve & Create Account' : 'Reject Request'}
+                        {saving ? 'Saving...' : decision === 'approved'
+                            ? decisionTarget?.requestType === 'duplicate_email' ? 'Approve Review' : 'Approve & Create Account'
+                            : 'Reject Request'}
                     </Button>
                 </DialogActions>
             </Dialog>

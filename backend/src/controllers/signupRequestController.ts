@@ -1,5 +1,5 @@
 import { Response } from 'express';
-import SignupRequest from '../models/SignupRequest';
+import SignupRequest, { type ISignupRequest } from '../models/SignupRequest';
 import User from '../models/User';
 import Business from '../models/Business';
 import type { AuthRequest } from '../middleware/auth';
@@ -19,6 +19,72 @@ const sendSignupDecisionEmail = async (to: string, payload: Record<string, unkno
     }
 };
 
+export interface SignupRequestData {
+    fullName: string;
+    email: string;
+    password: string;
+    businessName: string;
+    packageId?: 'free_trial' | 'starter' | 'pro';
+    packageName?: string;
+    country?: string;
+    currency?: string;
+    businessType?: string;
+    phone?: string;
+    employeeCount?: number;
+    address?: string;
+    notes?: string;
+}
+
+export const createPendingSignupRequest = async (
+    data: SignupRequestData,
+    requestType: 'new_signup' | 'duplicate_email' = 'new_signup'
+) => {
+    const email = String(data.email || '').trim().toLowerCase();
+    const pendingRequest = await SignupRequest.findOne({ email, status: 'pending' });
+    if (pendingRequest) {
+        return pendingRequest;
+    }
+
+    return SignupRequest.create({
+        fullName: String(data.fullName || '').trim(),
+        email,
+        password: String(data.password || ''),
+        businessName: String(data.businessName || '').trim(),
+        packageId: data.packageId || 'free_trial',
+        packageName: data.packageName || 'Free Trial',
+        country: data.country || 'PK',
+        currency: data.currency || 'PKR',
+        businessType: String(data.businessType || '').trim(),
+        phone: String(data.phone || '').trim(),
+        employeeCount: Number(data.employeeCount || 1),
+        address: String(data.address || '').trim(),
+        notes: String(data.notes || '').trim(),
+        requestType,
+    });
+};
+
+export const sendDuplicateSignupApprovalRequestEmail = async (request: ISignupRequest) => {
+    const payload = {
+        subject: 'Approval request for an existing ItemHive email',
+        status: 'pending',
+        requestType: 'duplicate_email',
+        name: request.fullName,
+        businessName: request.businessName,
+        loginEmail: request.email,
+    };
+
+    await sendSignupDecisionEmail(request.email, payload);
+
+    const adminEmail = String(process.env.SIGNUP_ADMIN_EMAIL || '').trim().toLowerCase();
+    if (adminEmail && adminEmail !== request.email) {
+        await sendSignupDecisionEmail(adminEmail, {
+            ...payload,
+            subject: 'New ItemHive signup approval request',
+            requesterEmail: request.email,
+        });
+    }
+};
+
 export const createSignupRequest = async (req: AuthRequest, res: Response) => {
     try {
         const email = String(req.body.email || '').trim().toLowerCase();
@@ -35,21 +101,7 @@ export const createSignupRequest = async (req: AuthRequest, res: Response) => {
             return res.status(400).json({ message: 'A signup request is already pending for this email' });
         }
 
-        const request = await SignupRequest.create({
-            fullName: String(req.body.fullName || '').trim(),
-            email,
-            password: String(req.body.password || ''),
-            businessName: String(req.body.businessName || '').trim(),
-            packageId: req.body.packageId,
-            packageName: req.body.packageName,
-            country: req.body.country,
-            currency: req.body.currency,
-            businessType: String(req.body.businessType || '').trim(),
-            phone: String(req.body.phone || '').trim(),
-            employeeCount: Number(req.body.employeeCount || 1),
-            address: String(req.body.address || '').trim(),
-            notes: String(req.body.notes || '').trim(),
-        });
+        const request = await createPendingSignupRequest(req.body);
 
         return res.status(201).json({
             message: 'Signup request submitted successfully',
@@ -96,7 +148,24 @@ export const decideSignupRequest = async (req: AuthRequest, res: Response) => {
         if (status === 'approved') {
             const existingUser = await User.exists({ email: request.email });
             if (existingUser) {
-                return res.status(400).json({ message: 'An account already exists for this email' });
+                // A duplicate-email request is for review/audit only. The existing
+                // account remains the single identity for this email.
+                request.createdUserId = existingUser._id as any;
+                await sendSignupDecisionEmail(request.email, {
+                    subject: 'Your ItemHive approval request was reviewed',
+                    status: 'approved',
+                    requestType: request.requestType,
+                    name: request.fullName,
+                    businessName: request.businessName,
+                    loginEmail: request.email,
+                    note: decisionNote || 'An account already exists for this email. Please sign in with that account.',
+                });
+                await request.save();
+
+                return res.json({
+                    message: 'Signup request approved. The existing account remains active for this email.',
+                    request,
+                });
             }
 
             const business = await Business.create({

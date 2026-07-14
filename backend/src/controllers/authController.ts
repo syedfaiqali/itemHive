@@ -5,6 +5,11 @@ import type { AuthRequest } from '../middleware/auth';
 import { isSuperAdminEmail, normalizeRole, serializeUser } from '../utils/accessControl';
 import Business from '../models/Business';
 import { ensureLegacyBusiness } from '../utils/tenancy';
+import SignupRequest from '../models/SignupRequest';
+import {
+    createPendingSignupRequest,
+    sendDuplicateSignupApprovalRequestEmail,
+} from './signupRequestController';
 
 const signToken = (id: string, role: string) => jwt.sign(
     { id, role: normalizeRole(role) },
@@ -14,9 +19,26 @@ const signToken = (id: string, role: string) => jwt.sign(
 
 export const register = async (req: AuthRequest, res: Response) => {
     try {
-        const { name, email, password, role, businessName, businessId: requestedBusinessId } = req.body;
+        const {
+            name,
+            email,
+            password,
+            role,
+            businessName,
+            businessId: requestedBusinessId,
+            packageId,
+            packageName,
+            country,
+            currency,
+            businessType,
+            phone,
+            employeeCount,
+            address,
+            notes,
+        } = req.body;
         const normalizedEmail = String(email || '').trim().toLowerCase();
         const requestedRole = normalizeRole(role);
+        const isPublicRegistration = !req.user;
 
         const [existingUser, totalUsers, currentUser] = await Promise.all([
             User.findOne({ email: normalizedEmail }),
@@ -25,15 +47,40 @@ export const register = async (req: AuthRequest, res: Response) => {
         ]);
 
         if (existingUser) {
+            if (isPublicRegistration) {
+                const hadPendingRequest = await SignupRequest.exists({ email: normalizedEmail, status: 'pending' });
+                const request = await createPendingSignupRequest({
+                    fullName: name,
+                    email: normalizedEmail,
+                    password,
+                    businessName,
+                    packageId,
+                    packageName,
+                    country,
+                    currency,
+                    businessType,
+                    phone,
+                    employeeCount,
+                    address,
+                    notes,
+                }, 'duplicate_email');
+
+                if (!hadPendingRequest) {
+                    await sendDuplicateSignupApprovalRequestEmail(request);
+                }
+
+                return res.status(202).json({
+                    message: 'This email already has an account. An approval request has been sent for review.',
+                    requestId: request._id,
+                    requiresApproval: true,
+                });
+            }
+
             return res.status(400).json({ message: 'User already exists' });
         }
 
         const superAdminExists = await User.exists({ role: 'super_admin' });
         const bootstrapSuperAdmin = totalUsers === 0 || (!superAdminExists && isSuperAdminEmail(normalizedEmail));
-
-        if (!req.user && !bootstrapSuperAdmin) {
-            return res.status(403).json({ message: 'Only admins and super admins can create new accounts' });
-        }
 
         if (req.user && !currentUser?.isActive) {
             return res.status(403).json({ message: 'Your account is not active' });
@@ -46,6 +93,15 @@ export const register = async (req: AuthRequest, res: Response) => {
         if (bootstrapSuperAdmin || isSuperAdminEmail(normalizedEmail)) {
             assignedRole = 'super_admin';
             businessId = (await ensureLegacyBusiness())._id;
+        } else if (isPublicRegistration) {
+            // A public signup owns a new workspace, so it becomes that
+            // workspace's administrator immediately.
+            assignedRole = 'admin';
+            const business = await Business.create({
+                name: String(businessName || `${name}'s Store`).trim(),
+                slug: `store-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            });
+            businessId = business._id;
         } else if (req.user) {
             const actorRole = normalizeRole(req.user.role);
             createdBy = req.user.id;
@@ -79,7 +135,23 @@ export const register = async (req: AuthRequest, res: Response) => {
             }
         }
 
-        const user = new User({ name, email: normalizedEmail, password, visiblePassword: password, role: assignedRole, createdBy, businessId });
+        const user = new User({
+            name,
+            email: normalizedEmail,
+            password,
+            visiblePassword: password,
+            role: assignedRole,
+            createdBy,
+            businessId,
+            preferences: country || currency ? {
+                country: country || 'PK',
+                currency: currency || 'PKR',
+                notifications: {
+                    orderUpdates: true,
+                    lowStockAlerts: true,
+                },
+            } : undefined,
+        });
         await user.save();
 
         const token = signToken(String(user._id), user.role);

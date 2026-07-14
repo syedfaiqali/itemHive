@@ -48,6 +48,8 @@ const Signup: React.FC = () => {
     const { loading, error, user } = useSelector((state: RootState) => state.auth);
     const [showPassword, setShowPassword] = useState(false);
     const [success, setSuccess] = useState(false);
+    const [approvalRequested, setApprovalRequested] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [businessName, setBusinessName] = useState('');
@@ -95,12 +97,14 @@ const Signup: React.FC = () => {
 
         if (!user) {
             setRequestError('');
+            setSubmitting(true);
             try {
-                await api.post('/signup-requests', {
-                    fullName: name,
+                const response = await api.post('/auth/register', {
+                    name,
                     email,
                     password,
                     businessName,
+                    role: 'admin',
                     packageId,
                     packageName: packageOptions.find((plan) => plan.id === packageId)?.name || 'Free Trial',
                     country,
@@ -111,9 +115,12 @@ const Signup: React.FC = () => {
                     address,
                     notes,
                 });
+                setApprovalRequested(Boolean(response.data?.requiresApproval));
                 setSuccess(true);
             } catch (error: any) {
-                setRequestError(error.response?.data?.message || 'Unable to submit signup request.');
+                setRequestError(error.response?.data?.message || 'Unable to create your account.');
+            } finally {
+                setSubmitting(false);
             }
             return;
         }
@@ -220,7 +227,7 @@ const Signup: React.FC = () => {
                                 Join ItemHive
                             </Typography>
                             <Typography variant="body2" color="text.secondary">
-                                {user ? 'Create a new workspace account.' : 'Request a new business workspace.'}
+                                {user ? 'Create a new workspace account.' : 'Create your business workspace instantly.'}
                             </Typography>
                         </Box>
 
@@ -247,7 +254,11 @@ const Signup: React.FC = () => {
                         >
                             {success && (
                                 <Alert severity="success" sx={{ borderRadius: 2, gridColumn: '1 / -1' }}>
-                                    {user ? 'Account created successfully! Redirecting to login...' : 'Request submitted successfully. We will email you after review.'}
+                                    {user
+                                        ? 'Account created successfully! Redirecting to login...'
+                                        : approvalRequested
+                                            ? 'This email already has an account. An approval request has been submitted and an email notification was sent.'
+                                            : 'Account created successfully! Redirecting to login...'}
                                 </Alert>
                             )}
 
@@ -264,7 +275,7 @@ const Signup: React.FC = () => {
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
                                 required
-                                disabled={loading || success}
+                                disabled={loading || submitting || success}
                                 InputProps={{
                                     startAdornment: (
                                         <InputAdornment position="start">
@@ -442,8 +453,8 @@ const Signup: React.FC = () => {
                                 variant="contained"
                                 size="large"
                                 type="submit"
-                                disabled={loading || success}
-                                startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <UserPlus size={20} />}
+                                disabled={loading || submitting || success}
+                                startIcon={loading || submitting ? <CircularProgress size={20} color="inherit" /> : <UserPlus size={20} />}
                                 sx={{
                                     gridColumn: '1 / -1',
                                     mt: 0.75,
@@ -454,7 +465,7 @@ const Signup: React.FC = () => {
                                     boxShadow: `0 12px 22px -12px ${alpha(theme.palette.primary.main, 0.8)}`
                                 }}
                             >
-                                {loading ? 'Creating Account...' : user ? 'Create Account' : 'Submit Request'}
+                                {loading || submitting ? 'Creating Account...' : 'Create Account'}
                             </Button>
                         </Box>
 

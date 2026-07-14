@@ -39,6 +39,15 @@ export const registerSchema = Joi.object({
     role: Joi.string().valid(...USER_ROLES).optional(),
     businessName: Joi.string().min(2).max(120).optional(),
     businessId: Joi.string().allow('').optional(),
+    packageId: Joi.string().valid('free_trial', 'starter', 'pro').optional(),
+    packageName: Joi.string().min(2).max(80).optional(),
+    country: Joi.string().valid('PK', 'US', 'DE', 'GB', 'CH', 'CD', 'CG', 'IN', 'AE').optional(),
+    currency: Joi.string().valid('USD', 'EUR', 'GBP', 'CHF', 'CDF', 'XAF', 'PKR', 'INR', 'AED').optional(),
+    businessType: Joi.string().allow('').max(120).optional(),
+    phone: Joi.string().allow('').max(60).optional(),
+    employeeCount: Joi.number().integer().min(1).max(100000).optional(),
+    address: Joi.string().allow('').max(240).optional(),
+    notes: Joi.string().allow('').max(600).optional(),
 });
 
 export const signupRequestSchema = Joi.object({

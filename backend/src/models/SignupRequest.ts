@@ -21,6 +21,7 @@ export interface ISignupRequest extends Document {
     reviewedAt?: Date;
     createdUserId?: mongoose.Types.ObjectId;
     createdBusinessId?: mongoose.Types.ObjectId;
+    requestType: 'new_signup' | 'duplicate_email';
 }
 
 const SignupRequestSchema: Schema<ISignupRequest> = new Schema({
@@ -44,6 +45,7 @@ const SignupRequestSchema: Schema<ISignupRequest> = new Schema({
     reviewedAt: { type: Date, default: null },
     createdUserId: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     createdBusinessId: { type: Schema.Types.ObjectId, ref: 'Business', default: null },
+    requestType: { type: String, enum: ['new_signup', 'duplicate_email'], default: 'new_signup', index: true },
 }, { timestamps: true });
 
 SignupRequestSchema.index({ email: 1, status: 1 });
