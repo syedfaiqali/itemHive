@@ -63,11 +63,14 @@ export const createPendingSignupRequest = async (
     });
 };
 
-export const sendDuplicateSignupApprovalRequestEmail = async (request: ISignupRequest) => {
+export const sendSignupApprovalRequestEmail = async (request: ISignupRequest) => {
+    const isDuplicateEmailRequest = request.requestType === 'duplicate_email';
     const payload = {
-        subject: 'Approval request for an existing ItemHive email',
+        subject: isDuplicateEmailRequest
+            ? 'Approval request for an existing ItemHive email'
+            : 'New ItemHive signup approval request',
         status: 'pending',
-        requestType: 'duplicate_email',
+        requestType: request.requestType,
         name: request.fullName,
         businessName: request.businessName,
         loginEmail: request.email,
@@ -75,8 +78,8 @@ export const sendDuplicateSignupApprovalRequestEmail = async (request: ISignupRe
 
     await sendSignupDecisionEmail(request.email, payload);
 
-    const adminEmail = String(process.env.SIGNUP_ADMIN_EMAIL || '').trim().toLowerCase();
-    if (adminEmail && adminEmail !== request.email) {
+    const adminEmail = String(process.env.SIGNUP_ADMIN_EMAIL || 'admin@itemhive.com').trim().toLowerCase();
+    if (adminEmail !== request.email) {
         await sendSignupDecisionEmail(adminEmail, {
             ...payload,
             subject: 'New ItemHive signup approval request',
@@ -84,6 +87,8 @@ export const sendDuplicateSignupApprovalRequestEmail = async (request: ISignupRe
         });
     }
 };
+
+export const sendDuplicateSignupApprovalRequestEmail = sendSignupApprovalRequestEmail;
 
 export const createSignupRequest = async (req: AuthRequest, res: Response) => {
     try {

@@ -3,7 +3,7 @@ import User from '../models/User';
 import type { AuthRequest } from '../middleware/auth';
 import { normalizeRole } from '../utils/accessControl';
 import type { IUser } from '../models/User';
-import { getAppSettingsForTenant } from '../utils/tenancy';
+import { getAppSettingsForTenant, getGlobalAppSettings } from '../utils/tenancy';
 
 const serializePreferences = (preferences: IUser['preferences']) => ({
     country: preferences.country,
@@ -16,9 +16,10 @@ const serializePreferences = (preferences: IUser['preferences']) => ({
 
 export const getSettings = async (req: AuthRequest, res: Response) => {
     try {
-        const [user, appSettings] = await Promise.all([
+        const [user, appSettings, globalAppSettings] = await Promise.all([
             User.findById(req.user?.id).select('preferences'),
             getAppSettingsForTenant(req.user!),
+            getGlobalAppSettings(),
         ]);
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
@@ -32,6 +33,7 @@ export const getSettings = async (req: AuthRequest, res: Response) => {
                 shopPhone: appSettings.shopPhone,
                 shopAddress: appSettings.shopAddress,
                 installmentsEnabled: appSettings.installmentsEnabled,
+                autoRegistrationEnabled: globalAppSettings.autoRegistrationEnabled,
             },
         });
     } catch (error: any) {
@@ -58,6 +60,7 @@ export const updateSettings = async (req: AuthRequest, res: Response) => {
         await user.save();
 
         const appSettings = await getAppSettingsForTenant(req.user!);
+        const globalAppSettings = await getGlobalAppSettings();
         if (normalizeRole(req.user?.role) === 'super_admin' && req.body.app) {
             appSettings.salesTaxRate = req.body.app.salesTaxRate;
             appSettings.shopName = req.body.app.shopName;
@@ -65,6 +68,10 @@ export const updateSettings = async (req: AuthRequest, res: Response) => {
             appSettings.shopAddress = req.body.app.shopAddress;
             appSettings.installmentsEnabled = req.body.app.installmentsEnabled;
             await appSettings.save();
+            if (typeof req.body.app.autoRegistrationEnabled === 'boolean') {
+                globalAppSettings.autoRegistrationEnabled = req.body.app.autoRegistrationEnabled;
+                await globalAppSettings.save();
+            }
         }
 
         return res.json({
@@ -75,6 +82,7 @@ export const updateSettings = async (req: AuthRequest, res: Response) => {
                 shopPhone: appSettings.shopPhone,
                 shopAddress: appSettings.shopAddress,
                 installmentsEnabled: appSettings.installmentsEnabled,
+                autoRegistrationEnabled: globalAppSettings.autoRegistrationEnabled,
             },
         });
     } catch (error: any) {

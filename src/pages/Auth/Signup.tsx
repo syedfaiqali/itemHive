@@ -49,6 +49,7 @@ const Signup: React.FC = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [success, setSuccess] = useState(false);
     const [approvalRequested, setApprovalRequested] = useState(false);
+    const [approvalMessage, setApprovalMessage] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
@@ -116,6 +117,7 @@ const Signup: React.FC = () => {
                     notes,
                 });
                 setApprovalRequested(Boolean(response.data?.requiresApproval));
+                setApprovalMessage(response.data?.message || 'Signup request submitted for review.');
                 setSuccess(true);
             } catch (error: any) {
                 setRequestError(error.response?.data?.message || 'Unable to create your account.');
@@ -257,7 +259,7 @@ const Signup: React.FC = () => {
                                     {user
                                         ? 'Account created successfully! Redirecting to login...'
                                         : approvalRequested
-                                            ? 'This email already has an account. An approval request has been submitted and an email notification was sent.'
+                                            ? approvalMessage
                                             : 'Account created successfully! Redirecting to login...'}
                                 </Alert>
                             )}

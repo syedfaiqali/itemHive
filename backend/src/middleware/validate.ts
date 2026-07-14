@@ -155,6 +155,7 @@ export const settingsSchema = Joi.object({
         shopPhone: Joi.string().allow('').max(60).required(),
         shopAddress: Joi.string().allow('').max(240).required(),
         installmentsEnabled: Joi.boolean().required(),
+        autoRegistrationEnabled: Joi.boolean().optional(),
     }).optional(),
 });
 

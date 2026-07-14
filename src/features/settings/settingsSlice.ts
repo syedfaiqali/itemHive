@@ -12,6 +12,7 @@ export interface AppSettings {
     shopPhone: string;
     shopAddress: string;
     installmentsEnabled: boolean;
+    autoRegistrationEnabled: boolean;
 }
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
@@ -20,6 +21,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     shopPhone: '',
     shopAddress: '',
     installmentsEnabled: false,
+    autoRegistrationEnabled: true,
 };
 
 export type CurrencyCode = 'USD' | 'EUR' | 'GBP' | 'CHF' | 'CDF' | 'XAF' | 'PKR' | 'INR' | 'AED';

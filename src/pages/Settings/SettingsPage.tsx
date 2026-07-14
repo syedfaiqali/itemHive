@@ -308,6 +308,43 @@ const SettingsPage: React.FC = () => {
                     <Grid size={{ xs: 12, md: 6 }}>
                         <Card>
                             <CardContent>
+                                <Typography variant="h6" fontWeight={700} gutterBottom>Registration Access</Typography>
+                                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                                    Choose whether new public signups create an account immediately or wait for approval.
+                                </Typography>
+                                <Divider sx={{ mb: 2 }} />
+                                <Stack spacing={1.5}>
+                                    <FormControlLabel
+                                        control={
+                                            <Switch
+                                                checked={appDraft.autoRegistrationEnabled}
+                                                onChange={(event) => setAppDraft({ ...appDraft, autoRegistrationEnabled: event.target.checked })}
+                                            />
+                                        }
+                                        label="Auto-register new accounts"
+                                    />
+                                    <Typography variant="caption" color="text.secondary">
+                                        {appDraft.autoRegistrationEnabled
+                                            ? 'New users get their workspace immediately.'
+                                            : 'New signups are sent to Signup Requests for super admin approval.'}
+                                    </Typography>
+                                    <Button
+                                        variant="contained"
+                                        onClick={() => persistSettings(country, currency, notifications, appDraft)}
+                                        disabled={loading}
+                                    >
+                                        Save Registration Setting
+                                    </Button>
+                                </Stack>
+                            </CardContent>
+                        </Card>
+                    </Grid>
+                )}
+
+                {user?.role === 'super_admin' && (
+                    <Grid size={{ xs: 12, md: 6 }}>
+                        <Card>
+                            <CardContent>
                                 <Typography variant="h6" fontWeight={700} gutterBottom>POS & Receipt</Typography>
                                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                                     Shared configuration used by every POS account and customer receipt.

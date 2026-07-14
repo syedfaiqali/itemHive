@@ -8,6 +8,7 @@ export interface IAppSetting extends Document {
     shopPhone: string;
     shopAddress: string;
     installmentsEnabled: boolean;
+    autoRegistrationEnabled: boolean;
 }
 
 const AppSettingSchema: Schema<IAppSetting> = new Schema({
@@ -18,6 +19,7 @@ const AppSettingSchema: Schema<IAppSetting> = new Schema({
     shopPhone: { type: String, default: '', trim: true },
     shopAddress: { type: String, default: '', trim: true },
     installmentsEnabled: { type: Boolean, default: false },
+    autoRegistrationEnabled: { type: Boolean, default: true },
 }, { timestamps: true });
 
 export default mongoose.model<IAppSetting>('AppSetting', AppSettingSchema);

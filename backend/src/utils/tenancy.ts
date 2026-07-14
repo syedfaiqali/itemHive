@@ -21,6 +21,12 @@ export const ensureLegacyBusiness = () => Business.findOneAndUpdate(
     { new: true, upsert: true, setDefaultsOnInsert: true }
 ).orFail();
 
+export const getGlobalAppSettings = () => AppSetting.findOneAndUpdate(
+    { key: 'global-auth' },
+    { $setOnInsert: { key: 'global-auth' } },
+    { new: true, upsert: true, setDefaultsOnInsert: true }
+).orFail();
+
 export const ensureUserBusiness = async (user: IUser) => {
     if (user.businessId) {
         const business = await Business.findById(user.businessId);

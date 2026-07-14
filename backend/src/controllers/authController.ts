@@ -4,11 +4,11 @@ import User from '../models/User';
 import type { AuthRequest } from '../middleware/auth';
 import { isSuperAdminEmail, normalizeRole, serializeUser } from '../utils/accessControl';
 import Business from '../models/Business';
-import { ensureLegacyBusiness } from '../utils/tenancy';
+import { ensureLegacyBusiness, getGlobalAppSettings } from '../utils/tenancy';
 import SignupRequest from '../models/SignupRequest';
 import {
     createPendingSignupRequest,
-    sendDuplicateSignupApprovalRequestEmail,
+    sendSignupApprovalRequestEmail,
 } from './signupRequestController';
 
 const signToken = (id: string, role: string) => jwt.sign(
@@ -39,6 +39,7 @@ export const register = async (req: AuthRequest, res: Response) => {
         const normalizedEmail = String(email || '').trim().toLowerCase();
         const requestedRole = normalizeRole(role);
         const isPublicRegistration = !req.user;
+        const globalAppSettings = isPublicRegistration ? await getGlobalAppSettings() : null;
 
         const [existingUser, totalUsers, currentUser] = await Promise.all([
             User.findOne({ email: normalizedEmail }),
@@ -66,7 +67,7 @@ export const register = async (req: AuthRequest, res: Response) => {
                 }, 'duplicate_email');
 
                 if (!hadPendingRequest) {
-                    await sendDuplicateSignupApprovalRequestEmail(request);
+                    await sendSignupApprovalRequestEmail(request);
                 }
 
                 return res.status(202).json({
@@ -77,6 +78,32 @@ export const register = async (req: AuthRequest, res: Response) => {
             }
 
             return res.status(400).json({ message: 'User already exists' });
+        }
+
+        if (isPublicRegistration && !globalAppSettings?.autoRegistrationEnabled) {
+            const request = await createPendingSignupRequest({
+                fullName: name,
+                email: normalizedEmail,
+                password,
+                businessName,
+                packageId,
+                packageName,
+                country,
+                currency,
+                businessType,
+                phone,
+                employeeCount,
+                address,
+                notes,
+            }, 'new_signup');
+
+            await sendSignupApprovalRequestEmail(request);
+
+            return res.status(202).json({
+                message: 'Signup request submitted. A super admin will review it before creating your account.',
+                requestId: request._id,
+                requiresApproval: true,
+            });
         }
 
         const superAdminExists = await User.exists({ role: 'super_admin' });
