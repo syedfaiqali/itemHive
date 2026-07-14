@@ -15,7 +15,6 @@ import {
     TextField,
     Button,
     Stack,
-    Chip,
     alpha,
     useTheme
 } from '@mui/material';
@@ -36,8 +35,6 @@ import {
     DEFAULT_APP_SETTINGS
 } from '../../features/settings/settingsSlice';
 import type { AppDispatch } from '../../store';
-import type { User } from '../../features/auth/authSlice';
-import api from '../../api/axios';
 
 const currencyOptions: Array<{ value: CurrencyCode; label: string }> = [
     { value: 'USD', label: 'USD - US Dollar' },
@@ -71,10 +68,6 @@ const SettingsPage: React.FC = () => {
     const { notifications, country, currency, app, loading } = useSelector((state: RootState) => state.settings);
     const activeAppSettings = app || DEFAULT_APP_SETTINGS;
     const [appDraft, setAppDraft] = React.useState<AppSettings>(activeAppSettings);
-    const [teamUsers, setTeamUsers] = React.useState<User[]>([]);
-    const [teamLoading, setTeamLoading] = React.useState(false);
-    const [teamSavingId, setTeamSavingId] = React.useState('');
-    const [teamError, setTeamError] = React.useState('');
 
     React.useEffect(() => {
         dispatch(fetchSettings());
@@ -83,38 +76,6 @@ const SettingsPage: React.FC = () => {
     React.useEffect(() => {
         setAppDraft(app || DEFAULT_APP_SETTINGS);
     }, [app]);
-
-    const loadTeamUsers = React.useCallback(async () => {
-        if (user?.role !== 'super_admin') return;
-
-        setTeamLoading(true);
-        setTeamError('');
-        try {
-            const response = await api.get('/users');
-            setTeamUsers((response.data as User[]).filter((teamUser) => teamUser.role !== 'super_admin'));
-        } catch (error: any) {
-            setTeamError(error.response?.data?.message || 'Unable to load accounts.');
-        } finally {
-            setTeamLoading(false);
-        }
-    }, [user?.role]);
-
-    React.useEffect(() => {
-        loadTeamUsers();
-    }, [loadTeamUsers]);
-
-    const handleInstallmentAccessChange = async (teamUser: User, installmentAccess: boolean) => {
-        setTeamSavingId(teamUser.id);
-        setTeamError('');
-        try {
-            await api.patch(`/users/${teamUser.id}/status`, { installmentAccess });
-            await loadTeamUsers();
-        } catch (error: any) {
-            setTeamError(error.response?.data?.message || 'Unable to update installment access.');
-        } finally {
-            setTeamSavingId('');
-        }
-    };
 
     const persistSettings = (
         nextCountry: CountryCode,
@@ -398,58 +359,6 @@ const SettingsPage: React.FC = () => {
                                     >
                                         Save POS Settings
                                     </Button>
-                                </Stack>
-                            </CardContent>
-                        </Card>
-                    </Grid>
-                )}
-
-                {user?.role === 'super_admin' && (
-                    <Grid size={{ xs: 12, md: 6 }}>
-                        <Card>
-                            <CardContent>
-                                <Typography variant="h6" fontWeight={700} gutterBottom>Installment Access</Typography>
-                                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                                    Choose which accounts can use installments after the master switch is enabled.
-                                </Typography>
-                                <Divider sx={{ mb: 2 }} />
-                                {teamError && (
-                                    <Typography variant="body2" color="error.main" sx={{ mb: 1.5 }}>
-                                        {teamError}
-                                    </Typography>
-                                )}
-                                <Stack spacing={1.5}>
-                                    {teamLoading && <Typography variant="body2" color="text.secondary">Loading accounts...</Typography>}
-                                    {!teamLoading && teamUsers.map((teamUser) => (
-                                        <Box
-                                            key={teamUser.id}
-                                            sx={{
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'space-between',
-                                                gap: 2,
-                                                p: 1.5,
-                                                borderRadius: 2,
-                                                bgcolor: 'action.hover',
-                                            }}
-                                        >
-                                            <Box>
-                                                <Typography variant="body2" fontWeight={700}>{teamUser.name}</Typography>
-                                                <Typography variant="caption" color="text.secondary">{teamUser.email}</Typography>
-                                            </Box>
-                                            <Stack direction="row" spacing={1} alignItems="center">
-                                                <Chip size="small" label={teamUser.role === 'admin' ? 'Admin' : 'User'} />
-                                                <Switch
-                                                    checked={Boolean(teamUser.installmentAccess)}
-                                                    onChange={(_, checked) => handleInstallmentAccessChange(teamUser, checked)}
-                                                    disabled={teamSavingId === teamUser.id}
-                                                />
-                                            </Stack>
-                                        </Box>
-                                    ))}
-                                    {!teamLoading && !teamUsers.length && (
-                                        <Typography variant="body2" color="text.secondary">No accounts created yet.</Typography>
-                                    )}
                                 </Stack>
                             </CardContent>
                         </Card>

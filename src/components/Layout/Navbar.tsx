@@ -25,7 +25,8 @@ import {
     LogOut,
     Sparkles,
     ChevronRight,
-    Building2
+    Building2,
+    Pin
 } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState } from '../../store';
@@ -439,6 +440,16 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
                     <IconButton color="inherit" onClick={handleThemeToggle} sx={{ display: { xs: 'inline-flex', md: 'none' } }}>
                         {mode === 'light' ? <Moon size={20} /> : <Sun size={20} />}
                     </IconButton>
+
+                    <Tooltip title="Sticky Notes">
+                        <IconButton
+                            color={isActivePath('/notes') ? 'primary' : 'inherit'}
+                            onClick={() => navigate('/notes')}
+                            aria-label="Open sticky notes"
+                        >
+                            <Pin size={20} />
+                        </IconButton>
+                    </Tooltip>
 
                     <IconButton color="inherit" onClick={handleNotifOpen}>
                         <Badge badgeContent={recentNotifications.length} color="secondary">
