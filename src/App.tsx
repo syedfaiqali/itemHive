@@ -15,7 +15,7 @@ import type { AppDispatch } from './store';
 import { fetchSettings } from './features/settings/settingsSlice';
 import { logout } from './features/auth/authSlice';
 
-// Lazy load pages for better performance
+// Lazy load pages for better performance i LOVE YOU
 import Login from './pages/Auth/Login';
 const Dashboard = React.lazy(() => import('./pages/Dashboard/Dashboard'));
 const ProductList = React.lazy(() => import('./pages/Inventory/ProductList'));

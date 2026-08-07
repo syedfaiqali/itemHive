@@ -20,7 +20,7 @@ import customerRoutes from './routes/customerRoutes';
 import { errorHandler, notFound } from './middleware/errorHandler';
 import { ensureTenantIndexes } from './utils/tenantIndexes';
 
-// Environmental variables
+// Environmental variables I LOVE YOU 2
 dotenv.config();
 
 const app = express();
