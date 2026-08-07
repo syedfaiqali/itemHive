@@ -7,6 +7,7 @@ export interface IAppSetting extends Document {
     shopName: string;
     shopPhone: string;
     shopAddress: string;
+    receiptBannerUrl: string;
     installmentsEnabled: boolean;
     autoRegistrationEnabled: boolean;
 }
@@ -18,6 +19,7 @@ const AppSettingSchema: Schema<IAppSetting> = new Schema({
     shopName: { type: String, default: 'ItemHive POS', trim: true },
     shopPhone: { type: String, default: '', trim: true },
     shopAddress: { type: String, default: '', trim: true },
+    receiptBannerUrl: { type: String, default: '' },
     installmentsEnabled: { type: Boolean, default: false },
     autoRegistrationEnabled: { type: Boolean, default: true },
 }, { timestamps: true });

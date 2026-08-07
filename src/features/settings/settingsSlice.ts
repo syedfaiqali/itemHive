@@ -11,6 +11,8 @@ export interface AppSettings {
     shopName: string;
     shopPhone: string;
     shopAddress: string;
+    /** Base64 data URL shown as the header banner on receipts, invoices and printed slips. */
+    receiptBannerUrl: string;
     installmentsEnabled: boolean;
     autoRegistrationEnabled: boolean;
 }
@@ -20,6 +22,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     shopName: 'ItemHive POS',
     shopPhone: '',
     shopAddress: '',
+    receiptBannerUrl: '',
     installmentsEnabled: false,
     autoRegistrationEnabled: true,
 };
@@ -97,6 +100,11 @@ export const saveSettings = createAsyncThunk(
                 app: AppSettings;
             };
         } catch (error: any) {
+            if (error.response?.status === 413) {
+                return rejectWithValue(
+                    'The banner is too large for the server. Upload a smaller image, or restart the API if it is running old code.'
+                );
+            }
             return rejectWithValue(error.response?.data?.message || 'Failed to save settings');
         }
     }
@@ -134,7 +142,7 @@ const settingsSlice = createSlice({
                 state.country = action.payload.country;
                 state.currency = action.payload.currency;
                 state.notifications = action.payload.notifications;
-                state.app = action.payload.app;
+                state.app = { ...DEFAULT_APP_SETTINGS, ...action.payload.app };
             })
             .addCase(fetchSettings.rejected, (state, action: PayloadAction<any>) => {
                 state.loading = false;
@@ -149,7 +157,7 @@ const settingsSlice = createSlice({
                 state.country = action.payload.country;
                 state.currency = action.payload.currency;
                 state.notifications = action.payload.notifications;
-                state.app = action.payload.app;
+                state.app = { ...DEFAULT_APP_SETTINGS, ...action.payload.app };
             })
             .addCase(saveSettings.rejected, (state, action: PayloadAction<any>) => {
                 state.loading = false;

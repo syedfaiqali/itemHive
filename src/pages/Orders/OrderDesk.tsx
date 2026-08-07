@@ -37,6 +37,7 @@ import {
     Package,
     ReceiptText,
     Search,
+    Share2,
     ShoppingBag,
     UserRound,
     UserRoundPlus,
@@ -50,6 +51,12 @@ import { addTransactionApi, fetchTransactions } from '../../features/transaction
 import { alpha, useTheme } from '@mui/material/styles';
 import type { AppDispatch } from '../../store';
 import useAppCurrency from '../../hooks/useAppCurrency';
+import DocumentBanner from '../../components/Common/DocumentBanner';
+import InvoiceLetterhead from '../../components/Common/InvoiceLetterhead';
+import InvoiceItemsTable from '../../components/Common/InvoiceItemsTable';
+import { amountToWords } from '../../lib/numberToWords';
+import { buildInvoicePdfBlob, shareOrDownloadPdf } from '../../lib/invoicePdf';
+import { DEFAULT_APP_SETTINGS } from '../../features/settings/settingsSlice';
 import api from '../../api/axios';
 
 type CustomerType = 'regular' | 'credit' | 'installment' | 'wholesale';
@@ -128,6 +135,8 @@ const OrderDesk: React.FC = () => {
     const { user } = useSelector((state: RootState) => state.auth);
     const { orders } = useSelector((state: RootState) => state.orders);
     const { transactions, loading: transactionLoading } = useSelector((state: RootState) => state.transactions);
+    const { app } = useSelector((state: RootState) => state.settings);
+    const appSettings = app || DEFAULT_APP_SETTINGS;
     const isManager = user?.role === 'super_admin' || user?.role === 'admin';
 
     const calculateOrderAmount = (product: Product | null, qtyValue: number | string) => {
@@ -150,6 +159,7 @@ const OrderDesk: React.FC = () => {
     const [invoiceOrder, setInvoiceOrder] = useState<Order | null>(null);
     const [printTarget, setPrintTarget] = useState<'orders' | 'invoice'>('orders');
     const [feedback, setFeedback] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
+    const [sharingInvoice, setSharingInvoice] = useState(false);
     const [filterText, setFilterText] = useState('');
     const [statusFilter, setStatusFilter] = useState<'all' | OrderStatus>('all');
 
@@ -427,6 +437,9 @@ const OrderDesk: React.FC = () => {
         document.body.removeChild(link);
     };
 
+    const printTargetId = printTarget === 'invoice' ? '#invoice-print-area' : '#orders-print-area';
+    const invoiceMoney = (value: number) => formatCurrency(value, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+
     const handleDownloadPDF = () => {
         setPrintTarget('orders');
         window.setTimeout(() => window.print(), 0);
@@ -435,6 +448,60 @@ const OrderDesk: React.FC = () => {
     const handlePrintInvoice = () => {
         setPrintTarget('invoice');
         window.setTimeout(() => window.print(), 0);
+    };
+
+    const handleShareInvoice = async () => {
+        if (!invoiceOrder) return;
+        setSharingInvoice(true);
+        try {
+            const amount = invoiceOrder.orderAmount || 0;
+            const unitPrice = invoiceOrder.quantity > 0 ? amount / invoiceOrder.quantity : 0;
+            const money = (value: number) => formatCurrency(value, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+
+            const blob = await buildInvoicePdfBlob({
+                title: 'Invoice',
+                bannerDataUrl: appSettings.receiptBannerUrl || undefined,
+                shop: {
+                    name: appSettings.shopName || DEFAULT_APP_SETTINGS.shopName,
+                    address: appSettings.shopAddress,
+                    phone: appSettings.shopPhone,
+                },
+                billToLabel: 'Invoice to',
+                billTo: invoiceOrder.customerName || ANONYMOUS_CUSTOMER_NAME,
+                billToSubtitle: `Requested by ${invoiceOrder.requestedBy}`,
+                meta: [
+                    { label: 'Invoice date', value: new Date(invoiceOrder.timestamp).toLocaleDateString() },
+                    { label: 'Invoice time', value: new Date(invoiceOrder.timestamp).toLocaleTimeString() },
+                    { label: 'Invoice number', value: `#${invoiceOrder.id}` },
+                ],
+                columns: [
+                    { label: '#', width: 0.6 },
+                    { label: 'Description', width: 5 },
+                    { label: 'Qty', width: 1, align: 'right' },
+                    { label: 'Unit price', width: 1.7, align: 'right' },
+                    { label: 'Total', width: 1.9, align: 'right' },
+                ],
+                rows: [['1', invoiceOrder.productName, String(invoiceOrder.quantity), money(unitPrice), money(amount)]],
+                totals: [
+                    { label: 'Total', value: money(amount), strong: true },
+                    ...((invoiceOrder.paidNow || 0) > 0 ? [{ label: 'Paid Now', value: money(invoiceOrder.paidNow || 0) }] : []),
+                    ...((invoiceOrder.dueAmount || 0) > 0 ? [{ label: 'Amount To Receive', value: money(invoiceOrder.dueAmount || 0) }] : []),
+                ],
+                amountInWords: amountToWords(amount),
+                footer: `Payment method: ${paymentMethodLabels[invoiceOrder.paymentMethod || 'cash']}  |  Status: ${invoiceOrder.status}`,
+            });
+
+            const result = await shareOrDownloadPdf(blob, `invoice-${invoiceOrder.id}.pdf`, 'Invoice');
+            setFeedback({
+                type: 'success',
+                message: result === 'shared' ? 'Invoice shared.' : 'Invoice PDF downloaded.',
+            });
+        } catch (error) {
+            if (error instanceof DOMException && error.name === 'AbortError') return;
+            setFeedback({ type: 'error', message: 'Could not build the invoice PDF.' });
+        } finally {
+            setSharingInvoice(false);
+        }
     };
 
     const summary = useMemo(() => {
@@ -914,6 +981,9 @@ const OrderDesk: React.FC = () => {
                                 }}
                                 id="orders-print-area"
                             >
+                                <DocumentBanner
+                                    sx={{ display: 'none', mb: 2, '@media print': { display: 'block' } }}
+                                />
                                 <Table sx={{ minWidth: 1260 }}>
                                     <TableHead>
                                         <TableRow>
@@ -1017,28 +1087,21 @@ const OrderDesk: React.FC = () => {
                 <DialogContent dividers>
                     {invoiceOrder && (
                         <Stack spacing={2.5} id="invoice-print-area">
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}>
-                                <Box>
-                                    <Typography variant="caption" color="text.secondary">Invoice No.</Typography>
-                                    <Typography variant="h6" fontWeight={900}>#{invoiceOrder.id}</Typography>
-                                </Box>
-                                <Box sx={{ textAlign: { xs: 'left', sm: 'right' } }}>
-                                    <Typography variant="caption" color="text.secondary">Date</Typography>
-                                    <Typography variant="body2" fontWeight={800}>{new Date(invoiceOrder.timestamp).toLocaleString()}</Typography>
-                                </Box>
-                            </Box>
+                            <InvoiceLetterhead
+                                title="Invoice"
+                                billToLabel="Invoice to"
+                                billTo={invoiceOrder.customerName || ANONYMOUS_CUSTOMER_NAME}
+                                billToSubtitle={`Requested by ${invoiceOrder.requestedBy}`}
+                                meta={[
+                                    { label: 'Invoice date', value: new Date(invoiceOrder.timestamp).toLocaleDateString() },
+                                    { label: 'Invoice time', value: new Date(invoiceOrder.timestamp).toLocaleTimeString() },
+                                    { label: 'Invoice number', value: `#${invoiceOrder.id}` },
+                                ]}
+                            />
 
                             <Divider />
 
                             <Grid container spacing={2}>
-                                <Grid size={{ xs: 12, sm: 6 }}>
-                                    <Typography variant="caption" color="text.secondary">Customer</Typography>
-                                    <Typography fontWeight={900}>{invoiceOrder.customerName || ANONYMOUS_CUSTOMER_NAME}</Typography>
-                                </Grid>
-                                <Grid size={{ xs: 12, sm: 6 }}>
-                                    <Typography variant="caption" color="text.secondary">Cashier / Requested By</Typography>
-                                    <Typography fontWeight={900}>{invoiceOrder.requestedBy}</Typography>
-                                </Grid>
                                 <Grid size={{ xs: 12, sm: 6 }}>
                                     <Typography variant="caption" color="text.secondary">Payment Method</Typography>
                                     <Typography fontWeight={900}>{paymentMethodLabels[invoiceOrder.paymentMethod || 'cash']}</Typography>
@@ -1049,37 +1112,24 @@ const OrderDesk: React.FC = () => {
                                 </Grid>
                             </Grid>
 
-                            <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: '8px', overflow: 'hidden' }}>
-                                <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 80px 120px', gap: 1, p: 1.5, bgcolor: alpha(theme.palette.primary.main, 0.08) }}>
-                                    <Typography variant="caption" fontWeight={900}>Product</Typography>
-                                    <Typography variant="caption" fontWeight={900} textAlign="right">Qty</Typography>
-                                    <Typography variant="caption" fontWeight={900} textAlign="right">Amount</Typography>
-                                </Box>
-                                <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 80px 120px', gap: 1, p: 1.5 }}>
-                                    <Typography variant="body2" fontWeight={800}>{invoiceOrder.productName}</Typography>
-                                    <Typography variant="body2" fontWeight={800} textAlign="right">{invoiceOrder.quantity}</Typography>
-                                    <Typography variant="body2" fontWeight={900} textAlign="right">
-                                        {formatCurrency(invoiceOrder.orderAmount || 0, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                                    </Typography>
-                                </Box>
-                            </Box>
-
-                            <Stack spacing={1}>
-                                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                    <Typography color="text.secondary">Total</Typography>
-                                    <Typography fontWeight={900}>{formatCurrency(invoiceOrder.orderAmount || 0, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</Typography>
-                                </Box>
-                                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                    <Typography color="text.secondary">Paid Now</Typography>
-                                    <Typography fontWeight={800}>{formatCurrency(invoiceOrder.paidNow || 0, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</Typography>
-                                </Box>
-                                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                    <Typography color="text.secondary">Amount To Receive</Typography>
-                                    <Typography fontWeight={900} color={(invoiceOrder.dueAmount || 0) > 0 ? 'warning.main' : 'success.main'}>
-                                        {formatCurrency(invoiceOrder.dueAmount || 0, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                                    </Typography>
-                                </Box>
-                            </Stack>
+                            <InvoiceItemsTable
+                                items={[{
+                                    description: invoiceOrder.productName,
+                                    quantity: invoiceOrder.quantity,
+                                    unitPrice: invoiceMoney(invoiceOrder.quantity > 0 ? (invoiceOrder.orderAmount || 0) / invoiceOrder.quantity : 0),
+                                    total: invoiceMoney(invoiceOrder.orderAmount || 0),
+                                }]}
+                                totals={[
+                                    { label: 'Total', value: invoiceMoney(invoiceOrder.orderAmount || 0), strong: true },
+                                    ...((invoiceOrder.paidNow || 0) > 0
+                                        ? [{ label: 'Paid Now', value: invoiceMoney(invoiceOrder.paidNow || 0) }]
+                                        : []),
+                                    ...((invoiceOrder.dueAmount || 0) > 0
+                                        ? [{ label: 'Amount To Receive', value: invoiceMoney(invoiceOrder.dueAmount || 0), strong: true }]
+                                        : []),
+                                ]}
+                                amountInWords={amountToWords(invoiceOrder.orderAmount || 0)}
+                            />
 
                             {invoiceOrder.notes && (
                                 <Alert severity={invoiceOrder.status === 'rejected' ? 'error' : 'info'}>
@@ -1097,6 +1147,15 @@ const OrderDesk: React.FC = () => {
                         sx={{ fontWeight: 800 }}
                     >
                         Print Invoice
+                    </Button>
+                    <Button
+                        variant="outlined"
+                        startIcon={<Share2 size={18} />}
+                        onClick={handleShareInvoice}
+                        disabled={sharingInvoice}
+                        sx={{ fontWeight: 800 }}
+                    >
+                        {sharingInvoice ? 'Preparing...' : 'Share PDF'}
                     </Button>
                     <Button color="inherit" onClick={() => setInvoiceOrder(null)}>Close</Button>
                 </DialogActions>
@@ -1208,23 +1267,37 @@ const OrderDesk: React.FC = () => {
             <style>
                 {`
                 @media print {
-                    body * { visibility: hidden; }
-                    ${printTarget === 'invoice' ? '#invoice-print-area' : '#orders-print-area'},
-                    ${printTarget === 'invoice' ? '#invoice-print-area' : '#orders-print-area'} * {
-                        visibility: visible;
+                    @page { margin: 12mm; }
+
+                    /* Drop everything outside the printed document from the layout.
+                       Hiding by visibility alone keeps the page's full height and
+                       spills the invoice across several blank sheets. */
+                    body *:not(:has(${printTargetId})):not(${printTargetId}):not(${printTargetId} *) {
+                        display: none !important;
                     }
-                    ${printTarget === 'invoice' ? '#invoice-print-area' : '#orders-print-area'} {
-                        position: absolute;
-                        left: 0;
-                        top: 0;
+
+                    /* Ancestors survive the rule above; strip their dialog chrome. */
+                    body, #root, .MuiDialog-root, .MuiDialog-container, .MuiDialog-paper, .MuiDialogContent-root {
+                        display: block !important;
+                        position: static !important;
+                        overflow: visible !important;
+                        height: auto !important;
+                        max-height: none !important;
+                        width: auto !important;
+                        max-width: none !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        box-shadow: none !important;
+                        background: #fff !important;
+                    }
+
+                    ${printTargetId} {
+                        display: block !important;
                         width: 100%;
-                        background: white !important;
-                        color: black !important;
-                        padding: 24px;
+                        background: #fff !important;
+                        color: #000 !important;
                     }
-                    ${printTarget === 'invoice' ? '#invoice-print-area' : '#orders-print-area'} * {
-                        color: black !important;
-                    }
+                    ${printTargetId} * { color: #000 !important; }
                 }
                 `}
             </style>

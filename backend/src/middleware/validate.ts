@@ -142,6 +142,9 @@ export const installmentPaymentSchema = Joi.object({
     notes: Joi.string().allow('').optional(),
 });
 
+/** Roughly 900KB of image data once base64 decoded. */
+export const RECEIPT_BANNER_MAX_LENGTH = 1_200_000;
+
 export const settingsSchema = Joi.object({
     country: Joi.string().valid('PK', 'US', 'DE', 'GB', 'CH', 'CD', 'CG', 'IN', 'AE').required(),
     currency: Joi.string().valid('USD', 'EUR', 'GBP', 'CHF', 'CDF', 'XAF', 'PKR', 'INR', 'AED').required(),
@@ -152,8 +155,17 @@ export const settingsSchema = Joi.object({
     app: Joi.object({
         salesTaxRate: Joi.number().min(0).max(100).required(),
         shopName: Joi.string().allow('').max(120).required(),
-        shopPhone: Joi.string().allow('').max(60).required(),
+        shopPhone: Joi.string().allow('').max(200).required(),
         shopAddress: Joi.string().allow('').max(240).required(),
+        receiptBannerUrl: Joi.string()
+            .allow('')
+            .max(RECEIPT_BANNER_MAX_LENGTH)
+            .pattern(/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/)
+            .messages({
+                'string.pattern.base': 'Banner must be a PNG, JPEG or WEBP image',
+                'string.max': 'Banner image is too large. Please use a smaller file.',
+            })
+            .optional(),
         installmentsEnabled: Joi.boolean().required(),
         autoRegistrationEnabled: Joi.boolean().optional(),
     }).optional(),

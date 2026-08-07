@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="400" viewBox="0 0 1200 400" role="img" aria-label="Hassan Traders">
+    <defs>
+        <radialGradient id="emblemGold" cx="38%" cy="30%" r="78%">
+            <stop offset="0%" stop-color="#ffe083" />
+            <stop offset="45%" stop-color="#f4bd3f" />
+            <stop offset="100%" stop-color="#d98b16" />
+        </radialGradient>
+        <linearGradient id="bladeSteel" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#ffffff" />
+            <stop offset="45%" stop-color="#dfe6ec" />
+            <stop offset="100%" stop-color="#9aa7b4" />
+        </linearGradient>
+        <linearGradient id="hiltGold" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#f6d071" />
+            <stop offset="100%" stop-color="#b9791a" />
+        </linearGradient>
+        <linearGradient id="palmGreen" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#4caf50" />
+            <stop offset="100%" stop-color="#1b5e20" />
+        </linearGradient>
+        <linearGradient id="wordFire" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#f7931e" />
+            <stop offset="55%" stop-color="#ef4123" />
+            <stop offset="100%" stop-color="#c62828" />
+        </linearGradient>
+        <linearGradient id="barSteel" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#8b949e" />
+            <stop offset="100%" stop-color="#5b636b" />
+        </linearGradient>
+        <clipPath id="emblemClip">
+            <circle cx="200" cy="200" r="176" />
+        </clipPath>
+    </defs>
+
+    <!-- ── Circular emblem ─────────────────────────────────── -->
+    <circle cx="200" cy="200" r="182" fill="#a9660f" />
+    <circle cx="200" cy="200" r="176" fill="url(#emblemGold)" />
+
+    <g clip-path="url(#emblemClip)">
+        <!-- Palm tree -->
+        <g fill="url(#palmGreen)">
+            <path d="M191 258 C 187 214, 190 176, 199 138 L 215 141 C 207 178, 204 216, 207 258 Z" />
+            <path d="M203 136 C 168 101, 128 93, 96 107 C 133 110, 171 122, 203 147 Z" />
+            <path d="M207 136 C 242 101, 282 93, 314 107 C 277 110, 239 122, 207 147 Z" />
+            <path d="M203 134 C 183 96, 149 71, 118 62 C 149 86, 179 112, 199 147 Z" />
+            <path d="M207 134 C 227 96, 261 71, 292 62 C 261 86, 231 112, 211 147 Z" />
+            <path d="M205 130 C 197 95, 199 70, 207 48 C 218 74, 216 106, 212 141 Z" />
+            <path d="M201 143 C 163 134, 132 145, 110 166 C 144 156, 177 153, 204 156 Z" />
+            <path d="M209 143 C 247 134, 278 145, 300 166 C 266 156, 233 153, 206 156 Z" />
+        </g>
+        <g fill="#8d5b12">
+            <circle cx="193" cy="150" r="7" />
+            <circle cx="212" cy="152" r="6" />
+            <circle cx="203" cy="161" r="6" />
+        </g>
+
+        <!-- Crossed sabres -->
+        <g>
+            <g transform="translate(200 236) rotate(-34)">
+                <path d="M0 -128 C 9 -110, 15 -66, 15 -22 L 15 34 L -15 34 L -15 -22 C -15 -66, -9 -110, 0 -128 Z" fill="url(#bladeSteel)" stroke="#7b858f" stroke-width="2" />
+                <rect x="-33" y="34" width="66" height="15" rx="7" fill="url(#hiltGold)" />
+                <rect x="-10" y="49" width="20" height="46" rx="9" fill="#7a4a12" />
+                <circle cx="0" cy="102" r="12" fill="url(#hiltGold)" />
+            </g>
+            <g transform="translate(200 236) rotate(34)">
+                <path d="M0 -128 C 9 -110, 15 -66, 15 -22 L 15 34 L -15 34 L -15 -22 C -15 -66, -9 -110, 0 -128 Z" fill="url(#bladeSteel)" stroke="#7b858f" stroke-width="2" />
+                <rect x="-33" y="34" width="66" height="15" rx="7" fill="url(#hiltGold)" />
+                <rect x="-10" y="49" width="20" height="46" rx="9" fill="#7a4a12" />
+                <circle cx="0" cy="102" r="12" fill="url(#hiltGold)" />
+            </g>
+        </g>
+
+        <!-- Sea -->
+        <path d="M0 292 C 45 268, 90 316, 140 296 C 190 276, 235 320, 285 300 C 330 282, 370 300, 400 292 L400 400 L0 400 Z" fill="#1e88e5" />
+        <path d="M0 322 C 48 300, 92 344, 145 326 C 198 308, 240 348, 290 330 C 335 314, 372 330, 400 322 L400 400 L0 400 Z" fill="#1565c0" />
+        <path d="M0 352 C 50 334, 95 372, 150 356 C 205 340, 245 374, 295 360 C 340 348, 374 358, 400 352 L400 400 L0 400 Z" fill="#0d47a1" />
+    </g>
+
+    <!-- ── Wordmark ────────────────────────────────────────── -->
+    <text x="430" y="212"
+        font-family="'Arial Black', 'Segoe UI Black', Impact, 'Helvetica Neue', sans-serif"
+        font-size="176" font-weight="900" letter-spacing="-2"
+        fill="url(#wordFire)" stroke="#7c2d12" stroke-width="3" paint-order="stroke">HASSAN</text>
+
+    <g>
+        <path d="M446 250 L1178 250 L1160 330 L428 330 Z" fill="url(#barSteel)" />
+        <text x="803" y="308" text-anchor="middle"
+            font-family="'Arial Black', 'Segoe UI Black', Impact, 'Helvetica Neue', sans-serif"
+            font-size="66" font-weight="900" letter-spacing="26" fill="#ffffff">TRADERS</text>
+    </g>
+</svg>

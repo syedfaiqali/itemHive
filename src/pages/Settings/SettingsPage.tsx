@@ -15,6 +15,7 @@ import {
     TextField,
     Button,
     Stack,
+    Alert,
     alpha,
     useTheme
 } from '@mui/material';
@@ -29,12 +30,14 @@ import {
     setCurrency,
     setLowStockAlertsEnabled,
     setOrderUpdatesEnabled,
+    clearSettingsError,
     type CountryCode,
     type CurrencyCode,
     type AppSettings,
     DEFAULT_APP_SETTINGS
 } from '../../features/settings/settingsSlice';
 import type { AppDispatch } from '../../store';
+import { prepareBannerDataUrl } from '../../lib/imageBanner';
 
 const currencyOptions: Array<{ value: CurrencyCode; label: string }> = [
     { value: 'USD', label: 'USD - US Dollar' },
@@ -65,9 +68,13 @@ const SettingsPage: React.FC = () => {
     const dispatch = useDispatch<AppDispatch>();
     const { mode } = useSelector((state: RootState) => state.theme);
     const { user } = useSelector((state: RootState) => state.auth);
-    const { notifications, country, currency, app, loading } = useSelector((state: RootState) => state.settings);
+    const { notifications, country, currency, app, loading, error } = useSelector((state: RootState) => state.settings);
     const activeAppSettings = app || DEFAULT_APP_SETTINGS;
     const [appDraft, setAppDraft] = React.useState<AppSettings>(activeAppSettings);
+    const [bannerError, setBannerError] = React.useState<string | null>(null);
+    const bannerInputRef = React.useRef<HTMLInputElement>(null);
+    // Admins own their workspace branding; the rest of the POS config stays super-admin only.
+    const canEditBranding = user?.role === 'super_admin' || user?.role === 'admin';
 
     React.useEffect(() => {
         dispatch(fetchSettings());
@@ -76,6 +83,20 @@ const SettingsPage: React.FC = () => {
     React.useEffect(() => {
         setAppDraft(app || DEFAULT_APP_SETTINGS);
     }, [app]);
+
+    const handleBannerFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        event.target.value = '';
+        if (!file) return;
+
+        setBannerError(null);
+        try {
+            const dataUrl = await prepareBannerDataUrl(file);
+            setAppDraft((current) => ({ ...current, receiptBannerUrl: dataUrl }));
+        } catch (error) {
+            setBannerError(error instanceof Error ? error.message : 'That image could not be used as a banner.');
+        }
+    };
 
     const persistSettings = (
         nextCountry: CountryCode,
@@ -320,26 +341,6 @@ const SettingsPage: React.FC = () => {
                                         onChange={(event) => setAppDraft({ ...appDraft, salesTaxRate: Number(event.target.value) })}
                                         inputProps={{ min: 0, max: 100, step: 0.01 }}
                                     />
-                                    <TextField
-                                        size="small"
-                                        label="Shop Name"
-                                        value={appDraft.shopName}
-                                        onChange={(event) => setAppDraft({ ...appDraft, shopName: event.target.value })}
-                                    />
-                                    <TextField
-                                        size="small"
-                                        label="Shop Phone"
-                                        value={appDraft.shopPhone}
-                                        onChange={(event) => setAppDraft({ ...appDraft, shopPhone: event.target.value })}
-                                    />
-                                    <TextField
-                                        size="small"
-                                        label="Shop Address"
-                                        value={appDraft.shopAddress}
-                                        onChange={(event) => setAppDraft({ ...appDraft, shopAddress: event.target.value })}
-                                        multiline
-                                        rows={2}
-                                    />
                                     <FormControlLabel
                                         control={
                                             <Switch
@@ -360,6 +361,117 @@ const SettingsPage: React.FC = () => {
                                         Save POS Settings
                                     </Button>
                                 </Stack>
+                            </CardContent>
+                        </Card>
+                    </Grid>
+                )}
+
+                {canEditBranding && (
+                    <Grid size={{ xs: 12, md: 6 }}>
+                        <Card>
+                            <CardContent>
+                                <Typography variant="h6" fontWeight={700} gutterBottom>Invoice & Receipt Branding</Typography>
+                                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                                    The banner prints at the top of receipts, order invoices, transaction invoices and stock slips.
+                                    PNG, JPEG, WEBP or SVG; wide images work best.
+                                </Typography>
+                                <Divider sx={{ mb: 2 }} />
+
+                                <Stack spacing={2} sx={{ mb: 2 }}>
+                                    <TextField
+                                        size="small"
+                                        label="Shop Name"
+                                        helperText="Printed beside the banner, e.g. HASSAN TRADERS"
+                                        value={appDraft.shopName}
+                                        onChange={(event) => setAppDraft({ ...appDraft, shopName: event.target.value })}
+                                    />
+                                    <TextField
+                                        size="small"
+                                        label="Shop Address"
+                                        helperText="One line per row"
+                                        value={appDraft.shopAddress}
+                                        onChange={(event) => setAppDraft({ ...appDraft, shopAddress: event.target.value })}
+                                        multiline
+                                        rows={2}
+                                    />
+                                    <TextField
+                                        size="small"
+                                        label="Shop Phone"
+                                        helperText="One contact per line, e.g. Tariq Shah : 0315-0808002"
+                                        value={appDraft.shopPhone}
+                                        onChange={(event) => setAppDraft({ ...appDraft, shopPhone: event.target.value })}
+                                        multiline
+                                        rows={2}
+                                    />
+                                </Stack>
+
+                                <Box
+                                    sx={{
+                                        p: 1.5,
+                                        borderRadius: 2,
+                                        border: '1px dashed',
+                                        borderColor: alpha(theme.palette.primary.main, 0.35),
+                                        bgcolor: alpha(theme.palette.primary.main, 0.04),
+                                        textAlign: 'center',
+                                    }}
+                                >
+                                    {appDraft.receiptBannerUrl ? (
+                                        <Box
+                                            component="img"
+                                            src={appDraft.receiptBannerUrl}
+                                            alt="Receipt banner preview"
+                                            sx={{ display: 'block', mx: 'auto', maxWidth: '100%', maxHeight: 96, objectFit: 'contain' }}
+                                        />
+                                    ) : (
+                                        <Typography variant="body2" color="text.secondary">
+                                            No banner uploaded yet.
+                                        </Typography>
+                                    )}
+                                </Box>
+
+                                {bannerError && (
+                                    <Typography variant="caption" color="error" sx={{ display: 'block', mt: 1 }}>
+                                        {bannerError}
+                                    </Typography>
+                                )}
+
+                                {error && (
+                                    <Alert severity="error" sx={{ mt: 2 }} onClose={() => dispatch(clearSettingsError())}>
+                                        {error}
+                                    </Alert>
+                                )}
+
+                                <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
+                                    <Button variant="outlined" onClick={() => bannerInputRef.current?.click()}>
+                                        {appDraft.receiptBannerUrl ? 'Replace Banner' : 'Upload Banner'}
+                                    </Button>
+                                    {appDraft.receiptBannerUrl && (
+                                        <Button
+                                            color="error"
+                                            onClick={() => {
+                                                setBannerError(null);
+                                                setAppDraft({ ...appDraft, receiptBannerUrl: '' });
+                                            }}
+                                        >
+                                            Remove
+                                        </Button>
+                                    )}
+                                    <Button
+                                        variant="contained"
+                                        sx={{ ml: 'auto' }}
+                                        onClick={() => persistSettings(country, currency, notifications, appDraft)}
+                                        disabled={loading}
+                                    >
+                                        Save Branding
+                                    </Button>
+                                </Stack>
+                                <input
+                                    ref={bannerInputRef}
+                                    type="file"
+                                    accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                                    style={{ display: 'none' }}
+                                    onChange={handleBannerFileChange}
+                                />
                             </CardContent>
                         </Card>
                     </Grid>

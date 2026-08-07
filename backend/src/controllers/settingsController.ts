@@ -4,6 +4,17 @@ import type { AuthRequest } from '../middleware/auth';
 import { normalizeRole } from '../utils/accessControl';
 import type { IUser } from '../models/User';
 import { getAppSettingsForTenant, getGlobalAppSettings } from '../utils/tenancy';
+import type { IAppSetting } from '../models/AppSetting';
+
+const serializeAppSettings = (appSettings: IAppSetting, globalAppSettings: IAppSetting) => ({
+    salesTaxRate: appSettings.salesTaxRate,
+    shopName: appSettings.shopName,
+    shopPhone: appSettings.shopPhone,
+    shopAddress: appSettings.shopAddress,
+    receiptBannerUrl: appSettings.receiptBannerUrl || '',
+    installmentsEnabled: appSettings.installmentsEnabled,
+    autoRegistrationEnabled: globalAppSettings.autoRegistrationEnabled,
+});
 
 const serializePreferences = (preferences: IUser['preferences']) => ({
     country: preferences.country,
@@ -27,14 +38,7 @@ export const getSettings = async (req: AuthRequest, res: Response) => {
 
         return res.json({
             ...serializePreferences(user.preferences),
-            app: {
-                salesTaxRate: appSettings.salesTaxRate,
-                shopName: appSettings.shopName,
-                shopPhone: appSettings.shopPhone,
-                shopAddress: appSettings.shopAddress,
-                installmentsEnabled: appSettings.installmentsEnabled,
-                autoRegistrationEnabled: globalAppSettings.autoRegistrationEnabled,
-            },
+            app: serializeAppSettings(appSettings, globalAppSettings),
         });
     } catch (error: any) {
         return res.status(500).json({ message: error.message || 'Failed to fetch settings' });
@@ -61,14 +65,30 @@ export const updateSettings = async (req: AuthRequest, res: Response) => {
 
         const appSettings = await getAppSettingsForTenant(req.user!);
         const globalAppSettings = await getGlobalAppSettings();
-        if (normalizeRole(req.user?.role) === 'super_admin' && req.body.app) {
-            appSettings.salesTaxRate = req.body.app.salesTaxRate;
-            appSettings.shopName = req.body.app.shopName;
-            appSettings.shopPhone = req.body.app.shopPhone;
-            appSettings.shopAddress = req.body.app.shopAddress;
-            appSettings.installmentsEnabled = req.body.app.installmentsEnabled;
-            await appSettings.save();
-            if (typeof req.body.app.autoRegistrationEnabled === 'boolean') {
+        const role = normalizeRole(req.user?.role);
+        const isSuperAdmin = role === 'super_admin';
+        // Admins may brand their own workspace; the rest of the POS config is super-admin only.
+        // Branding (banner, shop name, contact block) belongs to the workspace owner;
+        // tax and installments stay with the super admin.
+        const canEditBranding = isSuperAdmin || role === 'admin';
+
+        if (req.body.app) {
+            if (canEditBranding) {
+                if (typeof req.body.app.receiptBannerUrl === 'string') {
+                    appSettings.receiptBannerUrl = req.body.app.receiptBannerUrl;
+                }
+                appSettings.shopName = req.body.app.shopName;
+                appSettings.shopPhone = req.body.app.shopPhone;
+                appSettings.shopAddress = req.body.app.shopAddress;
+            }
+            if (isSuperAdmin) {
+                appSettings.salesTaxRate = req.body.app.salesTaxRate;
+                appSettings.installmentsEnabled = req.body.app.installmentsEnabled;
+            }
+            if (appSettings.isModified()) {
+                await appSettings.save();
+            }
+            if (isSuperAdmin && typeof req.body.app.autoRegistrationEnabled === 'boolean') {
                 globalAppSettings.autoRegistrationEnabled = req.body.app.autoRegistrationEnabled;
                 await globalAppSettings.save();
             }
@@ -76,14 +96,7 @@ export const updateSettings = async (req: AuthRequest, res: Response) => {
 
         return res.json({
             ...serializePreferences(user.preferences),
-            app: {
-                salesTaxRate: appSettings.salesTaxRate,
-                shopName: appSettings.shopName,
-                shopPhone: appSettings.shopPhone,
-                shopAddress: appSettings.shopAddress,
-                installmentsEnabled: appSettings.installmentsEnabled,
-                autoRegistrationEnabled: globalAppSettings.autoRegistrationEnabled,
-            },
+            app: serializeAppSettings(appSettings, globalAppSettings),
         });
     } catch (error: any) {
         return res.status(400).json({ message: error.message || 'Failed to update settings' });

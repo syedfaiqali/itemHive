@@ -35,6 +35,7 @@ import {
     Receipt,
     CheckCircle,
     Printer,
+    Share2,
     Download,
     X
 } from 'lucide-react';
@@ -50,60 +51,12 @@ import useAppCurrency from '../../hooks/useAppCurrency';
 import api from '../../api/axios';
 import { getRegionalIdLabel } from '../../lib/regional';
 import { DEFAULT_APP_SETTINGS } from '../../features/settings/settingsSlice';
+import DocumentBanner from '../../components/Common/DocumentBanner';
+import { amountToWords } from '../../lib/numberToWords';
+import { buildInvoicePdfBlob, shareOrDownloadPdf } from '../../lib/invoicePdf';
 
 const categories = ['All', ...PRODUCT_CATEGORIES];
 type CheckoutMethod = 'cash' | 'card' | 'credit' | 'installment';
-
-const escapePdfText = (text: string) => text
-    .replace(/\\/g, '\\\\')
-    .replace(/\(/g, '\\(')
-    .replace(/\)/g, '\\)')
-    .replace(/[^\x20-\x7E]/g, '?');
-
-const receiptDivider = '='.repeat(40);
-
-const padReceiptLine = (label: string, value: string, width = 40) => {
-    const cleanLabel = label.trim();
-    const cleanValue = value.trim();
-    const spaces = Math.max(width - cleanLabel.length - cleanValue.length, 1);
-    return `${cleanLabel}${' '.repeat(spaces)}${cleanValue}`;
-};
-
-const buildSimplePdf = (lines: string[]) => {
-    const textStream = [
-        'BT',
-        '/F1 11 Tf',
-        '14 TL',
-        '40 800 Td',
-        ...lines.map((line, index) => `${index === 0 ? '' : 'T* '}(` + escapePdfText(line) + ') Tj'),
-        'ET'
-    ].join('\n');
-
-    const objects: string[] = [];
-    objects[1] = '<< /Type /Catalog /Pages 2 0 R >>';
-    objects[2] = '<< /Type /Pages /Kids [3 0 R] /Count 1 >>';
-    objects[3] = '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>';
-    objects[4] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>';
-    objects[5] = `<< /Length ${textStream.length} >>\nstream\n${textStream}\nendstream`;
-
-    let pdf = '%PDF-1.4\n';
-    const offsets: number[] = [0];
-    for (let i = 1; i <= 5; i += 1) {
-        offsets[i] = pdf.length;
-        pdf += `${i} 0 obj\n${objects[i]}\nendobj\n`;
-    }
-
-    const xrefStart = pdf.length;
-    pdf += 'xref\n';
-    pdf += `0 ${objects.length}\n`;
-    pdf += '0000000000 65535 f \n';
-    for (let i = 1; i <= 5; i += 1) {
-        pdf += `${offsets[i].toString().padStart(10, '0')} 00000 n \n`;
-    }
-    pdf += `trailer\n<< /Size ${objects.length} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`;
-
-    return new Blob([pdf], { type: 'application/pdf' });
-};
 
 const POSTerminal: React.FC = () => {
     const dispatch = useDispatch<AppDispatch>();
@@ -132,6 +85,7 @@ const POSTerminal: React.FC = () => {
     const [receiptId, setReceiptId] = useState('');
     const [receiptTime, setReceiptTime] = useState('');
     const [stockToast, setStockToast] = useState({ open: false, message: '' });
+    const [sharingReceipt, setSharingReceipt] = useState(false);
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [pendingMethod, setPendingMethod] = useState<CheckoutMethod | null>(null);
     const [creditOpen, setCreditOpen] = useState(false);
@@ -184,57 +138,105 @@ const POSTerminal: React.FC = () => {
         ? (draftInstallmentUnitPrice - installmentItem.purchasePrice) * installmentQuantity
         : 0;
 
-    const handleSaveReceiptPdf = (id: string, method: CheckoutMethod, receiptTimeIso: string) => {
-        const dateLabel = new Date(receiptTimeIso).toLocaleString();
+    /** Branded slip PDF: same letterhead as the printed receipt, banner included. */
+    const buildReceiptPdf = (id: string, method: CheckoutMethod, receiptTimeIso: string) => {
         const paymentLabel = method === 'credit'
             ? `CREDIT (${creditPaidVia.toUpperCase()} + DUE)`
             : method === 'installment'
                 ? `INSTALLMENT (${installmentMonths} MONTHS)`
                 : method.toUpperCase();
         const pdfTotal = method === 'installment' ? draftInstallmentTotal : total;
-        const lines = [
-            'ITEMHIVE PAYMENT SLIP',
-            appSettings.shopName || 'ItemHive POS',
-            appSettings.shopPhone ? `Phone: ${appSettings.shopPhone}` : '',
-            appSettings.shopAddress ? `Address: ${appSettings.shopAddress}` : '',
-            receiptDivider,
-            padReceiptLine('Slip No.', id),
-            padReceiptLine('Date', dateLabel),
-            padReceiptLine('Cashier', user?.name || 'Staff'),
-            padReceiptLine('Payment', paymentLabel),
-            method === 'credit' ? `Customer: ${creditCustomerName}` : method === 'installment' ? `Customer: ${installmentCustomerName}` : '',
-            method === 'credit' ? `${regionalIdLabel}: ${creditCustomerCnic}` : method === 'installment' ? `${regionalIdLabel}: ${installmentCustomerCnic}` : '',
-            receiptDivider,
-            'ITEMS',
-            ...cart.map((item) => {
-                const lineUnitPrice = method === 'installment' ? draftInstallmentUnitPrice : item.price;
-                return `${item.name} x${item.quantity}\n${padReceiptLine(`  @ ${formatCurrency(lineUnitPrice)}`, formatCurrency(lineUnitPrice * item.quantity))}`;
-            }).flatMap((line) => line.split('\n')),
-            receiptDivider,
-            'SUMMARY',
-            padReceiptLine('Subtotal', formatCurrency(subtotal)),
-            method !== 'installment' ? padReceiptLine(taxLabel, formatCurrency(tax)) : '',
-            activeDiscount > 0 ? padReceiptLine('Discount', `-${formatCurrency(activeDiscount)}`) : '',
-            method === 'credit' ? padReceiptLine('Paid Now', formatCurrency(creditPaidNow)) : '',
-            method === 'credit' ? padReceiptLine('Remaining Due', formatCurrency(creditDue)) : '',
-            method === 'installment' ? padReceiptLine('Advance Paid', formatCurrency(draftInstallmentAdvance)) : '',
-            method === 'installment' ? padReceiptLine('EMI Balance', formatCurrency(draftInstallmentRemaining)) : '',
-            method === 'installment' ? padReceiptLine('Monthly EMI', formatCurrency(draftMonthlyInstallment)) : '',
-            padReceiptLine(method === 'installment' ? 'Installment Total' : method === 'credit' ? 'Order Total' : 'Total Paid', formatCurrency(pdfTotal)),
-            receiptDivider,
-            'Thank you for shopping with us.',
-            'Please keep this slip for your record.'
-        ].filter(Boolean);
+        const customerName = method === 'credit' ? creditCustomerName : method === 'installment' ? installmentCustomerName : '';
+        const customerCnic = method === 'credit' ? creditCustomerCnic : method === 'installment' ? installmentCustomerCnic : '';
 
-        const pdfBlob = buildSimplePdf(lines);
-        const url = URL.createObjectURL(pdfBlob);
-        const anchor = document.createElement('a');
-        anchor.href = url;
-        anchor.download = `receipt-${id}.pdf`;
-        document.body.appendChild(anchor);
-        anchor.click();
-        anchor.remove();
-        URL.revokeObjectURL(url);
+        return buildInvoicePdfBlob({
+            title: 'Payment Slip',
+            bannerDataUrl: appSettings.receiptBannerUrl || undefined,
+            shop: {
+                name: appSettings.shopName || DEFAULT_APP_SETTINGS.shopName,
+                address: appSettings.shopAddress,
+                phone: appSettings.shopPhone,
+            },
+            billToLabel: customerName ? 'Invoice to' : 'Cashier',
+            billTo: customerName || user?.name || 'Staff',
+            billToSubtitle: customerName ? `${regionalIdLabel}: ${customerCnic || '-'}` : undefined,
+            meta: [
+                { label: 'Slip date', value: new Date(receiptTimeIso).toLocaleDateString() },
+                { label: 'Slip time', value: new Date(receiptTimeIso).toLocaleTimeString() },
+                { label: 'Slip number', value: id },
+            ],
+            columns: [
+                { label: '#', width: 0.6 },
+                { label: 'Description', width: 5 },
+                { label: 'Qty', width: 1, align: 'right' },
+                { label: 'Unit price', width: 1.7, align: 'right' },
+                { label: 'Total', width: 1.9, align: 'right' },
+            ],
+            rows: cart.map((item, index) => {
+                const lineUnitPrice = method === 'installment' ? draftInstallmentUnitPrice : item.price;
+                return [
+                    String(index + 1),
+                    item.name,
+                    String(item.quantity),
+                    formatCurrency(lineUnitPrice),
+                    formatCurrency(lineUnitPrice * item.quantity),
+                ];
+            }),
+            totals: [
+                { label: 'Subtotal', value: formatCurrency(subtotal) },
+                ...(method !== 'installment' ? [{ label: taxLabel, value: formatCurrency(tax) }] : []),
+                ...(activeDiscount > 0 ? [{ label: 'Discount', value: `-${formatCurrency(activeDiscount)}` }] : []),
+                ...(method === 'credit' ? [
+                    { label: 'Paid Now', value: formatCurrency(creditPaidNow) },
+                    { label: 'Remaining Due', value: formatCurrency(creditDue) },
+                ] : []),
+                ...(method === 'installment' ? [
+                    { label: 'Advance Paid', value: formatCurrency(draftInstallmentAdvance) },
+                    { label: 'EMI Balance', value: formatCurrency(draftInstallmentRemaining) },
+                    { label: 'Monthly EMI', value: formatCurrency(draftMonthlyInstallment) },
+                ] : []),
+                {
+                    label: method === 'installment' ? 'Installment Total' : method === 'credit' ? 'Order Total' : 'Total Paid',
+                    value: formatCurrency(pdfTotal),
+                    strong: true,
+                },
+            ],
+            amountInWords: amountToWords(pdfTotal),
+            footer: `Payment: ${paymentLabel}  |  Cashier: ${user?.name || 'Staff'}  |  Please keep this slip for your record.`,
+        });
+    };
+
+    const handleSaveReceiptPdf = async (id: string, method: CheckoutMethod, receiptTimeIso: string) => {
+        try {
+            const blob = await buildReceiptPdf(id, method, receiptTimeIso);
+            const url = URL.createObjectURL(blob);
+            const anchor = document.createElement('a');
+            anchor.href = url;
+            anchor.download = `receipt-${id}.pdf`;
+            document.body.appendChild(anchor);
+            anchor.click();
+            anchor.remove();
+            URL.revokeObjectURL(url);
+        } catch {
+            setStockToast({ open: true, message: 'Could not build the receipt PDF.' });
+        }
+    };
+
+    const handleShareReceiptPdf = async (id: string, method: CheckoutMethod, receiptTimeIso: string) => {
+        setSharingReceipt(true);
+        try {
+            const blob = await buildReceiptPdf(id, method, receiptTimeIso);
+            const result = await shareOrDownloadPdf(blob, `receipt-${id}.pdf`, 'Payment Slip');
+            setStockToast({
+                open: true,
+                message: result === 'shared' ? 'Receipt shared.' : 'Receipt PDF downloaded.',
+            });
+        } catch (error) {
+            if (error instanceof DOMException && error.name === 'AbortError') return;
+            setStockToast({ open: true, message: 'Could not build the receipt PDF.' });
+        } finally {
+            setSharingReceipt(false);
+        }
     };
 
     const handleAddToCart = (product: Product) => {
@@ -1245,6 +1247,22 @@ const POSTerminal: React.FC = () => {
                                 : `0 24px 46px -30px ${alpha(theme.palette.primary.dark, 0.32)}`,
                         }}
                     >
+                        {appSettings.receiptBannerUrl && (
+                            <Box
+                                sx={{
+                                    px: 3,
+                                    py: 2,
+                                    bgcolor: 'common.white',
+                                    borderBottom: '1px solid',
+                                    borderColor: alpha(theme.palette.primary.main, 0.12),
+                                    WebkitPrintColorAdjust: 'exact',
+                                    printColorAdjust: 'exact',
+                                }}
+                            >
+                                <DocumentBanner showShopDetails={false} maxHeight={72} />
+                            </Box>
+                        )}
+
                         <Box
                             sx={{
                                 px: 3,
@@ -1259,8 +1277,8 @@ const POSTerminal: React.FC = () => {
                             <Typography variant="h5" fontWeight={900} sx={{ lineHeight: 1.1 }}>
                                 {appSettings.shopName || 'ItemHive POS'}
                             </Typography>
-                            {appSettings.shopPhone && <Typography variant="body2" sx={{ mt: 0.75, opacity: 0.9 }}>{appSettings.shopPhone}</Typography>}
-                            {appSettings.shopAddress && <Typography variant="caption" sx={{ display: 'block', opacity: 0.82 }}>{appSettings.shopAddress}</Typography>}
+                            {appSettings.shopPhone && <Typography variant="body2" sx={{ mt: 0.75, opacity: 0.9, whiteSpace: 'pre-line' }}>{appSettings.shopPhone}</Typography>}
+                            {appSettings.shopAddress && <Typography variant="caption" sx={{ display: 'block', opacity: 0.82, whiteSpace: 'pre-line' }}>{appSettings.shopAddress}</Typography>}
                             <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" sx={{ mt: 1.5 }}>
                                 <Chip size="small" label={`Order #${receiptId}`} sx={{ bgcolor: alpha('#fff', 0.16), color: 'common.white' }} />
                                 <Chip size="small" label={`Method: ${paymentMethod?.toUpperCase()}`} sx={{ bgcolor: alpha('#fff', 0.16), color: 'common.white' }} />
@@ -1309,10 +1327,10 @@ const POSTerminal: React.FC = () => {
                                     <Typography variant="caption" fontWeight={800}>Amount</Typography>
                                 </Box>
                                 <Stack spacing={0} divider={<Divider flexItem sx={{ borderStyle: 'dashed' }} />}>
-                                    {cart.map(item => (
+                                    {cart.map((item, index) => (
                                         <Box key={item.id} sx={{ px: 2, py: 1.5, display: 'flex', justifyContent: 'space-between', gap: 2 }}>
                                             <Box>
-                                                <Typography variant="body2" fontWeight={800}>{item.name}</Typography>
+                                                <Typography variant="body2" fontWeight={800}>{index + 1}. {item.name}</Typography>
                                                 <Typography variant="caption" color="text.secondary">
                                                     {item.quantity} x {formatCurrency(paymentMethod === 'installment' ? draftInstallmentUnitPrice : item.price)}
                                                 </Typography>
@@ -1439,6 +1457,19 @@ const POSTerminal: React.FC = () => {
                     </Button>
                     <Button
                         fullWidth
+                        variant="outlined"
+                        startIcon={<Share2 size={18} />}
+                        disabled={sharingReceipt}
+                        onClick={() => {
+                            if (!paymentMethod || !receiptId) return;
+                            handleShareReceiptPdf(receiptId, paymentMethod, receiptTime || new Date().toISOString());
+                        }}
+                        sx={{ borderRadius: 2 }}
+                    >
+                        {sharingReceipt ? '...' : 'Share'}
+                    </Button>
+                    <Button
+                        fullWidth
                         variant="contained"
                         startIcon={<Printer size={18} />}
                         onClick={handlePrint}
@@ -1475,16 +1506,31 @@ const POSTerminal: React.FC = () => {
             <style>
                 {`
                 @media print {
-                    body * { visibility: hidden; }
-                    #pos-receipt, #pos-receipt * { visibility: visible; }
-                    body {
+                    @page { margin: 10mm; }
+
+                    /* Everything outside the slip leaves the layout entirely, otherwise
+                       the terminal behind it prints as extra blank pages. */
+                    body *:not(:has(#pos-receipt)):not(#pos-receipt):not(#pos-receipt *) {
+                        display: none !important;
+                    }
+
+                    body, #root, .MuiDialog-root, .MuiDialog-container, .MuiDialog-paper, .MuiDialogContent-root {
+                        display: block !important;
+                        position: static !important;
+                        overflow: visible !important;
+                        height: auto !important;
+                        max-height: none !important;
+                        width: auto !important;
+                        max-width: none !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        box-shadow: none !important;
                         background: #fff !important;
                     }
+
                     #pos-receipt {
-                        position: absolute;
-                        left: 50%;
-                        top: 0;
-                        transform: translateX(-50%);
+                        display: block !important;
+                        margin: 0 auto !important;
                         width: 760px;
                         max-width: 100%;
                         background: white !important;
@@ -1492,11 +1538,6 @@ const POSTerminal: React.FC = () => {
                         border-radius: 18px !important;
                         padding: 0 !important;
                         box-shadow: none !important;
-                    }
-                    .MuiDialog-container { display: block !important; }
-                    .MuiPaper-root {
-                        box-shadow: none !important;
-                        background: transparent !important;
                     }
                 }
                 `}

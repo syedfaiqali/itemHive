@@ -68,8 +68,9 @@ const corsOptions: cors.CorsOptions = {
 app.use(helmet());
 app.use(cors(corsOptions));
 app.options(/.*/, cors(corsOptions));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Receipt banners are stored as base64 data URLs, so the default 100kb body cap is too small.
+app.use(express.json({ limit: '3mb' }));
+app.use(express.urlencoded({ extended: true, limit: '3mb' }));
 
 // ── Static Files ─────────────────────────────────────────────
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
