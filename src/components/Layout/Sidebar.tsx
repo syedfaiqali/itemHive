@@ -71,7 +71,7 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onDrawerToggle }) => {
         { text: 'Installments', icon: <CalendarClock size={20} />, path: '/installments', roles: ['super_admin', 'admin', 'user'], requiresInstallmentAccess: true },
         { text: 'Reports', icon: <BarChart3 size={20} />, path: '/reports', roles: ['super_admin', 'admin'] },
         { text: 'Team', icon: <Users size={20} />, path: '/team', roles: ['super_admin', 'admin'] },
-        { text: 'Signup Requests', icon: <UserPlus size={20} />, path: '/signup-requests', roles: ['super_admin'] },
+        { text: 'Signup Requests', icon: <UserPlus size={20} />, path: '/signup-requests', roles: ['super_admin'], requiresSignupApproval: true },
     ];
 
     const drawer = (
@@ -157,7 +157,9 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onDrawerToggle }) => {
             >
                 <List sx={{ px: 0 }}>
                     {menuItems
-                        .filter(item => item.roles.includes(currentRole) && (!item.requiresInstallmentAccess || canAccessInstallments))
+                        .filter(item => item.roles.includes(currentRole)
+                            && (!item.requiresInstallmentAccess || canAccessInstallments)
+                            && (!item.requiresSignupApproval || !app?.autoRegistrationEnabled))
                         .map((item) => {
                             const isActive = location.pathname === item.path;
                             return (

@@ -42,6 +42,7 @@ const AppContent: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const { mode } = useSelector((state: RootState) => state.theme);
   const { isAuthenticated } = useSelector((state: RootState) => state.auth);
+  const { app } = useSelector((state: RootState) => state.settings);
   const theme = React.useMemo(() => getAppTheme(mode), [mode]);
 
   useEffect(() => {
@@ -129,9 +130,11 @@ const AppContent: React.FC = () => {
                 </ProtectedRoute>
               } />
               <Route path="signup-requests" element={
-                <ProtectedRoute allowedRoles={['super_admin']}>
-                  <SignupRequestsPage />
-                </ProtectedRoute>
+                app.autoRegistrationEnabled
+                  ? <Navigate to="/settings" replace />
+                  : <ProtectedRoute allowedRoles={['super_admin']}>
+                      <SignupRequestsPage />
+                    </ProtectedRoute>
               } />
               <Route path="settings" element={
                 <ProtectedRoute allowedRoles={['super_admin', 'admin', 'user']}>

@@ -24,9 +24,10 @@ import {
     TablePagination,
     TableRow,
     TextField,
+    Tooltip,
     Typography,
 } from '@mui/material';
-import { Edit3, Eye, EyeOff, Search, ShieldCheck, Trash2, UserPlus, Users } from 'lucide-react';
+import { Edit3, Eye, EyeOff, Info, Search, ShieldCheck, Trash2, UserPlus, Users } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../../store';
 import type { User, UserRole } from '../../features/auth/authSlice';
@@ -75,6 +76,15 @@ const getApiErrorMessage = (error: unknown, fallback: string) => {
     if (!axios.isAxiosError<ApiErrorResponse>(error)) return fallback;
     return error.response?.data?.message || error.response?.data?.details || fallback;
 };
+
+const BusinessLabel = () => (
+    <Stack direction="row" spacing={0.5} alignItems="center">
+        <span>Business</span>
+        <Tooltip title="To edit or delete a business, go to Settings → Business Management." arrow>
+            <Info size={16} aria-label="Business management information" />
+        </Tooltip>
+    </Stack>
+);
 
 const TeamManagementPage: React.FC = () => {
     const { user: currentUser } = useSelector((state: RootState) => state.auth);
@@ -302,7 +312,7 @@ const TeamManagementPage: React.FC = () => {
                     <TableHead>
                         <TableRow>
                             <TableCell>Account</TableCell>
-                            <TableCell>Business</TableCell>
+                            <TableCell><BusinessLabel /></TableCell>
                             <TableCell>Role</TableCell>
                             <TableCell align="center">Active</TableCell>
                             <TableCell align="center">Visible</TableCell>
@@ -434,7 +444,7 @@ const TeamManagementPage: React.FC = () => {
                             {isSuperAdmin && createDraft.role !== 'super_admin' && (
                                 <TextField
                                     select
-                                    label="Business"
+                                    label={<BusinessLabel />}
                                     value={createDraft.businessId}
                                     onChange={(event) => setCreateDraft({ ...createDraft, businessId: event.target.value })}
                                     helperText="Choose which shop/workspace this account belongs to."
@@ -516,7 +526,7 @@ const TeamManagementPage: React.FC = () => {
                         {draft.role !== 'super_admin' && (
                             <TextField
                                 select
-                                label="Business"
+                                label={<BusinessLabel />}
                                 value={draft.businessId}
                                 onChange={(event) => setDraft({ ...draft, businessId: event.target.value })}
                                 helperText="Move this account to an existing shop/workspace."
