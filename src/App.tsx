@@ -20,6 +20,7 @@ import Login from './pages/Auth/Login';
 const Dashboard = React.lazy(() => import('./pages/Dashboard/Dashboard'));
 const ProductList = React.lazy(() => import('./pages/Inventory/ProductList'));
 const AddProduct = React.lazy(() => import('./pages/Inventory/AddProduct'));
+const ImportProducts = React.lazy(() => import('./pages/Inventory/ImportProducts'));
 const ReduceStock = React.lazy(() => import('./pages/Inventory/ReduceStock'));
 const ProductUnitsPage = React.lazy(() => import('./pages/Inventory/ProductUnitsPage'));
 const POSTerminal = React.lazy(() => import('./pages/POS/POSTerminal'));
@@ -74,6 +75,7 @@ const AppContent: React.FC = () => {
               <Route index element={<Dashboard />} />
               <Route path="inventory" element={<ProductList />} />
               <Route path="inventory/add" element={<AddProduct />} />
+              <Route path="inventory/import" element={<ImportProducts />} />
               <Route path="inventory/units" element={<ProductUnitsPage />} />
               <Route path="inventory/requests" element={<InventoryRequestsPage />} />
               <Route path="inventory/reduce" element={

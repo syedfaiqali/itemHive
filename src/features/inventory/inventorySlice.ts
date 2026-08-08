@@ -102,6 +102,18 @@ export const addProductApi = createAsyncThunk(
     }
 );
 
+export const importProductsApi = createAsyncThunk(
+    'inventory/importProducts',
+    async (products: Product[], { rejectWithValue }) => {
+        try {
+            const response = await api.post<{ products: ProductResponse[] }>('/products/bulk', { products });
+            return response.data.products.map(normalizeProduct);
+        } catch (error: unknown) {
+            return rejectWithValue(getApiErrorMessage(error, 'Failed to import products'));
+        }
+    }
+);
+
 export const fetchProductImageSuggestions = createAsyncThunk(
     'inventory/fetchProductImageSuggestions',
     async (
@@ -204,6 +216,9 @@ const inventorySlice = createSlice({
             // Add
             .addCase(addProductApi.fulfilled, (state, action: PayloadAction<Product>) => {
                 state.products.push(action.payload);
+            })
+            .addCase(importProductsApi.fulfilled, (state, action: PayloadAction<Product[]>) => {
+                state.products.push(...action.payload);
             })
             // Update
             .addCase(updateProductApi.fulfilled, (state, action: PayloadAction<Product>) => {

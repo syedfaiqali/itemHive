@@ -500,6 +500,74 @@ export const createProduct = async (req: AuthRequest, res: Response) => {
     }
 };
 
+export const bulkCreateProducts = async (req: AuthRequest, res: Response) => {
+    const products: Record<string, unknown>[] = Array.isArray(req.body?.products) ? req.body.products : [];
+
+    if (products.length === 0) {
+        return res.status(400).json({ message: 'Add at least one product to import.' });
+    }
+
+    if (products.length > 500) {
+        return res.status(400).json({ message: 'You can import up to 500 products at a time.' });
+    }
+
+    const requiredFields = ['id', 'sku', 'name', 'category', 'purchasePrice', 'salePrice', 'stock'];
+    const invalidRow = products.findIndex((product) =>
+        !product || requiredFields.some((field) => product[field] === undefined || product[field] === null || product[field] === '') ||
+        !Number.isFinite(Number(product.purchasePrice)) || Number(product.purchasePrice) < 0 ||
+        !Number.isFinite(Number(product.salePrice)) || Number(product.salePrice) < 0 ||
+        !Number.isFinite(Number(product.stock)) || Number(product.stock) < 0
+    );
+
+    if (invalidRow !== -1) {
+        return res.status(400).json({ message: `Row ${invalidRow + 2} has missing or invalid product data.` });
+    }
+
+    const ids = products.map((product) => String(product.id).trim());
+    const skus = products.map((product) => String(product.sku).trim().toUpperCase());
+    if (new Set(ids).size !== ids.length || new Set(skus).size !== skus.length) {
+        return res.status(400).json({ message: 'The spreadsheet contains duplicate product IDs or SKUs.' });
+    }
+
+    try {
+        const tenantFilter = buildTenantFilter(req.user!);
+        const existing = await Product.find({
+            ...tenantFilter,
+            $or: [{ id: { $in: ids } }, { sku: { $in: skus } }],
+        }).select('id sku').lean();
+
+        if (existing.length > 0) {
+            return res.status(409).json({
+                message: 'Some product IDs or SKUs already exist in this workspace.',
+                duplicates: existing.map((product: { id: string; sku: string }) => ({ id: product.id, sku: product.sku })),
+            });
+        }
+
+        const savedProducts = await Product.insertMany(products.map((product) => ({
+            ...product,
+            id: String(product.id).trim(),
+            sku: String(product.sku).trim().toUpperCase(),
+            name: String(product.name).trim(),
+            category: String(product.category).trim(),
+            purchasePrice: Number(product.purchasePrice),
+            salePrice: Number(product.salePrice),
+            price: Number(product.salePrice),
+            stock: Number(product.stock),
+            minStock: Number(product.minStock ?? 5),
+            businessId: getTenantObjectId(req.user!),
+            businessName: req.user?.businessName || '',
+            lastUpdated: new Date(),
+        })));
+
+        return res.status(201).json({ message: `${savedProducts.length} products imported successfully.`, products: savedProducts });
+    } catch (error: any) {
+        if (error?.code === 11000) {
+            return res.status(409).json({ message: 'A product ID or SKU already exists in this workspace.' });
+        }
+        return res.status(400).json({ message: error.message || 'Unable to import products.' });
+    }
+};
+
 export const updateProduct = async (req: AuthRequest, res: Response) => {
     try {
         const updatedProduct = await Product.findOneAndUpdate(

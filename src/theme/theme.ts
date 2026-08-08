@@ -68,6 +68,21 @@ export const getAppTheme = (mode: PaletteMode) => createTheme({
                     },
                 },
                 contained: { padding: '10px 22px' },
+                outlined: {
+                    minHeight: 44,
+                    padding: '10px 22px',
+                    borderRadius: 14,
+                    borderWidth: 1.5,
+                },
+                outlinedPrimary: {
+                    color: '#0ea5a5',
+                    borderColor: alpha('#0ea5a5', 0.5),
+                    backgroundColor: mode === 'light' ? alpha('#0ea5a5', 0.025) : alpha('#2dd4bf', 0.08),
+                    '&:hover': {
+                        borderColor: '#0ea5a5',
+                        backgroundColor: mode === 'light' ? alpha('#0ea5a5', 0.09) : alpha('#2dd4bf', 0.16),
+                    },
+                },
             },
         },
         MuiCard: {

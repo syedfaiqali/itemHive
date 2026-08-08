@@ -52,6 +52,7 @@ import { deleteProductApi, updateProductApi, addProductApi, fetchProducts, type 
 import { useNavigate, useLocation } from 'react-router-dom';
 import { alpha, useTheme, styled } from '@mui/material/styles';
 import { motion } from 'framer-motion';
+import * as XLSX from 'xlsx';
 import useAppCurrency from '../../hooks/useAppCurrency';
 import { DEFAULT_PRODUCT_UNIT, getProductUnit, getProductUnitLabel, PRODUCT_UNITS } from '../../lib/productUnits';
 
@@ -328,36 +329,27 @@ const ProductList: React.FC = () => {
         showSnack('Product added successfully', 'success');
     };
 
-    const exportToCSV = () => {
-        const headers = ['ID', 'Business', 'Name', 'Category', 'Unit', 'Unit Urdu', 'Purchase Price', 'Sale Price', 'Stock', 'Min Stock', 'Last Updated'];
-        const rows = products.map(p => [
-            p.id,
-            p.businessName || '',
-            p.name,
-            p.category,
-            p.productUnit || getProductUnit(p.productUnitCode).english,
-            p.productUnitUrdu || getProductUnit(p.productUnitCode).urdu,
-            p.purchasePrice,
-            p.salePrice,
-            p.stock,
-            p.minStock,
-            p.lastUpdated
-        ]);
-
-        const csvContent = [
-            headers.join(','),
-            ...rows.map(row => row.join(','))
-        ].join('\n');
-
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        const url = URL.createObjectURL(blob);
-        link.setAttribute('href', url);
-        link.setAttribute('download', `inventory_export_${new Date().toISOString().split('T')[0]}.csv`);
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+    const exportToExcel = () => {
+        const rows = products.map((product) => ({
+            SKU: product.sku,
+            Name: product.name,
+            Category: product.category,
+            'Purchase Price': product.purchasePrice,
+            'Sale Price': product.salePrice,
+            Stock: product.stock,
+            'Min Stock': product.minStock,
+            'Unit Code': product.productUnitCode || getProductUnit(product.productUnitCode).code,
+            Description: product.description || '',
+            'Batch Number': product.batchNumber || '',
+            'Expiry Date': product.expiryDate || '',
+            Supplier: product.supplier || '',
+            'Image URL': product.imageUrl || '',
+        }));
+        const worksheet = XLSX.utils.json_to_sheet(rows);
+        worksheet['!cols'] = Object.keys(rows[0] || {}).map((header) => ({ wch: Math.max(header.length + 2, 15) }));
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Products');
+        XLSX.writeFile(workbook, `itemhive_inventory_${new Date().toISOString().split('T')[0]}.xlsx`);
     };
 
     const categories = Array.from(new Set(products.map(p => p.category))).sort();
@@ -426,15 +418,17 @@ const ProductList: React.FC = () => {
                         <Button
                             variant="outlined"
                             startIcon={<Filter size={18} />}
-                            color="inherit"
-                            sx={{ borderColor: 'divider', width: { xs: '100%', sm: 'auto' } }}
+                            sx={{ width: { xs: '100%', sm: 'auto' } }}
                             onClick={() => setShowFilters(!showFilters)}
                         >
                             Filters
                         </Button>
-                        <Button variant="outlined" startIcon={<Download size={18} />} color="inherit" sx={{ borderColor: 'divider', width: { xs: '100%', sm: 'auto' } }} onClick={exportToCSV}>
-                            Export CSV
-                        </Button>
+                        {isManager && <Button variant="outlined" startIcon={<Download size={18} />} sx={{ width: { xs: '100%', sm: 'auto' } }} onClick={exportToExcel}>
+                            Export Excel
+                        </Button>}
+                        {isManager && <Button variant="outlined" startIcon={<Download size={18} />} sx={{ width: { xs: '100%', sm: 'auto' } }} onClick={() => navigate('/inventory/import')}>
+                            Import Excel
+                        </Button>}
                     </Box>
 
                     {showFilters && (
