@@ -189,6 +189,10 @@ export const updateUserAccountSchema = Joi.object({
     businessId: Joi.string().allow('').optional(),
 });
 
+export const updateBusinessSchema = Joi.object({
+    name: Joi.string().trim().min(2).max(120).required(),
+});
+
 export const inventoryRequestDecisionSchema = Joi.object({
     status: Joi.string().valid('approved', 'rejected').required(),
     decisionNote: Joi.string().allow('').optional(),

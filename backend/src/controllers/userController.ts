@@ -136,14 +136,77 @@ export const getBusinesses = async (_req: AuthRequest, res: Response) => {
             .select('name slug isLegacy createdAt')
             .sort({ isLegacy: -1, name: 1 });
 
+        const userCounts = await User.aggregate([
+            { $match: { businessId: { $in: businesses.map((business) => business._id) } } },
+            { $group: { _id: '$businessId', count: { $sum: 1 } } },
+        ]);
+        const userCountByBusiness = new Map(userCounts.map((entry) => [String(entry._id), entry.count]));
+
         return res.json(businesses.map((business) => ({
             id: String(business._id),
             name: business.name,
             slug: business.slug,
             isLegacy: business.isLegacy,
+            userCount: userCountByBusiness.get(String(business._id)) || 0,
         })));
     } catch (error: any) {
         return res.status(500).json({ message: error.message || 'Failed to fetch businesses' });
+    }
+};
+
+export const updateBusiness = async (req: AuthRequest, res: Response) => {
+    try {
+        const business = await Business.findById(req.params.id);
+
+        if (!business) {
+            return res.status(404).json({ message: 'Business not found' });
+        }
+        if (business.isLegacy) {
+            return res.status(400).json({ message: 'The default business cannot be renamed' });
+        }
+
+        business.name = String(req.body.name || '').trim();
+        await business.save();
+
+        return res.json({
+            message: 'Business updated successfully',
+            business: {
+                id: String(business._id),
+                name: business.name,
+                slug: business.slug,
+                isLegacy: business.isLegacy,
+            },
+        });
+    } catch (error: any) {
+        return res.status(400).json({ message: error.message || 'Failed to update business' });
+    }
+};
+
+export const deleteBusiness = async (req: AuthRequest, res: Response) => {
+    try {
+        const business = await Business.findById(req.params.id);
+
+        if (!business) {
+            return res.status(404).json({ message: 'Business not found' });
+        }
+        if (business.isLegacy) {
+            return res.status(400).json({ message: 'The default business cannot be deleted' });
+        }
+
+        const superAdminExists = await User.exists({ businessId: business._id, role: 'super_admin' });
+        if (superAdminExists) {
+            return res.status(400).json({ message: 'A business with a super admin account cannot be deleted' });
+        }
+
+        const deletedUsers = await User.deleteMany({ businessId: business._id });
+        await business.deleteOne();
+
+        return res.json({
+            message: 'Business and its related users deleted successfully',
+            deletedUsers: deletedUsers.deletedCount,
+        });
+    } catch (error: any) {
+        return res.status(400).json({ message: error.message || 'Failed to delete business' });
     }
 };
 
