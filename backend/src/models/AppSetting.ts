@@ -8,6 +8,7 @@ export interface IAppSetting extends Document {
     shopPhone: string;
     shopAddress: string;
     receiptBannerUrl: string;
+    invoiceLogoUrl: string;
     installmentsEnabled: boolean;
     autoRegistrationEnabled: boolean;
 }
@@ -20,6 +21,7 @@ const AppSettingSchema: Schema<IAppSetting> = new Schema({
     shopPhone: { type: String, default: '', trim: true },
     shopAddress: { type: String, default: '', trim: true },
     receiptBannerUrl: { type: String, default: '' },
+    invoiceLogoUrl: { type: String, default: '' },
     installmentsEnabled: { type: Boolean, default: false },
     autoRegistrationEnabled: { type: Boolean, default: true },
 }, { timestamps: true });

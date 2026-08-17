@@ -12,6 +12,7 @@ const serializeAppSettings = (appSettings: IAppSetting, globalAppSettings: IAppS
     shopPhone: appSettings.shopPhone,
     shopAddress: appSettings.shopAddress,
     receiptBannerUrl: appSettings.receiptBannerUrl || '',
+    invoiceLogoUrl: appSettings.invoiceLogoUrl || '',
     installmentsEnabled: appSettings.installmentsEnabled,
     autoRegistrationEnabled: globalAppSettings.autoRegistrationEnabled,
 });
@@ -76,6 +77,9 @@ export const updateSettings = async (req: AuthRequest, res: Response) => {
             if (canEditBranding) {
                 if (typeof req.body.app.receiptBannerUrl === 'string') {
                     appSettings.receiptBannerUrl = req.body.app.receiptBannerUrl;
+                }
+                if (typeof req.body.app.invoiceLogoUrl === 'string') {
+                    appSettings.invoiceLogoUrl = req.body.app.invoiceLogoUrl;
                 }
                 appSettings.shopName = req.body.app.shopName;
                 appSettings.shopPhone = req.body.app.shopPhone;

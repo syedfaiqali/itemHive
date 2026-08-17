@@ -166,6 +166,15 @@ export const settingsSchema = Joi.object({
                 'string.max': 'Banner image is too large. Please use a smaller file.',
             })
             .optional(),
+        invoiceLogoUrl: Joi.string()
+            .allow('')
+            .max(RECEIPT_BANNER_MAX_LENGTH)
+            .pattern(/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/)
+            .messages({
+                'string.pattern.base': 'Invoice logo must be a PNG, JPEG or WEBP image',
+                'string.max': 'Invoice logo is too large. Please use a smaller file.',
+            })
+            .optional(),
         installmentsEnabled: Joi.boolean().required(),
         autoRegistrationEnabled: Joi.boolean().optional(),
     }).optional(),

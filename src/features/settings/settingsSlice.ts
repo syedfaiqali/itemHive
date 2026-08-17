@@ -13,6 +13,8 @@ export interface AppSettings {
     shopAddress: string;
     /** Base64 data URL shown as the header banner on receipts, invoices and printed slips. */
     receiptBannerUrl: string;
+    /** Optional invoice-specific logo. Falls back to the receipt banner when empty. */
+    invoiceLogoUrl: string;
     installmentsEnabled: boolean;
     autoRegistrationEnabled: boolean;
 }
@@ -23,6 +25,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     shopPhone: '',
     shopAddress: '',
     receiptBannerUrl: '',
+    invoiceLogoUrl: '',
     installmentsEnabled: false,
     autoRegistrationEnabled: true,
 };

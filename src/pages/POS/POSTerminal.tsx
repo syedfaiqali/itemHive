@@ -22,6 +22,7 @@ import {
     Stack,
     Snackbar,
     Alert,
+    CircularProgress,
     useTheme,
     alpha
 } from '@mui/material';
@@ -52,6 +53,8 @@ import api from '../../api/axios';
 import { getRegionalIdLabel } from '../../lib/regional';
 import { DEFAULT_APP_SETTINGS } from '../../features/settings/settingsSlice';
 import DocumentBanner from '../../components/Common/DocumentBanner';
+import InvoiceLetterhead from '../../components/Common/InvoiceLetterhead';
+import InvoiceItemsTable from '../../components/Common/InvoiceItemsTable';
 import { amountToWords } from '../../lib/numberToWords';
 import { buildInvoicePdfBlob, shareOrDownloadPdf } from '../../lib/invoicePdf';
 
@@ -88,6 +91,7 @@ const POSTerminal: React.FC = () => {
     const [sharingReceipt, setSharingReceipt] = useState(false);
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [pendingMethod, setPendingMethod] = useState<CheckoutMethod | null>(null);
+    const [confirmingPayment, setConfirmingPayment] = useState(false);
     const [creditOpen, setCreditOpen] = useState(false);
     const [creditPaidInput, setCreditPaidInput] = useState('');
     const [creditPaidVia, setCreditPaidVia] = useState<'cash' | 'card'>('cash');
@@ -138,7 +142,7 @@ const POSTerminal: React.FC = () => {
         ? (draftInstallmentUnitPrice - installmentItem.purchasePrice) * installmentQuantity
         : 0;
 
-    /** Branded slip PDF: same letterhead as the printed receipt, banner included. */
+    /** POS invoice PDF: uses the same document structure as Order Desk. */
     const buildReceiptPdf = (id: string, method: CheckoutMethod, receiptTimeIso: string) => {
         const paymentLabel = method === 'credit'
             ? `CREDIT (${creditPaidVia.toUpperCase()} + DUE)`
@@ -150,20 +154,20 @@ const POSTerminal: React.FC = () => {
         const customerCnic = method === 'credit' ? creditCustomerCnic : method === 'installment' ? installmentCustomerCnic : '';
 
         return buildInvoicePdfBlob({
-            title: 'Payment Slip',
-            bannerDataUrl: appSettings.receiptBannerUrl || undefined,
+            title: 'Invoice',
+            bannerDataUrl: appSettings.invoiceLogoUrl || appSettings.receiptBannerUrl || undefined,
             shop: {
                 name: appSettings.shopName || DEFAULT_APP_SETTINGS.shopName,
                 address: appSettings.shopAddress,
                 phone: appSettings.shopPhone,
             },
-            billToLabel: customerName ? 'Invoice to' : 'Cashier',
+            billToLabel: customerName ? 'Invoice to' : 'Served by',
             billTo: customerName || user?.name || 'Staff',
             billToSubtitle: customerName ? `${regionalIdLabel}: ${customerCnic || '-'}` : undefined,
             meta: [
-                { label: 'Slip date', value: new Date(receiptTimeIso).toLocaleDateString() },
-                { label: 'Slip time', value: new Date(receiptTimeIso).toLocaleTimeString() },
-                { label: 'Slip number', value: id },
+                { label: 'Invoice date', value: new Date(receiptTimeIso).toLocaleDateString() },
+                { label: 'Invoice time', value: new Date(receiptTimeIso).toLocaleTimeString() },
+                { label: 'Invoice number', value: `#${id}` },
             ],
             columns: [
                 { label: '#', width: 0.6 },
@@ -202,7 +206,7 @@ const POSTerminal: React.FC = () => {
                 },
             ],
             amountInWords: amountToWords(pdfTotal),
-            footer: `Payment: ${paymentLabel}  |  Cashier: ${user?.name || 'Staff'}  |  Please keep this slip for your record.`,
+            footer: `Payment method: ${paymentLabel}  |  Cashier: ${user?.name || 'Staff'}`,
         });
     };
 
@@ -212,13 +216,13 @@ const POSTerminal: React.FC = () => {
             const url = URL.createObjectURL(blob);
             const anchor = document.createElement('a');
             anchor.href = url;
-            anchor.download = `receipt-${id}.pdf`;
+            anchor.download = `invoice-${id}.pdf`;
             document.body.appendChild(anchor);
             anchor.click();
             anchor.remove();
             URL.revokeObjectURL(url);
         } catch {
-            setStockToast({ open: true, message: 'Could not build the receipt PDF.' });
+            setStockToast({ open: true, message: 'Could not build the invoice PDF.' });
         }
     };
 
@@ -226,14 +230,14 @@ const POSTerminal: React.FC = () => {
         setSharingReceipt(true);
         try {
             const blob = await buildReceiptPdf(id, method, receiptTimeIso);
-            const result = await shareOrDownloadPdf(blob, `receipt-${id}.pdf`, 'Payment Slip');
+            const result = await shareOrDownloadPdf(blob, `invoice-${id}.pdf`, 'Invoice');
             setStockToast({
                 open: true,
-                message: result === 'shared' ? 'Receipt shared.' : 'Receipt PDF downloaded.',
+                message: result === 'shared' ? 'Invoice shared.' : 'Invoice PDF downloaded.',
             });
         } catch (error) {
             if (error instanceof DOMException && error.name === 'AbortError') return;
-            setStockToast({ open: true, message: 'Could not build the receipt PDF.' });
+            setStockToast({ open: true, message: 'Could not build the invoice PDF.' });
         } finally {
             setSharingReceipt(false);
         }
@@ -337,12 +341,14 @@ const POSTerminal: React.FC = () => {
     };
 
     const handleConfirmCheckout = async () => {
-        if (!pendingMethod) return;
+        if (!pendingMethod || confirmingPayment) return;
 
         const id = `R${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 10)}`;
         const receiptTimeIso = new Date().toISOString();
         const currentMethod = pendingMethod;
+        setConfirmingPayment(true);
 
+        try {
         if (pendingMethod === 'installment') {
             const item = cart[0];
 
@@ -431,9 +437,13 @@ const POSTerminal: React.FC = () => {
         setOrderDone(true);
         setConfirmOpen(false);
         setPendingMethod(null);
+        } finally {
+            setConfirmingPayment(false);
+        }
     };
 
     const handleCancelCheckout = () => {
+        if (confirmingPayment) return;
         setConfirmOpen(false);
         setPendingMethod(null);
     };
@@ -1159,7 +1169,7 @@ const POSTerminal: React.FC = () => {
 
             <Dialog
                 open={confirmOpen}
-                onClose={handleCancelCheckout}
+                onClose={confirmingPayment ? undefined : handleCancelCheckout}
                 maxWidth="xs"
                 fullWidth
                 PaperProps={{ sx: { borderRadius: 3 } }}
@@ -1206,11 +1216,16 @@ const POSTerminal: React.FC = () => {
                     </Box>
                 </DialogContent>
                 <DialogActions sx={{ p: 2 }}>
-                    <Button variant="outlined" onClick={handleCancelCheckout}>
+                    <Button variant="outlined" onClick={handleCancelCheckout} disabled={confirmingPayment}>
                         Cancel
                     </Button>
-                    <Button variant="contained" onClick={handleConfirmCheckout}>
-                        Confirm Payment
+                    <Button
+                        variant="contained"
+                        onClick={handleConfirmCheckout}
+                        disabled={confirmingPayment}
+                        startIcon={confirmingPayment ? <CircularProgress size={18} color="inherit" /> : undefined}
+                    >
+                        {confirmingPayment ? 'Processing...' : 'Confirm Payment'}
                     </Button>
                 </DialogActions>
             </Dialog>
@@ -1219,10 +1234,10 @@ const POSTerminal: React.FC = () => {
             <Dialog
                 open={orderDone}
                 onClose={handleCloseOrder}
-                maxWidth="xs"
+                maxWidth="md"
                 fullWidth
                 PaperProps={{
-                    sx: { borderRadius: 4, p: 1 }
+                    sx: { borderRadius: 2, p: 1 }
                 }}
             >
                 <DialogTitle sx={{ textAlign: 'center', pb: 0 }}>
@@ -1237,8 +1252,9 @@ const POSTerminal: React.FC = () => {
                         id="pos-receipt"
                         sx={{
                             mt: 3,
-                            borderRadius: 4,
-                            overflow: 'hidden',
+                            p: { xs: 2, sm: 3 },
+                            borderRadius: 2,
+                            overflowX: 'auto',
                             bgcolor: 'background.paper',
                             border: '1px solid',
                             borderColor: alpha(theme.palette.primary.main, 0.18),
@@ -1247,6 +1263,79 @@ const POSTerminal: React.FC = () => {
                                 : `0 24px 46px -30px ${alpha(theme.palette.primary.dark, 0.32)}`,
                         }}
                     >
+                        <Stack spacing={2.5} sx={{ minWidth: { xs: 620, sm: 0 } }}>
+                            <InvoiceLetterhead
+                                title="Invoice"
+                                billToLabel={paymentMethod === 'credit' || paymentMethod === 'installment' ? 'Invoice to' : 'Served by'}
+                                billTo={paymentMethod === 'credit'
+                                    ? creditCustomerName
+                                    : paymentMethod === 'installment'
+                                        ? installmentCustomerName
+                                        : user?.name || 'Staff'}
+                                billToSubtitle={paymentMethod === 'credit' || paymentMethod === 'installment'
+                                    ? `${regionalIdLabel}: ${paymentMethod === 'credit' ? creditCustomerCnic || '-' : installmentCustomerCnic || '-'}`
+                                    : undefined}
+                                meta={[
+                                    { label: 'Invoice date', value: receiptTime ? new Date(receiptTime).toLocaleDateString() : '-' },
+                                    { label: 'Invoice time', value: receiptTime ? new Date(receiptTime).toLocaleTimeString() : '-' },
+                                    { label: 'Invoice number', value: `#${receiptId}` },
+                                ]}
+                            />
+
+                            <Divider />
+
+                            <Grid container spacing={2}>
+                                <Grid size={{ xs: 6 }}>
+                                    <Typography variant="caption" color="text.secondary">Payment Method</Typography>
+                                    <Typography fontWeight={900} sx={{ textTransform: 'capitalize' }}>{paymentMethod || '-'}</Typography>
+                                </Grid>
+                                <Grid size={{ xs: 6 }}>
+                                    <Typography variant="caption" color="text.secondary">Cashier</Typography>
+                                    <Typography fontWeight={900}>{user?.name || 'Staff'}</Typography>
+                                </Grid>
+                            </Grid>
+
+                            <InvoiceItemsTable
+                                items={cart.map((item) => {
+                                    const unitPrice = paymentMethod === 'installment' ? draftInstallmentUnitPrice : item.price;
+                                    return {
+                                        description: item.name,
+                                        quantity: item.quantity,
+                                        unitPrice: formatCurrency(unitPrice),
+                                        total: formatCurrency(unitPrice * item.quantity),
+                                    };
+                                })}
+                                totals={[
+                                    ...(paymentMethod !== 'installment' && tax > 0
+                                        ? [
+                                            { label: 'Subtotal', value: formatCurrency(subtotal) },
+                                            { label: taxLabel, value: formatCurrency(tax) },
+                                        ]
+                                        : []),
+                                    ...(paymentMethod === 'credit'
+                                        ? [
+                                            { label: `Paid Now (${creditPaidVia.toUpperCase()})`, value: formatCurrency(creditPaidNow) },
+                                            { label: 'Amount To Receive', value: formatCurrency(creditDue), strong: true },
+                                        ]
+                                        : []),
+                                    ...(paymentMethod === 'installment'
+                                        ? [
+                                            { label: 'Advance Payment', value: formatCurrency(draftInstallmentAdvance) },
+                                            { label: 'EMI Balance', value: formatCurrency(draftInstallmentRemaining) },
+                                            { label: 'Monthly EMI', value: formatCurrency(draftMonthlyInstallment) },
+                                        ]
+                                        : []),
+                                    {
+                                        label: paymentMethod === 'installment' ? 'Installment Total' : paymentMethod === 'credit' ? 'Order Total' : 'Total Paid',
+                                        value: formatCurrency(paymentMethod === 'installment' ? draftInstallmentTotal : total),
+                                        strong: true,
+                                    },
+                                ]}
+                                amountInWords={amountToWords(paymentMethod === 'installment' ? draftInstallmentTotal : total)}
+                            />
+                        </Stack>
+
+                        <Box sx={{ display: 'none' }}>
                         {appSettings.receiptBannerUrl && (
                             <Box
                                 sx={{
@@ -1439,6 +1528,7 @@ const POSTerminal: React.FC = () => {
                                     Thank you for shopping with {appSettings.shopName || 'ItemHive'}
                                 </Typography>
                             </Box>
+                        </Box>
                         </Box>
                     </Box>
                 </DialogContent>
