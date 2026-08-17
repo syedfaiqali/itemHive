@@ -1623,11 +1623,31 @@ const POSTerminal: React.FC = () => {
                         margin: 0 auto !important;
                         width: 760px;
                         max-width: 100%;
+                        color-scheme: light !important;
+                        color: #111827 !important;
                         background: white !important;
                         border: 1px solid #d7deea !important;
                         border-radius: 18px !important;
                         padding: 0 !important;
                         box-shadow: none !important;
+                    }
+
+                    #pos-receipt * {
+                        color: #111827 !important;
+                        text-shadow: none !important;
+                    }
+
+                    #pos-receipt th,
+                    #pos-receipt td {
+                        border-color: #9ca3af !important;
+                    }
+
+                    #pos-receipt th {
+                        background: #f3f4f6 !important;
+                    }
+
+                    #pos-receipt .MuiDivider-root {
+                        border-color: #9ca3af !important;
                     }
                 }
                 `}
