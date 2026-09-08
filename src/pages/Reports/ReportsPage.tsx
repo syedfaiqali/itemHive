@@ -14,13 +14,14 @@ import {
     Alert,
     Button,
     ButtonGroup,
-    Stack,
     TextField,
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import {
     TrendingDown,
-    BarChart as BarChartIcon
+    BarChart as BarChartIcon,
+    Download,
+    FileDown
 } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from '../../store';
@@ -40,6 +41,7 @@ import {
     Area
 } from 'recharts';
 import useAppCurrency from '../../hooks/useAppCurrency';
+import * as XLSX from 'xlsx';
 import { fetchProducts } from '../../features/inventory/inventorySlice';
 import { fetchCategoryValuation, fetchSalesTrend, fetchTopSellingProducts, type ReportFilters, type ReportPeriod } from '../../features/reports/reportSlice';
 
@@ -50,6 +52,7 @@ const ReportsPage: React.FC = () => {
     const { salesTrend, categoryValuation, topSelling, error } = useSelector((state: RootState) => state.reports);
     const { currency, formatCurrency } = useAppCurrency();
     const [selectedPeriod, setSelectedPeriod] = useState<ReportPeriod>('7days');
+    const [selectedHourlyHours, setSelectedHourlyHours] = useState(24);
     const [generatedFilters, setGeneratedFilters] = useState<ReportFilters>({ period: '7days' });
     const [fromDate, setFromDate] = useState(() => {
         const date = new Date();
@@ -68,20 +71,82 @@ const ReportsPage: React.FC = () => {
     const buildFilters = (): ReportFilters => (
         selectedPeriod === 'custom'
             ? { period: 'custom', from: fromDate, to: toDate }
+            : selectedPeriod === 'hourly'
+                ? { period: 'hourly', hours: selectedHourlyHours }
             : { period: selectedPeriod }
     );
+
+    const loadReport = (filters: ReportFilters) => {
+        dispatch(fetchSalesTrend(filters));
+        dispatch(fetchTopSellingProducts(filters));
+        setGeneratedFilters(filters);
+    };
+
+    const handlePeriodChange = (period: ReportPeriod) => {
+        setSelectedPeriod(period);
+        loadReport(
+            period === 'custom'
+                ? { period, from: fromDate, to: toDate }
+                : period === 'hourly'
+                    ? { period, hours: selectedHourlyHours }
+                    : { period }
+        );
+    };
+
+    const handleHourlyHoursChange = (hours: number) => {
+        setSelectedHourlyHours(hours);
+        if (selectedPeriod === 'hourly') {
+            loadReport({ period: 'hourly', hours });
+        }
+    };
 
     const handleGenerateReport = () => {
         const filters = buildFilters();
         if (filters.period === 'custom' && (!filters.from || !filters.to)) {
             return;
         }
-        dispatch(fetchSalesTrend(filters));
-        dispatch(fetchTopSellingProducts(filters));
-        setGeneratedFilters(filters);
+        loadReport(filters);
+    };
+
+    const getReportFileName = (extension: string) => `itemhive_analytics_${generatedFilters.period}_${new Date().toISOString().slice(0, 10)}.${extension}`;
+
+    const handleDownloadExcel = () => {
+        const workbook = XLSX.utils.book_new();
+        const salesRows = trendData.map((row) => ({
+            Period: row.name,
+            Revenue: row.revenue,
+            'Units Sold': row.sales,
+        }));
+        const productsRows = topSellingRows.map(({ name, totalReduced, revenue, profit, product }) => ({
+            Product: name,
+            'Units Sold': totalReduced,
+            Revenue: revenue,
+            'Profit / Loss': profit || 0,
+            'Current Stock': product?.stock ?? 0,
+        }));
+        XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(salesRows), 'Sales Trend');
+        XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(productsRows), 'Top Products');
+        XLSX.writeFile(workbook, getReportFileName('xlsx'));
+    };
+
+    const handleDownloadPdf = () => {
+        const escapeHtml = (value: string | number) => String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+        const popup = window.open('', '_blank', 'width=900,height=700');
+        if (!popup) return;
+
+        const salesRows = trendData.map((row) => `<tr><td>${escapeHtml(row.name)}</td><td>${escapeHtml(formatCurrency(row.revenue))}</td><td>${escapeHtml(row.sales)}</td></tr>`).join('');
+        const productRows = topSellingRows.map(({ name, totalReduced, revenue, profit, product }) => `<tr><td>${escapeHtml(name)}</td><td>${escapeHtml(totalReduced)}</td><td>${escapeHtml(formatCurrency(revenue))}</td><td>${escapeHtml(formatCurrency(profit || 0))}</td><td>${escapeHtml(product?.stock ?? 0)}</td></tr>`).join('');
+        popup.document.write(`<!doctype html><html><head><title>${getReportFileName('pdf')}</title><style>body{font-family:Arial,sans-serif;color:#172033;margin:32px}h1{margin:0 0 6px}p{color:#5b6576}table{width:100%;border-collapse:collapse;margin:20px 0 32px}th,td{border:1px solid #d7dce5;padding:9px;text-align:left}th{background:#f2f5f9} .summary{font-weight:bold;font-size:18px;color:#126b45}@media print{body{margin:18px}}</style></head><body><h1>Inventory Analytics Report</h1><p>Period: ${escapeHtml(reportHeading)} · Generated: ${escapeHtml(new Date().toLocaleString())}</p><p class="summary">Total profit / loss: ${escapeHtml(formatCurrency(totalProfit))}</p><h2>Sales Trend</h2><table><thead><tr><th>Period</th><th>Revenue</th><th>Units Sold</th></tr></thead><tbody>${salesRows}</tbody></table><h2>Top Selling Products</h2><table><thead><tr><th>Product</th><th>Units Sold</th><th>Revenue</th><th>Profit / Loss</th><th>Current Stock</th></tr></thead><tbody>${productRows}</tbody></table></body></html>`);
+        popup.document.close();
+        popup.focus();
+        window.setTimeout(() => popup.print(), 250);
     };
 
     const reportHeading = useMemo(() => {
+        if (generatedFilters.period === 'hourly') return `Last ${generatedFilters.hours || 24} Hours`;
         if (generatedFilters.period === 'monthly') return 'Last 30 Days';
         if (generatedFilters.period === 'yearly') return 'Last 12 Months';
         if (generatedFilters.period === 'custom') {
@@ -103,6 +168,25 @@ const ReportsPage: React.FC = () => {
     );
 
     const trendData = useMemo(() => {
+        if (generatedFilters.period === 'hourly') {
+            const hourCount = generatedFilters.hours || 24;
+            return [...Array(hourCount)].map((_, i) => {
+                const date = new Date();
+                date.setHours(date.getHours() - ((hourCount - 1) - i), 0, 0, 0);
+                const hourKey = new Intl.DateTimeFormat('en-GB', {
+                    hour: '2-digit',
+                    hourCycle: 'h23',
+                    timeZone: 'Asia/Karachi',
+                }).format(date);
+                const point = salesTrend.find((entry) => entry._id === hourKey);
+                return {
+                    name: date.toLocaleTimeString('en-US', { hour: 'numeric', hour12: true, timeZone: 'Asia/Karachi' }),
+                    revenue: point?.revenue || 0,
+                    sales: point?.sales || 0,
+                };
+            });
+        }
+
         if (generatedFilters.period === 'yearly') {
             return [...Array(12)].map((_, i) => {
                 const d = new Date();
@@ -185,58 +269,83 @@ const ReportsPage: React.FC = () => {
                 sx={{
                     mb: 4,
                     display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: { xs: 'flex-start', sm: 'center' },
-                    flexDirection: { xs: 'column', sm: 'row' },
-                    gap: 1.5,
+                    flexDirection: 'column',
+                    gap: 2,
                     '@media print': { display: 'none' }
                 }}
             >
                 <Box>
                     <Typography variant="h4" fontWeight={800}>Inventory Analytics & Reports</Typography>
                     <Typography variant="body2" color="text.secondary">
-                        Generate 7-day, monthly, yearly, or custom date range reports from the controls below.
+                        Generate hourly, daily, monthly, yearly, or custom date range reports from the controls below.
                     </Typography>
                 </Box>
-                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ width: { xs: '100%', sm: 'auto' } }}>
-                    <ButtonGroup variant="outlined" sx={{ flexWrap: 'wrap' }}>
-                        <Button variant={selectedPeriod === '7days' ? 'contained' : 'outlined'} onClick={() => setSelectedPeriod('7days')}>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1.25 }}>
+                    <ButtonGroup variant="outlined" size="small" sx={{ '& .MuiButton-root': { whiteSpace: 'nowrap', minHeight: 40 } }}>
+                        <Button variant={selectedPeriod === '7days' ? 'contained' : 'outlined'} onClick={() => handlePeriodChange('7days')}>
                             7 Days
                         </Button>
-                        <Button variant={selectedPeriod === 'monthly' ? 'contained' : 'outlined'} onClick={() => setSelectedPeriod('monthly')}>
+                        <Button variant={selectedPeriod === 'monthly' ? 'contained' : 'outlined'} onClick={() => handlePeriodChange('monthly')}>
                             Monthly
                         </Button>
-                        <Button variant={selectedPeriod === 'yearly' ? 'contained' : 'outlined'} onClick={() => setSelectedPeriod('yearly')}>
+                        <Button variant={selectedPeriod === 'yearly' ? 'contained' : 'outlined'} onClick={() => handlePeriodChange('yearly')}>
                             Yearly
                         </Button>
-                        <Button variant={selectedPeriod === 'custom' ? 'contained' : 'outlined'} onClick={() => setSelectedPeriod('custom')}>
+                        <Button variant={selectedPeriod === 'custom' ? 'contained' : 'outlined'} onClick={() => handlePeriodChange('custom')}>
                             Custom Range
                         </Button>
+                        <Button variant={selectedPeriod === 'hourly' ? 'contained' : 'outlined'} onClick={() => handlePeriodChange('hourly')}>
+                            Hourly
+                        </Button>
                     </ButtonGroup>
-                    {selectedPeriod === 'custom' && (
-                        <>
-                            <TextField
-                                type="date"
-                                size="small"
-                                label="From"
-                                InputLabelProps={{ shrink: true }}
-                                value={fromDate}
-                                onChange={(e) => setFromDate(e.target.value)}
-                            />
-                            <TextField
-                                type="date"
-                                size="small"
-                                label="To"
-                                InputLabelProps={{ shrink: true }}
-                                value={toDate}
-                                onChange={(e) => setToDate(e.target.value)}
-                            />
-                        </>
-                    )}
-                    <Button variant="contained" onClick={handleGenerateReport}>
+                    <Button variant="contained" size="small" sx={{ minHeight: 40, whiteSpace: 'nowrap' }} onClick={handleGenerateReport}>
                         Generate Report
                     </Button>
-                </Stack>
+                    <Button variant="outlined" size="small" sx={{ minHeight: 40, whiteSpace: 'nowrap' }} startIcon={<FileDown size={18} />} onClick={handleDownloadPdf}>
+                        Download PDF
+                    </Button>
+                    <Button variant="outlined" size="small" sx={{ minHeight: 40, whiteSpace: 'nowrap' }} startIcon={<Download size={18} />} onClick={handleDownloadExcel}>
+                        Download Excel
+                    </Button>
+                </Box>
+                {selectedPeriod === 'custom' && (
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.25, alignItems: 'center' }}>
+                        <Typography variant="body2" color="text.secondary" fontWeight={700}>Custom date range:</Typography>
+                        <TextField
+                            type="date"
+                            size="small"
+                            label="From"
+                            InputLabelProps={{ shrink: true }}
+                            value={fromDate}
+                            onChange={(e) => setFromDate(e.target.value)}
+                        />
+                        <TextField
+                            type="date"
+                            size="small"
+                            label="To"
+                            InputLabelProps={{ shrink: true }}
+                            value={toDate}
+                            onChange={(e) => setToDate(e.target.value)}
+                        />
+                    </Box>
+                )}
+                {selectedPeriod === 'hourly' && (
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.25, alignItems: 'center' }}>
+                        <Typography variant="body2" color="text.secondary" fontWeight={700}>Show hourly activity for:</Typography>
+                        <ButtonGroup size="small" variant="outlined">
+                            {[6, 12, 24].map((hours) => (
+                                <Button
+                                    key={hours}
+                                    variant={selectedHourlyHours === hours ? 'contained' : 'outlined'}
+                                    onClick={() => handleHourlyHoursChange(hours)}
+                                >
+                                    Last {hours} hours
+                                </Button>
+                            ))}
+                        </ButtonGroup>
+                        <Typography variant="caption" color="text.secondary">Charts update when you choose a window.</Typography>
+                    </Box>
+                )}
             </Box>
 
             {error && (

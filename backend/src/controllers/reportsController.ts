@@ -36,6 +36,17 @@ const resolveReportRange = (query: Request['query']) => {
         return { period, dateLimit: fromDate, endDate: toDate };
     }
 
+    if (period === 'hourly') {
+        const requestedHours = Number(query.hours);
+        const hours = Number.isInteger(requestedHours) && requestedHours >= 1 && requestedHours <= 24
+            ? requestedHours
+            : 24;
+        const endDate = new Date();
+        const dateLimit = new Date(endDate);
+        dateLimit.setHours(dateLimit.getHours() - (hours - 1), 0, 0, 0);
+        return { period, dateLimit, endDate };
+    }
+
     const daysByPeriod: Record<string, number> = {
         '7days': 7,
         monthly: 30,
@@ -50,7 +61,11 @@ const resolveReportRange = (query: Request['query']) => {
 export const getSalesTrend = async (req: AuthRequest, res: Response) => {
     try {
         const { period, dateLimit, endDate } = resolveReportRange(req.query);
-        const groupFormat = period === 'yearly' ? '%Y-%m' : '%Y-%m-%d';
+        const groupFormat = period === 'yearly'
+            ? '%Y-%m'
+            : period === 'hourly'
+                ? '%H'
+                : '%Y-%m-%d';
 
         const stats = await Transaction.aggregate([
             {
@@ -62,7 +77,13 @@ export const getSalesTrend = async (req: AuthRequest, res: Response) => {
             },
             {
                 $group: {
-                    _id: { $dateToString: { format: groupFormat, date: '$timestamp' } },
+                    _id: {
+                        $dateToString: {
+                            format: groupFormat,
+                            date: '$timestamp',
+                            ...(period === 'hourly' ? { timezone: 'Asia/Karachi' } : {})
+                        }
+                    },
                     revenue: { $sum: '$totalPrice' },
                     sales: { $sum: '$amount' },
                     profit: { $sum: '$grossProfit' }

@@ -8,12 +8,13 @@ export interface SalesTrendPoint {
     profit?: number;
 }
 
-export type ReportPeriod = '7days' | 'monthly' | 'yearly' | 'custom';
+export type ReportPeriod = '7days' | 'monthly' | 'yearly' | 'custom' | 'hourly';
 
 export interface ReportFilters {
     period: ReportPeriod;
     from?: string;
     to?: string;
+    hours?: number;
 }
 
 export interface CategoryValuationPoint {
