@@ -460,7 +460,7 @@ const OrderDesk: React.FC = () => {
 
             const blob = await buildInvoicePdfBlob({
                 title: 'Invoice',
-                bannerDataUrl: appSettings.receiptBannerUrl || undefined,
+                bannerDataUrl: appSettings.invoiceLogoUrl || appSettings.receiptBannerUrl || undefined,
                 shop: {
                     name: appSettings.shopName || DEFAULT_APP_SETTINGS.shopName,
                     address: appSettings.shopAddress,

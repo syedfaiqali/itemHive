@@ -19,6 +19,7 @@ import { logout } from './features/auth/authSlice';
 import Login from './pages/Auth/Login';
 const Dashboard = React.lazy(() => import('./pages/Dashboard/Dashboard'));
 const ProductList = React.lazy(() => import('./pages/Inventory/ProductList'));
+const CategoriesPage = React.lazy(() => import('./pages/Inventory/CategoriesPage'));
 const AddProduct = React.lazy(() => import('./pages/Inventory/AddProduct'));
 const ImportProducts = React.lazy(() => import('./pages/Inventory/ImportProducts'));
 const ReduceStock = React.lazy(() => import('./pages/Inventory/ReduceStock'));
@@ -74,6 +75,7 @@ const AppContent: React.FC = () => {
             }>
               <Route index element={<Dashboard />} />
               <Route path="inventory" element={<ProductList />} />
+              <Route path="inventory/categories" element={<ProtectedRoute allowedRoles={['super_admin', 'admin']}><CategoriesPage /></ProtectedRoute>} />
               <Route path="inventory/add" element={<AddProduct />} />
               <Route path="inventory/import" element={<ImportProducts />} />
               <Route path="inventory/units" element={<ProductUnitsPage />} />

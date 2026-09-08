@@ -1,3 +1,5 @@
+import ProductImageUpload from '../../components/Common/ProductImageUpload';
+import useProductCategories from '../../hooks/useProductCategories';
 import React, { useState } from 'react';
 import {
     Box,
@@ -40,7 +42,6 @@ import {
     Package,
     Layers,
     DollarSign,
-    Image as ImageIcon,
     X,
     TrendingUp,
     ShieldCheck,
@@ -48,7 +49,7 @@ import {
 } from 'lucide-react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState, AppDispatch } from '../../store';
-import { deleteProductApi, updateProductApi, addProductApi, fetchProducts, type Product, resolveProductImage, placeholderFallback, PRODUCT_CATEGORIES } from '../../features/inventory/inventorySlice';
+import { deleteProductApi, updateProductApi, addProductApi, fetchProducts, type Product, resolveProductImage, placeholderFallback } from '../../features/inventory/inventorySlice';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { alpha, useTheme, styled } from '@mui/material/styles';
 import { motion } from 'framer-motion';
@@ -100,10 +101,11 @@ const PremiumDialog = styled(Dialog)(({ theme }) => ({
     }
 }));
 
-const categories_list = PRODUCT_CATEGORIES;
+
 type InlineField = 'stock' | 'salePrice';
 
 const ProductList: React.FC = () => {
+    const { categories: categories_list } = useProductCategories();
     const theme = useTheme();
     const dispatch = useDispatch<AppDispatch>();
     const navigate = useNavigate();
@@ -116,6 +118,7 @@ const ProductList: React.FC = () => {
     const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
     const [deleteId, setDeleteId] = useState<string | null>(null);
     const [viewProduct, setViewProduct] = useState<Product | null>(null);
+    const [editSaving, setEditSaving] = useState(false);
     const [editProduct, setEditProduct] = useState<Product | null>(null);
     const [inlineEdit, setInlineEdit] = useState<{ id: string; field: InlineField; value: string } | null>(null);
     const [inlineSaving, setInlineSaving] = useState<string | null>(null);
@@ -140,7 +143,8 @@ const ProductList: React.FC = () => {
         description: '',
         batchNumber: '',
         expiryDate: '',
-        supplier: ''
+        supplier: '',
+        imageUrl: ''
     });
 
     const location = useLocation();
@@ -218,13 +222,17 @@ const ProductList: React.FC = () => {
         }
     };
 
-    const handleUpdateSubmit = (e: React.FormEvent) => {
+    const handleUpdateSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (editProduct) {
-            dispatch(updateProductApi(editProduct));
+        if (!editProduct || editSaving) return;
+        setEditSaving(true);
+        try {
+            await dispatch(updateProductApi(editProduct)).unwrap();
             setEditProduct(null);
             showSnack('Product updated successfully', 'success');
-        }
+        } catch (error) {
+            showSnack(typeof error === 'string' ? error : 'Unable to save product', 'error');
+        } finally { setEditSaving(false); }
     };
 
     const saveProductInline = (product: Product, message = 'Product updated successfully') => {
@@ -283,7 +291,7 @@ const ProductList: React.FC = () => {
         setAddFormData({ ...addFormData, [e.target.name]: e.target.value });
     };
 
-    const handleAddSubmit = (e: React.FormEvent) => {
+    const handleAddSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
         // Check for duplicate SKU
@@ -292,7 +300,10 @@ const ProductList: React.FC = () => {
             return;
         }
 
-        dispatch(addProductApi({
+        if (editSaving) return;
+        setEditSaving(true);
+        try {
+        await dispatch(addProductApi({
             id: Math.random().toString(36).substr(2, 9),
             sku: addFormData.sku.toUpperCase(),
             name: addFormData.name,
@@ -308,8 +319,9 @@ const ProductList: React.FC = () => {
             description: addFormData.description,
             batchNumber: addFormData.batchNumber || `B-${Math.floor(Math.random() * 9000) + 1000}`,
             expiryDate: addFormData.expiryDate || new Date(Date.now() + 31536000000).toISOString().split('T')[0],
-            supplier: addFormData.supplier || 'General Supplier'
-        }));
+            supplier: addFormData.supplier || 'General Supplier',
+            imageUrl: addFormData.imageUrl
+        })).unwrap();
 
         setShowAddModal(false);
         setAddFormData({
@@ -324,9 +336,13 @@ const ProductList: React.FC = () => {
             description: '',
             batchNumber: '',
             expiryDate: '',
-            supplier: ''
+            supplier: '',
+        imageUrl: ''
         });
         showSnack('Product added successfully', 'success');
+        } catch (error) {
+            showSnack(typeof error === 'string' ? error : 'Unable to save product', 'error');
+        } finally { setEditSaving(false); }
     };
 
     const exportToExcel = () => {
@@ -800,7 +816,7 @@ const ProductList: React.FC = () => {
             </PremiumDialog>
 
             {/* Edit Product Dialog */}
-            <Dialog open={Boolean(editProduct)} onClose={() => setEditProduct(null)} maxWidth="md" fullWidth>
+            <Dialog open={Boolean(editProduct)} onClose={() => { if (!editSaving) setEditProduct(null); }} maxWidth="md" fullWidth>
                 <form onSubmit={handleUpdateSubmit}>
                     <DialogTitle sx={{ fontWeight: 800 }}>Edit Product</DialogTitle>
                     <DialogContent dividers>
@@ -894,6 +910,9 @@ const ProductList: React.FC = () => {
                                     />
                                 </Grid>
                                 <Grid size={12}>
+                                    <ProductImageUpload key={editProduct.id} value={editProduct.imageUrl} disabled={editSaving} onChange={imageUrl => setEditProduct(current => current ? { ...current, imageUrl } : current)} />
+                                </Grid>
+                                <Grid size={12}>
                                     <TextField
                                         fullWidth
                                         multiline
@@ -933,8 +952,8 @@ const ProductList: React.FC = () => {
                         )}
                     </DialogContent>
                     <DialogActions sx={{ p: 2 }}>
-                        <Button onClick={() => setEditProduct(null)}>Cancel</Button>
-                        <Button type="submit" variant="contained" startIcon={<Save size={20} />}>Save Changes</Button>
+                        <Button disabled={editSaving} onClick={() => setEditProduct(null)}>Cancel</Button>
+                        <Button type="submit" variant="contained" disabled={editSaving} startIcon={<Save size={20} />}>{editSaving ? 'Saving...' : 'Save Changes'}</Button>
                     </DialogActions>
                 </form>
             </Dialog>
@@ -953,7 +972,7 @@ const ProductList: React.FC = () => {
             {/* Add Product Modal */}
             <PremiumDialog
                 open={showAddModal}
-                onClose={() => setShowAddModal(false)}
+                onClose={() => { if (!editSaving) setShowAddModal(false); }}
                 maxWidth="md"
                 fullWidth
                 scroll="paper"
@@ -969,7 +988,7 @@ const ProductList: React.FC = () => {
                         </IconContainer>
                         <span className="gradient-text">Add New Product</span>
                     </Box>
-                    <IconButton onClick={() => setShowAddModal(false)} size="small" sx={{ color: 'text.secondary', '&:hover': { color: 'error.main', bgcolor: alpha('#ef4444', 0.1) } }}>
+                    <IconButton disabled={editSaving} onClick={() => setShowAddModal(false)} size="small" sx={{ color: 'text.secondary', '&:hover': { color: 'error.main', bgcolor: alpha('#ef4444', 0.1) } }}>
                         <X size={20} />
                     </IconButton>
                 </DialogTitle>
@@ -1150,35 +1169,7 @@ const ProductList: React.FC = () => {
                                 </Stack>
                             </Box>
 
-                            <Box>
-                                <Typography variant="subtitle2" fontWeight={800} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5, color: 'text.secondary' }}>
-                                    <ImageIcon size={18} /> Product Imagery
-                                </Typography>
-                                <Box
-                                    sx={{
-                                        border: '2px dashed',
-                                        borderColor: alpha(theme.palette.primary.main, 0.2),
-                                        borderRadius: 4,
-                                        p: 2,
-                                        textAlign: 'center',
-                                        bgcolor: alpha(theme.palette.primary.main, 0.02),
-                                        cursor: 'pointer',
-                                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                        '&:hover': {
-                                            bgcolor: alpha(theme.palette.primary.main, 0.05),
-                                            borderColor: theme.palette.primary.main,
-                                            transform: 'scale(1.02)'
-                                        }
-                                    }}
-                                >
-                                    <motion.div whileHover={{ rotate: 10 }}>
-                                        <ImageIcon size={32} color={theme.palette.primary.main} style={{ opacity: 0.6, marginBottom: 8 }} />
-                                    </motion.div>
-                                    <Typography variant="caption" fontWeight={700} color="primary.main" sx={{ display: 'block' }}>
-                                        Add Image
-                                    </Typography>
-                                </Box>
-                            </Box>
+                            <ProductImageUpload value={addFormData.imageUrl} disabled={editSaving} onChange={imageUrl => setAddFormData(current => ({ ...current, imageUrl }))} />
                         </Grid>
                     </Grid>
                 </DialogContent>
@@ -1197,6 +1188,7 @@ const ProductList: React.FC = () => {
                         variant="contained"
                         size="large"
                         startIcon={<Plus size={20} />}
+                        disabled={editSaving}
                         sx={{
                             borderRadius: 3,
                             px: 6,

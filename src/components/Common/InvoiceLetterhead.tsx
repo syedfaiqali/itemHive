@@ -36,7 +36,7 @@ const InvoiceLetterhead: React.FC<InvoiceLetterheadProps> = ({
 }) => {
     const { app } = useSelector((state: RootState) => state.settings);
     const appSettings = app || DEFAULT_APP_SETTINGS;
-    const bannerUrl = appSettings.receiptBannerUrl;
+    const bannerUrl = appSettings.invoiceLogoUrl || appSettings.receiptBannerUrl;
     const shopName = appSettings.shopName || DEFAULT_APP_SETTINGS.shopName;
 
     return (
@@ -53,7 +53,7 @@ const InvoiceLetterhead: React.FC<InvoiceLetterheadProps> = ({
             <Box
                 sx={{
                     display: 'flex',
-                    alignItems: 'flex-start',
+                    alignItems: 'center',
                     justifyContent: 'space-between',
                     gap: 2,
                     minHeight: bannerUrl ? 72 : 'auto',
@@ -68,9 +68,12 @@ const InvoiceLetterhead: React.FC<InvoiceLetterheadProps> = ({
                         src={bannerUrl}
                         alt={`${shopName} banner`}
                         sx={{
+                            display: 'block',
                             maxHeight: 90,
                             maxWidth: { xs: 160, sm: 280 },
                             objectFit: 'contain',
+                            objectPosition: 'right center',
+                            ml: 'auto',
                         }}
                     />
                 )}

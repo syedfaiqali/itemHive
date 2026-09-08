@@ -105,6 +105,7 @@ const SettingsPage: React.FC = () => {
     const activeAppSettings = app || DEFAULT_APP_SETTINGS;
     const [appDraft, setAppDraft] = React.useState<AppSettings>(activeAppSettings);
     const [bannerError, setBannerError] = React.useState<string | null>(null);
+    const [invoiceLogoError, setInvoiceLogoError] = React.useState<string | null>(null);
     const [businesses, setBusinesses] = React.useState<Business[]>([]);
     const [businessesLoading, setBusinessesLoading] = React.useState(false);
     const [businessError, setBusinessError] = React.useState('');
@@ -114,6 +115,7 @@ const SettingsPage: React.FC = () => {
     const [deletingBusiness, setDeletingBusiness] = React.useState<Business | null>(null);
     const [businessSaving, setBusinessSaving] = React.useState(false);
     const bannerInputRef = React.useRef<HTMLInputElement>(null);
+    const invoiceLogoInputRef = React.useRef<HTMLInputElement>(null);
     // Admins own their workspace branding; the rest of the POS config stays super-admin only.
     const canEditBranding = user?.role === 'super_admin' || user?.role === 'admin';
 
@@ -197,6 +199,20 @@ const SettingsPage: React.FC = () => {
             setAppDraft((current) => ({ ...current, receiptBannerUrl: dataUrl }));
         } catch (error) {
             setBannerError(error instanceof Error ? error.message : 'That image could not be used as a banner.');
+        }
+    };
+
+    const handleInvoiceLogoFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        event.target.value = '';
+        if (!file) return;
+
+        setInvoiceLogoError(null);
+        try {
+            const dataUrl = await prepareBannerDataUrl(file);
+            setAppDraft((current) => ({ ...current, invoiceLogoUrl: dataUrl }));
+        } catch (error) {
+            setInvoiceLogoError(error instanceof Error ? error.message : 'That image could not be used as an invoice logo.');
         }
     };
 
@@ -612,14 +628,6 @@ const SettingsPage: React.FC = () => {
                                             Remove
                                         </Button>
                                     )}
-                                    <Button
-                                        variant="contained"
-                                        sx={{ ml: 'auto' }}
-                                        onClick={() => persistSettings(country, currency, notifications, appDraft)}
-                                        disabled={loading}
-                                    >
-                                        Save Branding
-                                    </Button>
                                 </Stack>
                                 <input
                                     ref={bannerInputRef}
@@ -627,6 +635,76 @@ const SettingsPage: React.FC = () => {
                                     accept="image/png,image/jpeg,image/webp,image/svg+xml"
                                     style={{ display: 'none' }}
                                     onChange={handleBannerFileChange}
+                                />
+
+                                <Divider sx={{ my: 3 }} />
+                                <Typography variant="subtitle2" fontWeight={800} sx={{ mb: 0.5 }}>
+                                    Invoice Logo
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                                    Used on invoices and invoice PDFs. When empty, the receipt banner is used.
+                                </Typography>
+                                <Box
+                                    sx={{
+                                        p: 1.5,
+                                        minHeight: 112,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        borderRadius: 2,
+                                        border: '1px dashed',
+                                        borderColor: alpha(theme.palette.primary.main, 0.35),
+                                        bgcolor: alpha(theme.palette.primary.main, 0.04),
+                                    }}
+                                >
+                                    {appDraft.invoiceLogoUrl ? (
+                                        <Box
+                                            component="img"
+                                            src={appDraft.invoiceLogoUrl}
+                                            alt="Invoice logo preview"
+                                            sx={{ display: 'block', maxWidth: '100%', maxHeight: 88, objectFit: 'contain' }}
+                                        />
+                                    ) : (
+                                        <Typography variant="body2" color="text.secondary">
+                                            Using the receipt banner.
+                                        </Typography>
+                                    )}
+                                </Box>
+                                {invoiceLogoError && (
+                                    <Typography variant="caption" color="error" sx={{ display: 'block', mt: 1 }}>
+                                        {invoiceLogoError}
+                                    </Typography>
+                                )}
+                                <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
+                                    <Button variant="outlined" onClick={() => invoiceLogoInputRef.current?.click()}>
+                                        {appDraft.invoiceLogoUrl ? 'Replace Logo' : 'Upload Logo'}
+                                    </Button>
+                                    {appDraft.invoiceLogoUrl && (
+                                        <Button
+                                            color="error"
+                                            onClick={() => {
+                                                setInvoiceLogoError(null);
+                                                setAppDraft({ ...appDraft, invoiceLogoUrl: '' });
+                                            }}
+                                        >
+                                            Remove
+                                        </Button>
+                                    )}
+                                    <Button
+                                        variant="contained"
+                                        sx={{ ml: 'auto' }}
+                                        onClick={() => persistSettings(country, currency, notifications, appDraft)}
+                                        disabled={loading}
+                                    >
+                                        {loading ? 'Saving...' : 'Save Branding'}
+                                    </Button>
+                                </Stack>
+                                <input
+                                    ref={invoiceLogoInputRef}
+                                    type="file"
+                                    accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                                    style={{ display: 'none' }}
+                                    onChange={handleInvoiceLogoFileChange}
                                 />
                             </CardContent>
                         </Card>

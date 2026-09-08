@@ -1,0 +1,13 @@
+#itemhive-report-print { display: none; }
+@media print {
+    @page { size: A4; margin: 14mm; }
+    body:has(#itemhive-report-print) > * { display: none !important; }
+    body:has(#itemhive-report-print) { background: white !important; color: black !important; }
+    body > #itemhive-report-print { display: block !important; font: 11pt Arial, sans-serif; color: black; }
+    #itemhive-report-print h1 { font-size: 20pt; }
+    #itemhive-report-print h2 { font-size: 14pt; margin-top: 24px; break-after: avoid; }
+    #itemhive-report-print table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+    #itemhive-report-print th, #itemhive-report-print td { border: 1px solid #aaa; padding: 7px; text-align: left; overflow-wrap: anywhere; }
+    #itemhive-report-print thead { display: table-header-group; }
+    #itemhive-report-print tr { break-inside: avoid; }
+}
