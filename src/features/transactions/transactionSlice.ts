@@ -17,6 +17,8 @@ export interface Transaction {
     dueAmount?: number;
     customerName?: string;
     customerCnic?: string;
+    orderType?: 'dine_in' | 'takeaway' | 'foodpanda' | 'other';
+    otherOrderType?: string;
     unitCost?: number;
     unitPrice?: number;
     grossProfit?: number;

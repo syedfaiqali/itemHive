@@ -34,6 +34,8 @@ export const createTransaction = async (req: AuthRequest, res: Response) => {
             dueAmount,
             customerName,
             customerCnic,
+            orderType,
+            otherOrderType,
             unitPrice,
         } = req.body;
 
@@ -72,6 +74,8 @@ export const createTransaction = async (req: AuthRequest, res: Response) => {
             dueAmount: dueAmount || 0,
             customerName,
             customerCnic,
+            orderType,
+            otherOrderType,
             unitCost: resolvedUnitCost,
             unitPrice: resolvedUnitPrice,
             grossProfit: resolvedGrossProfit,

@@ -61,6 +61,7 @@ import { buildInvoicePdfBlob, shareOrDownloadPdf } from '../../lib/invoicePdf';
 
 
 type CheckoutMethod = 'cash' | 'card' | 'credit' | 'installment';
+type OrderType = 'dine_in' | 'takeaway' | 'foodpanda' | 'other';
 
 const POSTerminal: React.FC = () => {
     const { categories: productCategories } = useProductCategories();
@@ -87,6 +88,8 @@ const POSTerminal: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [activeTab, setActiveTab] = useState(0);
     const [paymentMethod, setPaymentMethod] = useState<CheckoutMethod | null>(null);
+    const [orderType, setOrderType] = useState<OrderType | ''>('');
+    const [otherOrderType, setOtherOrderType] = useState('');
     const [orderDone, setOrderDone] = useState(false);
     const [receiptId, setReceiptId] = useState('');
     const [receiptTime, setReceiptTime] = useState('');
@@ -144,6 +147,8 @@ const POSTerminal: React.FC = () => {
     const draftInstallmentProfit = installmentItem
         ? (draftInstallmentUnitPrice - installmentItem.purchasePrice) * installmentQuantity
         : 0;
+    const isOrderTypeComplete = Boolean(orderType && (orderType !== 'other' || otherOrderType.trim()));
+    const canChoosePayment = cart.length > 0 && isOrderTypeComplete;
 
     /** POS invoice PDF: uses the same document structure as Order Desk. */
     const buildReceiptPdf = (id: string, method: CheckoutMethod, receiptTimeIso: string) => {
@@ -265,7 +270,6 @@ const POSTerminal: React.FC = () => {
 
     const handleCheckout = (method: 'cash' | 'card') => {
         setPendingMethod(method);
-        setConfirmOpen(true);
     };
 
     const handleOpenCredit = () => {
@@ -317,7 +321,6 @@ const POSTerminal: React.FC = () => {
         setCreditDue(draftCreditDue);
         setPendingMethod('credit');
         setCreditOpen(false);
-        setConfirmOpen(true);
     };
 
     const handleContinueInstallment = () => {
@@ -340,11 +343,14 @@ const POSTerminal: React.FC = () => {
 
         setPendingMethod('installment');
         setInstallmentOpen(false);
-        setConfirmOpen(true);
     };
 
     const handleConfirmCheckout = async () => {
         if (!pendingMethod || confirmingPayment) return;
+        if (!isOrderTypeComplete) {
+            setStockToast({ open: true, message: 'Select an order type before taking payment.' });
+            return;
+        }
 
         const id = `R${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 10)}`;
         const receiptTimeIso = new Date().toISOString();
@@ -371,6 +377,8 @@ const POSTerminal: React.FC = () => {
                     saleDate: installmentSaleDate,
                     installmentMonths,
                     userName: user?.name || 'Staff',
+                    orderType,
+                    otherOrderType: orderType === 'other' ? otherOrderType.trim() : undefined,
                     witnesses: [
                         { name: witnessOneName.trim(), cnic: witnessOneCnic.trim(), address: witnessOneAddress.trim() },
                         { name: witnessTwoName.trim(), cnic: witnessTwoCnic.trim(), address: witnessTwoAddress.trim() },
@@ -415,6 +423,8 @@ const POSTerminal: React.FC = () => {
                 dueAmount: pendingMethod === 'credit' ? creditDue : 0,
                 customerName: pendingMethod === 'credit' ? creditCustomerName.trim() : undefined,
                 customerCnic: pendingMethod === 'credit' ? creditCustomerCnic.trim() : undefined,
+                orderType,
+                otherOrderType: orderType === 'other' ? otherOrderType.trim() : undefined,
                 unitPrice: item.price,
             };
             return dispatch(reduceStockApi({ id: item.id, amount: item.quantity, transaction: tx }));
@@ -451,10 +461,24 @@ const POSTerminal: React.FC = () => {
         setPendingMethod(null);
     };
 
+    const handleOrderTypeChange = (value: OrderType | '') => {
+        setOrderType(value);
+        setOtherOrderType('');
+        setPendingMethod(null);
+    };
+
+    const handlePayNow = () => {
+        if (!isOrderTypeComplete || !pendingMethod) return;
+        setConfirmOpen(true);
+    };
+
     const handleCloseOrder = () => {
         dispatch(clearCart());
         setOrderDone(false);
         setPaymentMethod(null);
+        setOrderType('');
+        setOtherOrderType('');
+        setPendingMethod(null);
         setCreditPaidNow(0);
         setCreditDue(0);
         setCreditCustomerName('');
@@ -908,13 +932,45 @@ const POSTerminal: React.FC = () => {
                         </Box>
                     </Stack>
 
+                    <Stack spacing={1} sx={{ mb: 1.25 }}>
+                        <TextField
+                            select
+                            fullWidth
+                            size="small"
+                            label="Order Type"
+                            value={orderType}
+                            onChange={(event) => handleOrderTypeChange(event.target.value as OrderType)}
+                            helperText="Select an order type to enable payment options."
+                        >
+                            <MenuItem value="dine_in">Dine In</MenuItem>
+                            <MenuItem value="takeaway">Takeaway</MenuItem>
+                            <MenuItem value="foodpanda">Foodpanda</MenuItem>
+                            <MenuItem value="other">Other</MenuItem>
+                        </TextField>
+                        {orderType === 'other' && (
+                            <TextField
+                                fullWidth
+                                size="small"
+                                autoFocus
+                                label="Other order type"
+                                placeholder="Write order type"
+                                value={otherOrderType}
+                                onChange={(event) => {
+                                    setOtherOrderType(event.target.value);
+                                    setPendingMethod(null);
+                                }}
+                                required
+                            />
+                        )}
+                    </Stack>
+
                     <Grid container spacing={1}>
                         <Grid size={{ xs: canAccessInstallments ? 3 : 4 }}>
                             <Button
                                 fullWidth
-                                variant="outlined"
+                                variant={pendingMethod === 'cash' ? 'contained' : 'outlined'}
                                 startIcon={<Banknote size={20} />}
-                                disabled={cart.length === 0}
+                                disabled={!canChoosePayment}
                                 onClick={() => handleCheckout('cash')}
                                 sx={{ py: 1, borderRadius: 2, fontWeight: 700 }}
                             >
@@ -924,9 +980,9 @@ const POSTerminal: React.FC = () => {
                         <Grid size={{ xs: canAccessInstallments ? 3 : 4 }}>
                             <Button
                                 fullWidth
-                                variant="outlined"
+                                variant={pendingMethod === 'card' ? 'contained' : 'outlined'}
                                 startIcon={<CreditCard size={20} />}
-                                disabled={cart.length === 0}
+                                disabled={!canChoosePayment}
                                 onClick={() => handleCheckout('card')}
                                 sx={{ py: 1, borderRadius: 2, fontWeight: 700 }}
                             >
@@ -936,9 +992,9 @@ const POSTerminal: React.FC = () => {
                         <Grid size={{ xs: canAccessInstallments ? 3 : 4 }}>
                             <Button
                                 fullWidth
-                                variant="outlined"
+                                variant={pendingMethod === 'credit' ? 'contained' : 'outlined'}
                                 startIcon={<Receipt size={20} />}
-                                disabled={cart.length === 0}
+                                disabled={!canChoosePayment}
                                 onClick={handleOpenCredit}
                                 sx={{ py: 1, borderRadius: 2, fontWeight: 700 }}
                             >
@@ -948,9 +1004,9 @@ const POSTerminal: React.FC = () => {
                         {canAccessInstallments && <Grid size={{ xs: 3 }}>
                             <Button
                                 fullWidth
-                                variant="outlined"
+                                variant={pendingMethod === 'installment' ? 'contained' : 'outlined'}
                                 startIcon={<Receipt size={20} />}
-                                disabled={cart.length === 0}
+                                disabled={!canChoosePayment}
                                 onClick={handleOpenInstallment}
                                 sx={{ py: 1, borderRadius: 2, fontWeight: 700 }}
                             >
@@ -980,8 +1036,8 @@ const POSTerminal: React.FC = () => {
                                 variant="contained"
                                 size="large"
                                 startIcon={<Receipt size={24} />}
-                                disabled={cart.length === 0}
-                                onClick={() => handleCheckout('card')}
+                                disabled={!canChoosePayment || !pendingMethod}
+                                onClick={handlePayNow}
                                 sx={{
                                     py: 1.3,
                                     mt: 0.5,
@@ -991,7 +1047,7 @@ const POSTerminal: React.FC = () => {
                                     boxShadow: (theme) => `0 8px 16px -4px ${alpha(theme.palette.primary.main, 0.4)}`
                                 }}
                             >
-                                Pay Now
+                                {pendingMethod ? `Pay with ${pendingMethod === 'installment' ? 'EMI' : pendingMethod}` : 'Pay Now'}
                             </Button>
                         </Grid>
                     </Grid>

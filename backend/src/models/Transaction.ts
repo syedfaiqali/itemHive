@@ -15,6 +15,8 @@ export interface ITransaction extends Document {
     dueAmount?: number;
     customerName?: string;
     customerCnic?: string;
+    orderType?: 'dine_in' | 'takeaway' | 'foodpanda' | 'other';
+    otherOrderType?: string;
     unitCost?: number;
     unitPrice?: number;
     grossProfit?: number;
@@ -37,6 +39,8 @@ const TransactionSchema: Schema = new Schema({
     dueAmount: { type: Number, default: 0 },
     customerName: { type: String, default: '' },
     customerCnic: { type: String, default: '' },
+    orderType: { type: String, enum: ['dine_in', 'takeaway', 'foodpanda', 'other'], default: undefined },
+    otherOrderType: { type: String, default: '' },
     unitCost: { type: Number, default: 0 },
     unitPrice: { type: Number, default: 0 },
     grossProfit: { type: Number, default: 0 },

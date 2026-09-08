@@ -81,6 +81,8 @@ export const createInstallmentPlan = async (req: AuthRequest, res: Response) => 
             saleDate,
             installmentMonths,
             userName,
+            orderType,
+            otherOrderType,
         } = req.body;
 
         const product = await Product.findOne({ id: productId, ...buildTenantFilter(req.user!) }).session(session);
@@ -132,6 +134,8 @@ export const createInstallmentPlan = async (req: AuthRequest, res: Response) => 
             dueAmount: financedAmount,
             customerName,
             customerCnic,
+            orderType,
+            otherOrderType,
             unitCost: product.purchasePrice ?? 0,
             unitPrice: resolvedUnitPrice,
             grossProfit: (resolvedUnitPrice - (product.purchasePrice ?? 0)) * Number(amount || 0),
