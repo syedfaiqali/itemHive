@@ -381,7 +381,7 @@ const ReportsPage: React.FC = () => {
             </Box>
 
             {generated && !error && <Alert severity="success" sx={{ mb: 2 }}>Report generated for {reportHeading}. {salesTrend.length === 0 ? 'No sales were recorded in this period.' : ''}</Alert>}
-            <Button variant="outlined" disabled={!generated || generating || Boolean(error)} sx={{ mb: 2 }} onClick={() => window.print()}>Print / Save as PDF</Button>
+            <Button variant="outlined" disabled={!generated || generating || Boolean(error)} sx={{ mb: 2 }} onClick={() => window.print()}>Print as PDF</Button>
             <Typography variant="caption" display="block" sx={{ mb: 2 }}>Generate your report, then choose Save as PDF in the print dialog.</Typography>
             {error && (
                 <Alert severity="error" sx={{ mb: 3 }}>
