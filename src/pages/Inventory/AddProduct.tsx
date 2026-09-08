@@ -1,3 +1,4 @@
+import useProductCategories from '../../hooks/useProductCategories';
 import React, { useRef, useState } from 'react';
 import {
     Box,
@@ -29,7 +30,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { addProductApi, fetchProductImageSuggestions, type Product, type ProductImageSuggestion, PRODUCT_CATEGORIES } from '../../features/inventory/inventorySlice';
+import { addProductApi, fetchProductImageSuggestions, type Product, type ProductImageSuggestion } from '../../features/inventory/inventorySlice';
 import type { AppDispatch } from '../../store';
 import type { RootState } from '../../store';
 import { motion } from 'framer-motion';
@@ -37,7 +38,7 @@ import useAppCurrency from '../../hooks/useAppCurrency';
 import api from '../../api/axios';
 import { DEFAULT_PRODUCT_UNIT, getProductUnit, PRODUCT_UNITS } from '../../lib/productUnits';
 
-const categories = PRODUCT_CATEGORIES;
+
 
 const getErrorMessage = (error: unknown, fallback: string) => {
     if (typeof error === 'string') return error;
@@ -50,6 +51,7 @@ const getErrorMessage = (error: unknown, fallback: string) => {
 };
 
 const AddProduct: React.FC = () => {
+    const { categories } = useProductCategories();
     const navigate = useNavigate();
     const dispatch = useDispatch<AppDispatch>();
     const [success, setSuccess] = useState(false);

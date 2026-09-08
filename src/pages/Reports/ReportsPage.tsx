@@ -1,4 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import api from '../../api/axios';
+import { createPortal } from 'react-dom';
+import './reportsPrint.css';
+import React, { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import {
     Box,
     Typography,
@@ -41,13 +44,19 @@ import {
 } from 'recharts';
 import useAppCurrency from '../../hooks/useAppCurrency';
 import { fetchProducts } from '../../features/inventory/inventorySlice';
-import { fetchCategoryValuation, fetchSalesTrend, fetchTopSellingProducts, type ReportFilters, type ReportPeriod } from '../../features/reports/reportSlice';
+import { type SalesTrendPoint, type CategoryValuationPoint, type TopSellingProduct, type ReportFilters, type ReportPeriod } from '../../features/reports/reportSlice';
 
 const ReportsPage: React.FC = () => {
     const theme = useTheme();
     const dispatch = useDispatch<AppDispatch>();
     const { products } = useSelector((state: RootState) => state.inventory);
-    const { salesTrend, categoryValuation, topSelling, error } = useSelector((state: RootState) => state.reports);
+    const [salesTrend, setSalesTrend] = useState<SalesTrendPoint[]>([]);
+    const [categoryValuation, setCategoryValuation] = useState<CategoryValuationPoint[]>([]);
+    const [topSelling, setTopSelling] = useState<TopSellingProduct[]>([]);
+    const [error, setError] = useState('');
+    const [generating, setGenerating] = useState(false);
+    const [generated, setGenerated] = useState(false);
+    const requestId = useRef(0);
     const { currency, formatCurrency } = useAppCurrency();
     const [selectedPeriod, setSelectedPeriod] = useState<ReportPeriod>('7days');
     const [generatedFilters, setGeneratedFilters] = useState<ReportFilters>({ period: '7days' });
@@ -58,27 +67,36 @@ const ReportsPage: React.FC = () => {
     });
     const [toDate, setToDate] = useState(() => new Date().toISOString().split('T')[0]);
 
-    useEffect(() => {
-        dispatch(fetchProducts());
-        dispatch(fetchSalesTrend({ period: '7days' }));
-        dispatch(fetchCategoryValuation());
-        dispatch(fetchTopSellingProducts({ period: '7days' }));
+    const generate = useCallback(async (filters: ReportFilters) => {
+        const request = ++requestId.current;
+        setGenerating(true); setGenerated(false); setError('');
+        try {
+            const [trend, valuation, selling] = await Promise.all([
+                api.get<SalesTrendPoint[]>('/reports/sales-trend', { params: filters }),
+                api.get<CategoryValuationPoint[]>('/reports/category-valuation'),
+                api.get<TopSellingProduct[]>('/reports/top-selling', { params: filters }),
+            ]);
+            if (request !== requestId.current) return;
+            setSalesTrend(trend.data); setCategoryValuation(valuation.data); setTopSelling(selling.data);
+            setGeneratedFilters(filters); setGenerated(true);
+            dispatch(fetchProducts());
+        } catch (failure) {
+            if (request !== requestId.current) return;
+            const response = (failure as { response?: { status?: number; data?: { message?: string } } }).response;
+            setError(response?.status === 404 ? 'The report API is unavailable on the connected backend. Deploy the updated backend and retry.' : response?.data?.message || 'Unable to generate reports. Check your connection and retry.');
+        } finally { if (request === requestId.current) setGenerating(false); }
     }, [dispatch]);
-
-    const buildFilters = (): ReportFilters => (
-        selectedPeriod === 'custom'
-            ? { period: 'custom', from: fromDate, to: toDate }
-            : { period: selectedPeriod }
-    );
-
+    useEffect(() => {
+        const refresh = () => { setSalesTrend([]); setCategoryValuation([]); setTopSelling([]); void generate({ period: '7days' }); };
+        refresh();
+        window.addEventListener('itemhive-workspace-changed', refresh);
+        return () => { ++requestId.current; window.removeEventListener('itemhive-workspace-changed', refresh); };
+    }, [generate]);
     const handleGenerateReport = () => {
-        const filters = buildFilters();
-        if (filters.period === 'custom' && (!filters.from || !filters.to)) {
-            return;
+        if (selectedPeriod === 'custom' && (!fromDate || !toDate || fromDate > toDate)) {
+            setError('Choose a valid From and To date, with From on or before To.'); return;
         }
-        dispatch(fetchSalesTrend(filters));
-        dispatch(fetchTopSellingProducts(filters));
-        setGeneratedFilters(filters);
+        void generate(selectedPeriod === 'custom' ? { period: 'custom', from: fromDate, to: toDate } : { period: selectedPeriod });
     };
 
     const reportHeading = useMemo(() => {
@@ -181,6 +199,18 @@ const ReportsPage: React.FC = () => {
 
     return (
         <Box>
+            {createPortal(<section id="itemhive-report-print">
+                <h1>ItemHive Inventory &amp; Sales Report</h1>
+                <p>{reportHeading} | Currency: {currency}</p>
+                <p>Total profit/loss: {formatCurrency(totalProfit)}</p>
+                <h2>Sales Summary</h2>
+                {salesTrend.length === 0 ? <p>No sales recorded for this period.</p> : <table><thead><tr><th>Date</th><th>Revenue</th><th>Units sold</th><th>Profit/loss</th></tr></thead><tbody>{salesTrend.map(row => <tr key={row._id}><td>{row._id}</td><td>{formatCurrency(row.revenue)}</td><td>{row.sales}</td><td>{formatCurrency(row.profit || 0)}</td></tr>)}</tbody></table>}
+                <h2>Top Selling Products</h2>
+                {topSelling.length === 0 ? <p>No sales recorded for this period.</p> : <table><thead><tr><th>Product</th><th>Units sold</th><th>Revenue</th><th>Profit/loss</th></tr></thead><tbody>{topSelling.map(row => <tr key={row._id}><td>{row.name}</td><td>{row.totalReduced}</td><td>{formatCurrency(row.revenue)}</td><td>{formatCurrency(row.profit || 0)}</td></tr>)}</tbody></table>}
+                <h2>Current Inventory Valuation</h2><p>Current stock values, independent of the selected sales period.</p>
+                <table><thead><tr><th>Category</th><th>Stock value</th></tr></thead><tbody>{categoryValuation.map(row => <tr key={row.name}><td>{row.name}</td><td>{formatCurrency(row.value)}</td></tr>)}</tbody></table>
+            </section>, document.body)}
+
             <Box
                 sx={{
                     mb: 4,
@@ -233,12 +263,15 @@ const ReportsPage: React.FC = () => {
                             />
                         </>
                     )}
-                    <Button variant="contained" onClick={handleGenerateReport}>
-                        Generate Report
+                    <Button variant="contained" disabled={generating} onClick={handleGenerateReport}>
+                        {generating ? 'Generating...' : 'Generate Report'}
                     </Button>
                 </Stack>
             </Box>
 
+            {generated && !error && <Alert severity="success" sx={{ mb: 2 }}>Report generated for {reportHeading}. {salesTrend.length === 0 ? 'No sales were recorded in this period.' : ''}</Alert>}
+            <Button variant="outlined" disabled={!generated || generating || Boolean(error)} sx={{ mb: 2 }} onClick={() => window.print()}>Print / Save as PDF</Button>
+            <Typography variant="caption" display="block" sx={{ mb: 2 }}>Generate your report, then choose Save as PDF in the print dialog.</Typography>
             {error && (
                 <Alert severity="error" sx={{ mb: 3 }}>
                     {error}

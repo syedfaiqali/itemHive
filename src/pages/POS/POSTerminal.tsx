@@ -1,3 +1,4 @@
+import useProductCategories from '../../hooks/useProductCategories';
 import React, { useState, useMemo } from 'react';
 import {
     Box,
@@ -43,7 +44,7 @@ import {
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
 import { addToCart, updateCartItemPrice, updateQuantity, clearCart } from '../../features/pos/posSlice';
-import { reduceStockApi, resolveProductImage, PRODUCT_CATEGORIES, fetchProducts } from '../../features/inventory/inventorySlice';
+import { reduceStockApi, resolveProductImage, fetchProducts } from '../../features/inventory/inventorySlice';
 import { fetchTransactions } from '../../features/transactions/transactionSlice';
 import type { Product } from '../../features/inventory/inventorySlice';
 import type { AppDispatch } from '../../store';
@@ -58,10 +59,12 @@ import InvoiceItemsTable from '../../components/Common/InvoiceItemsTable';
 import { amountToWords } from '../../lib/numberToWords';
 import { buildInvoicePdfBlob, shareOrDownloadPdf } from '../../lib/invoicePdf';
 
-const categories = ['All', ...PRODUCT_CATEGORIES];
+
 type CheckoutMethod = 'cash' | 'card' | 'credit' | 'installment';
 
 const POSTerminal: React.FC = () => {
+    const { categories: productCategories } = useProductCategories();
+    const categories = ['All', ...productCategories];
     const dispatch = useDispatch<AppDispatch>();
     const theme = useTheme();
 

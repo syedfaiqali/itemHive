@@ -7,6 +7,7 @@ import path from 'path';
 import connectDB from './config/db';
 import authRoutes from './routes/authRoutes';
 import productRoutes from './routes/productRoutes';
+import categoryRoutes from './routes/categoryRoutes';
 import transactionRoutes from './routes/transactionRoutes';
 import reportRoutes from './routes/reportRoutes';
 import creditRoutes from './routes/creditRoutes';
@@ -100,6 +101,7 @@ app.get('/health', (_req: Request, res: Response) => {
 // ── API Routes ────────────────────────────────────────────────
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
+app.use('/api/categories', categoryRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/customers', customerRoutes);
