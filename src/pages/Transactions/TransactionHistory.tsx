@@ -162,6 +162,9 @@ const TransactionHistory: React.FC = () => {
         try {
             const money = (value: number) => formatCurrency(value, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
             const unitPrice = selectedTx.unitPrice ?? (selectedTx.amount > 0 ? selectedTx.totalPrice / selectedTx.amount : 0);
+            const subtotal = selectedTx.subtotal ?? unitPrice * selectedTx.amount;
+            const discountAmount = selectedTx.discountAmount || 0;
+            const taxAmount = selectedTx.taxAmount || 0;
 
             const blob = await buildInvoicePdfBlob({
                 title: 'Invoice',
@@ -188,6 +191,9 @@ const TransactionHistory: React.FC = () => {
                 ],
                 rows: [['1', selectedTx.productName, String(selectedTx.amount), money(unitPrice), money(selectedTx.totalPrice || 0)]],
                 totals: [
+                    { label: 'Pricing', value: money(subtotal) },
+                    ...(discountAmount > 0 ? [{ label: `Discount (${selectedTx.discountPercent || 0}%)`, value: `-${money(discountAmount)}` }] : []),
+                    ...(taxAmount > 0 ? [{ label: 'Tax', value: money(taxAmount) }] : []),
                     { label: 'Total Value', value: money(selectedTx.totalPrice || 0), strong: true },
                     ...((selectedTx.paidNow || 0) > 0 ? [{ label: 'Paid Now', value: money(selectedTx.paidNow || 0) }] : []),
                     ...((selectedTx.dueAmount || 0) > 0 ? [{ label: 'Remaining Due', value: money(selectedTx.dueAmount || 0) }] : []),
@@ -413,6 +419,12 @@ const TransactionHistory: React.FC = () => {
                                                 <Typography variant="body2" fontWeight={800}>
                                                     {tx.totalPrice != null ? formatCurrency(tx.totalPrice, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : '-'}
                                                 </Typography>
+                                                {((tx.discountAmount || 0) > 0 || (tx.subtotal != null)) && (
+                                                    <Typography variant="caption" display="block" color="text.secondary">
+                                                        Pricing: {formatCurrency(tx.subtotal ?? ((tx.unitPrice ?? (tx.amount > 0 ? tx.totalPrice / tx.amount : 0)) * tx.amount), { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                                                        {(tx.discountAmount || 0) > 0 && ` | Discount (${tx.discountPercent || 0}%): -${formatCurrency(tx.discountAmount || 0, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`}
+                                                    </Typography>
+                                                )}
                                                 <Typography
                                                     variant="caption"
                                                     color={(tx.grossProfit || 0) >= 0 ? 'success.main' : 'error.main'}
@@ -642,6 +654,13 @@ const TransactionHistory: React.FC = () => {
                                     total: invoiceMoney(selectedTx.totalPrice || 0),
                                 }]}
                                 totals={[
+                                    { label: 'Pricing', value: invoiceMoney(selectedTx.subtotal ?? ((selectedTx.unitPrice ?? (selectedTx.amount > 0 ? selectedTx.totalPrice / selectedTx.amount : 0)) * selectedTx.amount)) },
+                                    ...((selectedTx.discountAmount || 0) > 0
+                                        ? [{ label: `Discount (${selectedTx.discountPercent || 0}%)`, value: `-${invoiceMoney(selectedTx.discountAmount || 0)}` }]
+                                        : []),
+                                    ...((selectedTx.taxAmount || 0) > 0
+                                        ? [{ label: 'Tax', value: invoiceMoney(selectedTx.taxAmount || 0) }]
+                                        : []),
                                     { label: 'Total Value', value: invoiceMoney(selectedTx.totalPrice || 0), strong: true },
                                     ...((selectedTx.paidNow || 0) > 0
                                         ? [{ label: 'Paid Now', value: invoiceMoney(selectedTx.paidNow || 0) }]

@@ -16,6 +16,10 @@ export interface AppSettings {
     /** Optional invoice-specific logo. Falls back to the receipt banner when empty. */
     invoiceLogoUrl: string;
     installmentsEnabled: boolean;
+    /** Enables percentage discounts in the POS for this workspace. */
+    discountsEnabled: boolean;
+    /** Super-admin configured discount percentages shown to cashiers. */
+    discountOptions: number[];
     autoRegistrationEnabled: boolean;
 }
 
@@ -27,6 +31,8 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     receiptBannerUrl: '',
     invoiceLogoUrl: '',
     installmentsEnabled: false,
+    discountsEnabled: false,
+    discountOptions: [],
     autoRegistrationEnabled: true,
 };
 

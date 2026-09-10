@@ -11,6 +11,10 @@ export interface Transaction {
     userName: string;
     timestamp: string;
     totalPrice: number;
+    subtotal?: number;
+    discountPercent?: number;
+    discountAmount?: number;
+    taxAmount?: number;
     paymentMethod?: 'cash' | 'card' | 'credit' | 'installment';
     paidVia?: 'cash' | 'card';
     paidNow?: number;

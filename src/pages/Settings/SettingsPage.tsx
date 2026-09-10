@@ -500,7 +500,7 @@ const SettingsPage: React.FC = () => {
                     <Grid size={{ xs: 12, md: 6 }}>
                         <Accordion disableGutters elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: '12px !important' }}>
                             <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                                <Box><Typography fontWeight={700}>POS Controls</Typography><Typography variant="caption" color="text.secondary">Tax and installments</Typography></Box>
+                                <Box><Typography fontWeight={700}>POS Controls</Typography><Typography variant="caption" color="text.secondary">Tax, discounts and installments</Typography></Box>
                             </AccordionSummary>
                             <AccordionDetails>
                                 <Divider sx={{ mb: 2 }} />
@@ -522,6 +522,63 @@ const SettingsPage: React.FC = () => {
                                         }
                                         label="Enable installments for permitted accounts"
                                     />
+                                    <FormControlLabel
+                                        control={
+                                            <Switch
+                                                checked={appDraft.discountsEnabled}
+                                                onChange={(event) => setAppDraft({ ...appDraft, discountsEnabled: event.target.checked })}
+                                            />
+                                        }
+                                        label="Enable percentage discounts in POS"
+                                    />
+                                    <Typography variant="caption" color="text.secondary">
+                                        When enabled, cashiers choose only from the discount percentages configured below.
+                                    </Typography>
+                                    {appDraft.discountsEnabled && (
+                                        <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden' }}>
+                                            <Box sx={{ px: 1.5, py: 1, bgcolor: 'action.hover', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <Box>
+                                                    <Typography variant="subtitle2" fontWeight={800}>Discount options</Typography>
+                                                    <Typography variant="caption" color="text.secondary">Add the percentages cashiers may select in POS.</Typography>
+                                                </Box>
+                                                <Button
+                                                    size="small"
+                                                    onClick={() => setAppDraft({ ...appDraft, discountOptions: [...appDraft.discountOptions, 5] })}
+                                                >
+                                                    Add row
+                                                </Button>
+                                            </Box>
+                                            <Table size="small">
+                                                <TableHead><TableRow><TableCell>Discount %</TableCell><TableCell align="right">Action</TableCell></TableRow></TableHead>
+                                                <TableBody>
+                                                    {appDraft.discountOptions.map((option, index) => (
+                                                        <TableRow key={`${option}-${index}`}>
+                                                            <TableCell>
+                                                                <TextField
+                                                                    size="small"
+                                                                    type="number"
+                                                                    value={option}
+                                                                    onChange={(event) => {
+                                                                        const discountOptions = [...appDraft.discountOptions];
+                                                                        discountOptions[index] = Number(event.target.value || 0);
+                                                                        setAppDraft({ ...appDraft, discountOptions });
+                                                                    }}
+                                                                    inputProps={{ min: 0.01, max: 100, step: 0.01 }}
+                                                                    InputProps={{ endAdornment: <Typography variant="body2">%</Typography> }}
+                                                                />
+                                                            </TableCell>
+                                                            <TableCell align="right">
+                                                                <Button color="error" size="small" onClick={() => setAppDraft({ ...appDraft, discountOptions: appDraft.discountOptions.filter((_, itemIndex) => itemIndex !== index) })}>Remove</Button>
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    ))}
+                                                    {appDraft.discountOptions.length === 0 && (
+                                                        <TableRow><TableCell colSpan={2} align="center"><Typography variant="caption" color="text.secondary">No options added yet. Add a row to make discounts available in POS.</Typography></TableCell></TableRow>
+                                                    )}
+                                                </TableBody>
+                                            </Table>
+                                        </Box>
+                                    )}
                                     <Typography variant="caption" color="text.secondary">
                                         Super admin always keeps access. Enable this switch before granting installment access to selected accounts in Team Management.
                                     </Typography>

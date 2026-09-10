@@ -9,6 +9,10 @@ export interface ITransaction extends Document {
     type: 'addition' | 'reduction';
     amount: number;
     totalPrice: number;
+    subtotal?: number;
+    discountPercent?: number;
+    discountAmount?: number;
+    taxAmount?: number;
     paymentMethod?: 'cash' | 'card' | 'credit' | 'installment';
     paidVia?: 'cash' | 'card';
     paidNow?: number;
@@ -33,6 +37,10 @@ const TransactionSchema: Schema = new Schema({
     type: { type: String, enum: ['addition', 'reduction'], required: true, index: true },
     amount: { type: Number, required: true },
     totalPrice: { type: Number, required: true },
+    subtotal: { type: Number, default: 0 },
+    discountPercent: { type: Number, default: 0, min: 0, max: 100 },
+    discountAmount: { type: Number, default: 0, min: 0 },
+    taxAmount: { type: Number, default: 0, min: 0 },
     paymentMethod: { type: String, enum: ['cash', 'card', 'credit', 'installment'], default: 'cash' },
     paidVia: { type: String, enum: ['cash', 'card'], default: undefined },
     paidNow: { type: Number, default: 0 },

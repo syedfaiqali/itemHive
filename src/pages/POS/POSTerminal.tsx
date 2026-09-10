@@ -43,7 +43,7 @@ import {
 } from 'lucide-react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
-import { addToCart, updateCartItemPrice, updateQuantity, clearCart } from '../../features/pos/posSlice';
+import { addToCart, updateCartItemPrice, updateQuantity, clearCart, setCartDiscountPercent } from '../../features/pos/posSlice';
 import { reduceStockApi, resolveProductImage, fetchProducts } from '../../features/inventory/inventorySlice';
 import { fetchTransactions } from '../../features/transactions/transactionSlice';
 import type { Product } from '../../features/inventory/inventorySlice';
@@ -75,7 +75,7 @@ const POSTerminal: React.FC = () => {
 
     const { user } = useSelector((state: RootState) => state.auth);
     const { products } = useSelector((state: RootState) => state.inventory);
-    const { cart, activeDiscount } = useSelector((state: RootState) => state.pos);
+    const { cart, discountPercent } = useSelector((state: RootState) => state.pos);
     const { app, country } = useSelector((state: RootState) => state.settings);
     const appSettings = app || DEFAULT_APP_SETTINGS;
     const { formatCurrency, currencySymbol } = useAppCurrency();
@@ -84,6 +84,11 @@ const POSTerminal: React.FC = () => {
     const regionalIdLabel = getRegionalIdLabel(country);
     const taxRate = Number(appSettings.salesTaxRate || 0) / 100;
     const taxLabel = `Tax (${Number(appSettings.salesTaxRate || 0).toLocaleString()}%)`;
+    const discountsEnabled = Boolean(appSettings.discountsEnabled);
+    const discountOptions = Array.from(new Set((appSettings.discountOptions || [])
+        .map(Number)
+        .filter((option) => Number.isFinite(option) && option > 0 && option <= 100)))
+        .sort((first, second) => first - second);
 
     const [searchTerm, setSearchTerm] = useState('');
     const [activeTab, setActiveTab] = useState(0);
@@ -98,6 +103,9 @@ const POSTerminal: React.FC = () => {
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [pendingMethod, setPendingMethod] = useState<CheckoutMethod | null>(null);
     const [confirmingPayment, setConfirmingPayment] = useState(false);
+    // State updates apply on the next render; this ref blocks a rapid double
+    // click immediately, before the button visually becomes disabled.
+    const checkoutInFlightRef = React.useRef(false);
     const [creditOpen, setCreditOpen] = useState(false);
     const [creditPaidInput, setCreditPaidInput] = useState('');
     const [creditPaidVia, setCreditPaidVia] = useState<'cash' | 'card'>('cash');
@@ -133,7 +141,13 @@ const POSTerminal: React.FC = () => {
     const subtotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
     const projectedProfit = cart.reduce((acc, item) => acc + ((item.price - item.purchasePrice) * item.quantity), 0);
     const tax = subtotal * taxRate;
+    const appliedDiscountPercent = discountsEnabled && discountOptions.includes(Number(discountPercent)) ? Number(discountPercent) : 0;
+    const activeDiscount = subtotal * (appliedDiscountPercent / 100);
     const total = subtotal + tax - activeDiscount;
+
+    React.useEffect(() => {
+        if (discountPercent !== appliedDiscountPercent) dispatch(setCartDiscountPercent(appliedDiscountPercent));
+    }, [discountPercent, appliedDiscountPercent, dispatch]);
     const draftCreditPaid = Math.min(Math.max(Number(creditPaidInput || 0), 0), total);
     const draftCreditDue = Math.max(total - draftCreditPaid, 0);
     const installmentItem = cart[0];
@@ -197,7 +211,7 @@ const POSTerminal: React.FC = () => {
             totals: [
                 { label: 'Subtotal', value: formatCurrency(subtotal) },
                 ...(method !== 'installment' ? [{ label: taxLabel, value: formatCurrency(tax) }] : []),
-                ...(activeDiscount > 0 ? [{ label: 'Discount', value: `-${formatCurrency(activeDiscount)}` }] : []),
+                ...(method !== 'installment' && activeDiscount > 0 ? [{ label: `Discount (${appliedDiscountPercent}%)`, value: `-${formatCurrency(activeDiscount)}` }] : []),
                 ...(method === 'credit' ? [
                     { label: 'Paid Now', value: formatCurrency(creditPaidNow) },
                     { label: 'Remaining Due', value: formatCurrency(creditDue) },
@@ -346,12 +360,13 @@ const POSTerminal: React.FC = () => {
     };
 
     const handleConfirmCheckout = async () => {
-        if (!pendingMethod || confirmingPayment) return;
+        if (!pendingMethod || confirmingPayment || checkoutInFlightRef.current) return;
         if (!isOrderTypeComplete) {
             setStockToast({ open: true, message: 'Select an order type before taking payment.' });
             return;
         }
 
+        checkoutInFlightRef.current = true;
         const id = `R${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 10)}`;
         const receiptTimeIso = new Date().toISOString();
         const currentMethod = pendingMethod;
@@ -417,6 +432,7 @@ const POSTerminal: React.FC = () => {
                 userName: user?.name || 'Staff',
                 timestamp: receiptTimeIso,
                 totalPrice: item.price * item.quantity,
+                discountPercent: appliedDiscountPercent,
                 paymentMethod: pendingMethod,
                 paidVia: pendingMethod === 'credit' ? creditPaidVia : undefined,
                 paidNow: pendingMethod === 'credit' ? creditPaidNow : total,
@@ -452,6 +468,7 @@ const POSTerminal: React.FC = () => {
         setPendingMethod(null);
         } finally {
             setConfirmingPayment(false);
+            checkoutInFlightRef.current = false;
         }
     };
 
@@ -911,9 +928,23 @@ const POSTerminal: React.FC = () => {
                             <Typography variant="body2" color="text.secondary">{taxLabel}</Typography>
                             <Typography variant="body2" fontWeight={700}>{formatCurrency(tax)}</Typography>
                         </Box>
+                        {discountsEnabled && discountOptions.length > 0 && (
+                            <TextField
+                                select
+                                size="small"
+                                fullWidth
+                                label="Discount"
+                                value={appliedDiscountPercent}
+                                onChange={(event) => dispatch(setCartDiscountPercent(Number(event.target.value)))}
+                                helperText="Select an approved discount percentage."
+                            >
+                                <MenuItem value={0}>No discount</MenuItem>
+                                {discountOptions.map((option) => <MenuItem key={option} value={option}>{option}%</MenuItem>)}
+                            </TextField>
+                        )}
                         {activeDiscount > 0 && (
                             <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <Typography variant="body2" color="error.main">Discount</Typography>
+                                <Typography variant="body2" color="error.main">Discount ({appliedDiscountPercent}%)</Typography>
                                 <Typography variant="body2" fontWeight={700} color="error.main">-{formatCurrency(activeDiscount)}</Typography>
                             </Box>
                         )}
@@ -1371,6 +1402,9 @@ const POSTerminal: React.FC = () => {
                                             { label: taxLabel, value: formatCurrency(tax) },
                                         ]
                                         : []),
+                                    ...(paymentMethod !== 'installment' && activeDiscount > 0
+                                        ? [{ label: `Discount (${appliedDiscountPercent}%)`, value: `-${formatCurrency(activeDiscount)}` }]
+                                        : []),
                                     ...(paymentMethod === 'credit'
                                         ? [
                                             { label: `Paid Now (${creditPaidVia.toUpperCase()})`, value: formatCurrency(creditPaidNow) },
@@ -1535,6 +1569,12 @@ const POSTerminal: React.FC = () => {
                                                 <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                                                     <Typography variant="caption">{taxLabel}</Typography>
                                                     <Typography variant="caption" fontWeight={700}>{formatCurrency(tax)}</Typography>
+                                                </Box>
+                                            )}
+                                            {activeDiscount > 0 && (
+                                                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                    <Typography variant="caption" color="error.main">Discount ({appliedDiscountPercent}%)</Typography>
+                                                    <Typography variant="caption" fontWeight={700} color="error.main">-{formatCurrency(activeDiscount)}</Typography>
                                                 </Box>
                                             )}
                                             {paymentMethod === 'credit' && (

@@ -14,6 +14,8 @@ const serializeAppSettings = (appSettings: IAppSetting, globalAppSettings: IAppS
     receiptBannerUrl: appSettings.receiptBannerUrl || '',
     invoiceLogoUrl: appSettings.invoiceLogoUrl || '',
     installmentsEnabled: appSettings.installmentsEnabled,
+    discountsEnabled: appSettings.discountsEnabled,
+    discountOptions: appSettings.discountOptions || [],
     autoRegistrationEnabled: globalAppSettings.autoRegistrationEnabled,
 });
 
@@ -88,6 +90,8 @@ export const updateSettings = async (req: AuthRequest, res: Response) => {
             if (isSuperAdmin) {
                 appSettings.salesTaxRate = req.body.app.salesTaxRate;
                 appSettings.installmentsEnabled = req.body.app.installmentsEnabled;
+                appSettings.discountsEnabled = req.body.app.discountsEnabled;
+                appSettings.discountOptions = req.body.app.discountOptions;
             }
             if (appSettings.isModified()) {
                 await appSettings.save();

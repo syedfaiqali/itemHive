@@ -8,12 +8,12 @@ export interface CartItem extends Product {
 
 interface POSState {
     cart: CartItem[];
-    activeDiscount: number; // Flat discount on whole cart
+    discountPercent: number;
 }
 
 const initialState: POSState = {
     cart: [],
-    activeDiscount: 0,
+    discountPercent: 0,
 };
 
 const posSlice = createSlice({
@@ -48,13 +48,13 @@ const posSlice = createSlice({
         },
         clearCart: (state) => {
             state.cart = [];
-            state.activeDiscount = 0;
+            state.discountPercent = 0;
         },
-        setCartDiscount: (state, action: PayloadAction<number>) => {
-            state.activeDiscount = action.payload;
+        setCartDiscountPercent: (state, action: PayloadAction<number>) => {
+            state.discountPercent = Math.min(100, Math.max(0, action.payload || 0));
         },
     },
 });
 
-export const { addToCart, updateCartItemPrice, removeFromCart, updateQuantity, clearCart, setCartDiscount } = posSlice.actions;
+export const { addToCart, updateCartItemPrice, removeFromCart, updateQuantity, clearCart, setCartDiscountPercent } = posSlice.actions;
 export default posSlice.reducer;

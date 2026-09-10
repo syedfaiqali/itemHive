@@ -176,6 +176,8 @@ export const settingsSchema = Joi.object({
             })
             .optional(),
         installmentsEnabled: Joi.boolean().required(),
+        discountsEnabled: Joi.boolean().required(),
+        discountOptions: Joi.array().items(Joi.number().greater(0).max(100)).max(20).unique().required(),
         autoRegistrationEnabled: Joi.boolean().optional(),
     }).optional(),
 });
