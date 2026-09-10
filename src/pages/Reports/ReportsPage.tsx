@@ -47,6 +47,7 @@ import useAppCurrency from '../../hooks/useAppCurrency';
 import * as XLSX from 'xlsx';
 import { fetchProducts } from '../../features/inventory/inventorySlice';
 import { type SalesTrendPoint, type CategoryValuationPoint, type TopSellingProduct, type ReportFilters, type ReportPeriod } from '../../features/reports/reportSlice';
+import { buildInvoicePdfBlob } from '../../lib/invoicePdf';
 
 const ReportsPage: React.FC = () => {
     const theme = useTheme();
@@ -129,6 +130,8 @@ const ReportsPage: React.FC = () => {
     };
 
     const getReportFileName = (extension: string) => `itemhive_analytics_${generatedFilters.period}_${new Date().toISOString().slice(0, 10)}.${extension}`;
+    const formatItemSales = (items: SalesTrendPoint['items']) =>
+        items?.map((item) => `${item.name}: ${item.quantity}`).join(', ') || '-';
 
     const handleDownloadExcel = () => {
         const workbook = XLSX.utils.book_new();
@@ -136,6 +139,7 @@ const ReportsPage: React.FC = () => {
             Period: row.name,
             Revenue: row.revenue,
             'Units Sold': row.sales,
+            'Item-wise Sales': formatItemSales(row.items),
         }));
         const productsRows = topSellingRows.map(({ name, totalReduced, revenue, profit, product }) => ({
             Product: name,
@@ -149,7 +153,43 @@ const ReportsPage: React.FC = () => {
         XLSX.writeFile(workbook, getReportFileName('xlsx'));
     };
 
-    const handleDownloadPdf = () => {
+    const handleDownloadPdf = async () => {
+        try {
+            const blob = await buildInvoicePdfBlob({
+                title: 'Inventory Analytics Report',
+                shop: { name: 'ItemHive' },
+                billToLabel: 'Report period',
+                billTo: reportHeading,
+                meta: [{ label: 'Generated', value: new Date().toLocaleString() }],
+                columns: [
+                    { label: 'Period', width: 1.2 },
+                    { label: 'Revenue', width: 1.5, align: 'right' },
+                    { label: 'Units', width: 0.8, align: 'right' },
+                    { label: 'Item-wise sales', width: 3.5 },
+                ],
+                rows: trendData.map((row) => [
+                    row.name,
+                    formatCurrency(row.revenue),
+                    String(row.sales),
+                    formatItemSales(row.items),
+                ]),
+                totals: [{ label: 'Total profit / loss', value: formatCurrency(totalProfit), strong: true }],
+                footer: 'Item-wise quantities show the products sold in each reporting period.',
+            });
+            const url = URL.createObjectURL(blob);
+            const anchor = document.createElement('a');
+            anchor.href = url;
+            anchor.download = getReportFileName('pdf');
+            document.body.appendChild(anchor);
+            anchor.click();
+            anchor.remove();
+            URL.revokeObjectURL(url);
+        } catch {
+            setError('Could not generate the PDF download. Please try again.');
+        }
+    };
+
+    const handleDownloadPdfLegacy = () => {
         const escapeHtml = (value: string | number) => String(value)
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
@@ -157,13 +197,16 @@ const ReportsPage: React.FC = () => {
         const popup = window.open('', '_blank', 'width=900,height=700');
         if (!popup) return;
 
-        const salesRows = trendData.map((row) => `<tr><td>${escapeHtml(row.name)}</td><td>${escapeHtml(formatCurrency(row.revenue))}</td><td>${escapeHtml(row.sales)}</td></tr>`).join('');
+        const salesRows = trendData.map((row) => `<tr><td>${escapeHtml(row.name)}</td><td>${escapeHtml(formatCurrency(row.revenue))}</td><td>${escapeHtml(row.sales)}<br><small>Items: ${escapeHtml(formatItemSales(row.items))}</small></td></tr>`).join('');
         const productRows = topSellingRows.map(({ name, totalReduced, revenue, profit, product }) => `<tr><td>${escapeHtml(name)}</td><td>${escapeHtml(totalReduced)}</td><td>${escapeHtml(formatCurrency(revenue))}</td><td>${escapeHtml(formatCurrency(profit || 0))}</td><td>${escapeHtml(product?.stock ?? 0)}</td></tr>`).join('');
         popup.document.write(`<!doctype html><html><head><title>${getReportFileName('pdf')}</title><style>body{font-family:Arial,sans-serif;color:#172033;margin:32px}h1{margin:0 0 6px}p{color:#5b6576}table{width:100%;border-collapse:collapse;margin:20px 0 32px}th,td{border:1px solid #d7dce5;padding:9px;text-align:left}th{background:#f2f5f9} .summary{font-weight:bold;font-size:18px;color:#126b45}@media print{body{margin:18px}}</style></head><body><h1>Inventory Analytics Report</h1><p>Period: ${escapeHtml(reportHeading)} · Generated: ${escapeHtml(new Date().toLocaleString())}</p><p class="summary">Total profit / loss: ${escapeHtml(formatCurrency(totalProfit))}</p><h2>Sales Trend</h2><table><thead><tr><th>Period</th><th>Revenue</th><th>Units Sold</th></tr></thead><tbody>${salesRows}</tbody></table><h2>Top Selling Products</h2><table><thead><tr><th>Product</th><th>Units Sold</th><th>Revenue</th><th>Profit / Loss</th><th>Current Stock</th></tr></thead><tbody>${productRows}</tbody></table></body></html>`);
         popup.document.close();
         popup.focus();
         window.setTimeout(() => popup.print(), 250);
     };
+
+    // Keep the legacy print popup isolated; Download PDF now uses a Blob download.
+    void handleDownloadPdfLegacy;
 
     const reportHeading = useMemo(() => {
         if (generatedFilters.period === 'hourly') return `Last ${generatedFilters.hours || 24} Hours`;
@@ -203,6 +246,7 @@ const ReportsPage: React.FC = () => {
                     name: date.toLocaleTimeString('en-US', { hour: 'numeric', hour12: true, timeZone: 'Asia/Karachi' }),
                     revenue: point?.revenue || 0,
                     sales: point?.sales || 0,
+                    items: point?.items || [],
                 };
             });
         }
@@ -214,7 +258,7 @@ const ReportsPage: React.FC = () => {
                 const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
                 const monthLabel = d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
                 const point = salesTrend.find((entry) => entry._id === monthKey);
-                return { name: monthLabel, revenue: point?.revenue || 0, sales: point?.sales || 0 };
+                return { name: monthLabel, revenue: point?.revenue || 0, sales: point?.sales || 0, items: point?.items || [] };
             });
         }
 
@@ -226,7 +270,7 @@ const ReportsPage: React.FC = () => {
             : null;
 
         if (start && end && !Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime())) {
-            const rows: Array<{ name: string; revenue: number; sales: number }> = [];
+            const rows: Array<{ name: string; revenue: number; sales: number; items: SalesTrendPoint['items'] }> = [];
             const cursor = new Date(start);
             while (cursor <= end) {
                 const dateStr = cursor.toISOString().split('T')[0];
@@ -235,6 +279,7 @@ const ReportsPage: React.FC = () => {
                     name: cursor.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
                     revenue: point?.revenue || 0,
                     sales: point?.sales || 0,
+                    items: point?.items || [],
                 });
                 cursor.setDate(cursor.getDate() + 1);
             }
@@ -251,7 +296,7 @@ const ReportsPage: React.FC = () => {
                 ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
                 : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
-            return { name: label, revenue: point?.revenue || 0, sales: point?.sales || 0 };
+            return { name: label, revenue: point?.revenue || 0, sales: point?.sales || 0, items: point?.items || [] };
         });
     }, [fromDate, generatedFilters, salesTrend, toDate]);
 
@@ -290,7 +335,7 @@ const ReportsPage: React.FC = () => {
                 <p>{reportHeading} | Currency: {currency}</p>
                 <p>Total profit/loss: {formatCurrency(totalProfit)}</p>
                 <h2>Sales Summary</h2>
-                {salesTrend.length === 0 ? <p>No sales recorded for this period.</p> : <table><thead><tr><th>Date</th><th>Revenue</th><th>Units sold</th><th>Profit/loss</th></tr></thead><tbody>{salesTrend.map(row => <tr key={row._id}><td>{row._id}</td><td>{formatCurrency(row.revenue)}</td><td>{row.sales}</td><td>{formatCurrency(row.profit || 0)}</td></tr>)}</tbody></table>}
+                {salesTrend.length === 0 ? <p>No sales recorded for this period.</p> : <table><thead><tr><th>Date / hour</th><th>Revenue</th><th>Units sold</th><th>Item-wise sales</th><th>Profit/loss</th></tr></thead><tbody>{salesTrend.map(row => <tr key={row._id}><td>{row._id}</td><td>{formatCurrency(row.revenue)}</td><td>{row.sales}</td><td>{formatItemSales(row.items)}</td><td>{formatCurrency(row.profit || 0)}</td></tr>)}</tbody></table>}
                 <h2>Top Selling Products</h2>
                 {topSelling.length === 0 ? <p>No sales recorded for this period.</p> : <table><thead><tr><th>Product</th><th>Units sold</th><th>Revenue</th><th>Profit/loss</th></tr></thead><tbody>{topSelling.map(row => <tr key={row._id}><td>{row.name}</td><td>{row.totalReduced}</td><td>{formatCurrency(row.revenue)}</td><td>{formatCurrency(row.profit || 0)}</td></tr>)}</tbody></table>}
                 <h2>Current Inventory Valuation</h2><p>Current stock values, independent of the selected sales period.</p>

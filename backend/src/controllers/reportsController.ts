@@ -78,15 +78,28 @@ export const getSalesTrend = async (req: AuthRequest, res: Response) => {
             {
                 $group: {
                     _id: {
-                        $dateToString: {
-                            format: groupFormat,
-                            date: '$timestamp',
-                            ...(period === 'hourly' ? { timezone: 'Asia/Karachi' } : {})
-                        }
+                        period: {
+                            $dateToString: {
+                                format: groupFormat,
+                                date: '$timestamp',
+                                ...(period === 'hourly' ? { timezone: 'Asia/Karachi' } : {})
+                            }
+                        },
+                        productId: '$productId',
+                        productName: '$productName',
                     },
                     revenue: { $sum: '$totalPrice' },
                     sales: { $sum: '$amount' },
                     profit: { $sum: '$grossProfit' }
+                }
+            },
+            {
+                $group: {
+                    _id: '$_id.period',
+                    revenue: { $sum: '$revenue' },
+                    sales: { $sum: '$sales' },
+                    profit: { $sum: '$profit' },
+                    items: { $push: { name: '$_id.productName', quantity: '$sales' } }
                 }
             },
             { $sort: { _id: 1 } }

@@ -6,6 +6,7 @@ export interface SalesTrendPoint {
     revenue: number;
     sales: number;
     profit?: number;
+    items?: Array<{ name: string; quantity: number }>;
 }
 
 export type ReportPeriod = '7days' | 'monthly' | 'yearly' | 'custom' | 'hourly';
