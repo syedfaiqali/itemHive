@@ -56,6 +56,7 @@ interface SettingsState {
     country: CountryCode;
     currency: CurrencyCode;
     app: AppSettings;
+    canManageDiscounts: boolean;
     loading: boolean;
     error: string | null;
 }
@@ -68,6 +69,7 @@ const initialState: SettingsState = {
     country: 'PK',
     currency: 'PKR',
     app: DEFAULT_APP_SETTINGS,
+    canManageDiscounts: false,
     loading: false,
     error: null,
 };
@@ -82,6 +84,7 @@ export const fetchSettings = createAsyncThunk(
                 currency: CurrencyCode;
                 notifications: NotificationSettings;
                 app: AppSettings;
+                canManageDiscounts: boolean;
             };
         } catch (error: any) {
             return rejectWithValue(error.response?.data?.message || 'Failed to fetch settings');
@@ -107,6 +110,7 @@ export const saveSettings = createAsyncThunk(
                 currency: CurrencyCode;
                 notifications: NotificationSettings;
                 app: AppSettings;
+                canManageDiscounts: boolean;
             };
         } catch (error: any) {
             if (error.response?.status === 413) {
@@ -152,6 +156,7 @@ const settingsSlice = createSlice({
                 state.currency = action.payload.currency;
                 state.notifications = action.payload.notifications;
                 state.app = { ...DEFAULT_APP_SETTINGS, ...action.payload.app };
+                state.canManageDiscounts = Boolean(action.payload.canManageDiscounts);
             })
             .addCase(fetchSettings.rejected, (state, action: PayloadAction<any>) => {
                 state.loading = false;
@@ -167,6 +172,7 @@ const settingsSlice = createSlice({
                 state.currency = action.payload.currency;
                 state.notifications = action.payload.notifications;
                 state.app = { ...DEFAULT_APP_SETTINGS, ...action.payload.app };
+                state.canManageDiscounts = Boolean(action.payload.canManageDiscounts);
             })
             .addCase(saveSettings.rejected, (state, action: PayloadAction<any>) => {
                 state.loading = false;

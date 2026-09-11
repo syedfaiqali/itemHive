@@ -34,6 +34,7 @@ export const serializeUser = (user: IUser) => ({
     isActive: user.isActive,
     isVisible: user.isVisible,
     installmentAccess: normalizeRole(user.role) === 'super_admin' || Boolean(user.installmentAccess),
+    discountAccess: normalizeRole(user.role) === 'super_admin' || Boolean(user.discountAccess),
     userCreationLimit: user.userCreationLimit ?? 0,
     businessId: user.businessId ? String(user.businessId) : '',
     createdBy: user.createdBy ? String(user.createdBy) : '',

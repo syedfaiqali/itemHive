@@ -13,6 +13,7 @@ export interface User {
     isActive?: boolean;
     isVisible?: boolean;
     installmentAccess?: boolean;
+    discountAccess?: boolean;
     userCreationLimit?: number;
     businessId?: string;
     businessName?: string;

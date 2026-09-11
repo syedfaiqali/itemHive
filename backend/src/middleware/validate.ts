@@ -186,7 +186,8 @@ export const updateUserStatusSchema = Joi.object({
     isActive: Joi.boolean().optional(),
     isVisible: Joi.boolean().optional(),
     installmentAccess: Joi.boolean().optional(),
-}).or('isActive', 'isVisible', 'installmentAccess');
+    discountAccess: Joi.boolean().optional(),
+}).or('isActive', 'isVisible', 'installmentAccess', 'discountAccess');
 
 export const updateAdminLimitSchema = Joi.object({
     userCreationLimit: Joi.number().integer().min(0).required(),

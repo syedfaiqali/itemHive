@@ -42,6 +42,7 @@ export const getSettings = async (req: AuthRequest, res: Response) => {
         return res.json({
             ...serializePreferences(user.preferences),
             app: serializeAppSettings(appSettings, globalAppSettings),
+            canManageDiscounts: req.user?.role === 'super_admin' || Boolean(req.user?.discountAccess),
         });
     } catch (error: any) {
         return res.status(500).json({ message: error.message || 'Failed to fetch settings' });
@@ -70,6 +71,7 @@ export const updateSettings = async (req: AuthRequest, res: Response) => {
         const globalAppSettings = await getGlobalAppSettings();
         const role = normalizeRole(req.user?.role);
         const isSuperAdmin = role === 'super_admin';
+        const canEditDiscounts = isSuperAdmin || (role === 'admin' && Boolean(req.user?.discountAccess));
         // Admins may brand their own workspace; the rest of the POS config is super-admin only.
         // Branding (banner, shop name, contact block) belongs to the workspace owner;
         // tax and installments stay with the super admin.
@@ -90,6 +92,8 @@ export const updateSettings = async (req: AuthRequest, res: Response) => {
             if (isSuperAdmin) {
                 appSettings.salesTaxRate = req.body.app.salesTaxRate;
                 appSettings.installmentsEnabled = req.body.app.installmentsEnabled;
+            }
+            if (canEditDiscounts) {
                 appSettings.discountsEnabled = req.body.app.discountsEnabled;
                 appSettings.discountOptions = req.body.app.discountOptions;
             }
@@ -105,6 +109,7 @@ export const updateSettings = async (req: AuthRequest, res: Response) => {
         return res.json({
             ...serializePreferences(user.preferences),
             app: serializeAppSettings(appSettings, globalAppSettings),
+            canManageDiscounts: req.user?.role === 'super_admin' || Boolean(req.user?.discountAccess),
         });
     } catch (error: any) {
         return res.status(400).json({ message: error.message || 'Failed to update settings' });

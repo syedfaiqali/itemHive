@@ -12,6 +12,7 @@ export interface IUser extends Document {
     isActive: boolean;
     isVisible: boolean;
     installmentAccess: boolean;
+    discountAccess: boolean;
     userCreationLimit: number;
     createdBy?: mongoose.Types.ObjectId;
     businessId?: mongoose.Types.ObjectId;
@@ -36,6 +37,8 @@ const UserSchema: Schema = new Schema({
     isActive: { type: Boolean, default: true, index: true },
     isVisible: { type: Boolean, default: true, index: true },
     installmentAccess: { type: Boolean, default: false },
+    // Allows a workspace administrator to configure the discounts available in POS.
+    discountAccess: { type: Boolean, default: false },
     userCreationLimit: { type: Number, default: 0, min: 0 },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     businessId: { type: Schema.Types.ObjectId, ref: 'Business', default: null, index: true },

@@ -157,7 +157,7 @@ const TeamManagementPage: React.FC = () => {
         loadBusinesses();
     }, [loadBusinesses]);
 
-    const handleStatusChange = async (target: User, updates: { isActive?: boolean; isVisible?: boolean; installmentAccess?: boolean }) => {
+    const handleStatusChange = async (target: User, updates: { isActive?: boolean; isVisible?: boolean; installmentAccess?: boolean; discountAccess?: boolean }) => {
         setSavingId(target.id);
         try {
             await api.patch(`/users/${target.id}/status`, updates);
@@ -308,7 +308,7 @@ const TeamManagementPage: React.FC = () => {
             />
 
             <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3 }}>
-                <Table size="small" sx={{ minWidth: 1060 }}>
+                <Table size="small" sx={{ minWidth: 1140 }}>
                     <TableHead>
                         <TableRow>
                             <TableCell>Account</TableCell>
@@ -317,6 +317,7 @@ const TeamManagementPage: React.FC = () => {
                             <TableCell align="center">Active</TableCell>
                             <TableCell align="center">Visible</TableCell>
                             <TableCell align="center">Installments</TableCell>
+                            <TableCell align="center">Discount Access</TableCell>
                             <TableCell align="center">User Limit</TableCell>
                             <TableCell align="right">Actions</TableCell>
                         </TableRow>
@@ -324,7 +325,7 @@ const TeamManagementPage: React.FC = () => {
                     <TableBody>
                         {loading && (
                             <TableRow>
-                                <TableCell colSpan={8} align="center" sx={{ py: 8 }}><CircularProgress size={30} /></TableCell>
+                                <TableCell colSpan={9} align="center" sx={{ py: 8 }}><CircularProgress size={30} /></TableCell>
                             </TableRow>
                         )}
                         {!loading && users.map((teamUser) => {
@@ -356,6 +357,17 @@ const TeamManagementPage: React.FC = () => {
                                     <TableCell align="center">
                                         <Switch size="small" checked={Boolean(teamUser.installmentAccess)} disabled={!isManageable || isBusy} onChange={(_, checked) => handleStatusChange(teamUser, { installmentAccess: checked })} />
                                     </TableCell>
+                                    <TableCell align="center">
+                                        {teamUser.role === 'admin' ? (
+                                            <Switch
+                                                size="small"
+                                                checked={Boolean(teamUser.discountAccess)}
+                                                disabled={!isManageable || isBusy}
+                                                onChange={(_, checked) => handleStatusChange(teamUser, { discountAccess: checked })}
+                                                inputProps={{ 'aria-label': `Discount access for ${teamUser.name}` }}
+                                            />
+                                        ) : '-'}
+                                    </TableCell>
                                     <TableCell align="center">{teamUser.role === 'admin' ? teamUser.userCreationLimit ?? 0 : '-'}</TableCell>
                                     <TableCell align="right">
                                         <Stack direction="row" spacing={1} justifyContent="flex-end">
@@ -383,7 +395,7 @@ const TeamManagementPage: React.FC = () => {
                         })}
                         {!loading && !users.length && (
                             <TableRow>
-                                <TableCell colSpan={8} align="center" sx={{ py: 8 }}>
+                                <TableCell colSpan={9} align="center" sx={{ py: 8 }}>
                                     <Users size={34} style={{ opacity: 0.45, marginBottom: 8 }} />
                                     <Typography variant="body2" color="text.secondary">No matching accounts found.</Typography>
                                 </TableCell>

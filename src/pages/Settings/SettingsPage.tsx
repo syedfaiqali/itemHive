@@ -101,7 +101,7 @@ const SettingsPage: React.FC = () => {
     const dispatch = useDispatch<AppDispatch>();
     const { mode } = useSelector((state: RootState) => state.theme);
     const { user } = useSelector((state: RootState) => state.auth);
-    const { notifications, country, currency, app, loading, error } = useSelector((state: RootState) => state.settings);
+    const { notifications, country, currency, app, canManageDiscounts, loading, error } = useSelector((state: RootState) => state.settings);
     const activeAppSettings = app || DEFAULT_APP_SETTINGS;
     const [appDraft, setAppDraft] = React.useState<AppSettings>(activeAppSettings);
     const [bannerError, setBannerError] = React.useState<string | null>(null);
@@ -118,6 +118,7 @@ const SettingsPage: React.FC = () => {
     const invoiceLogoInputRef = React.useRef<HTMLInputElement>(null);
     // Admins own their workspace branding; the rest of the POS config stays super-admin only.
     const canEditBranding = user?.role === 'super_admin' || user?.role === 'admin';
+    const canEditDiscounts = user?.role === 'super_admin' || canManageDiscounts;
 
     React.useEffect(() => {
         dispatch(fetchSettings());
@@ -496,32 +497,34 @@ const SettingsPage: React.FC = () => {
                     </Grid>
                 )}
 
-                {user?.role === 'super_admin' && (
+                {canEditDiscounts && (
                     <Grid size={{ xs: 12, md: 6 }}>
                         <Accordion disableGutters elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: '12px !important' }}>
                             <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                                <Box><Typography fontWeight={700}>POS Controls</Typography><Typography variant="caption" color="text.secondary">Tax, discounts and installments</Typography></Box>
+                                <Box><Typography fontWeight={700}>Discount Controls</Typography><Typography variant="caption" color="text.secondary">Manage the discounts available in your POS</Typography></Box>
                             </AccordionSummary>
                             <AccordionDetails>
                                 <Divider sx={{ mb: 2 }} />
                                 <Stack spacing={2}>
-                                    <TextField
-                                        size="small"
-                                        label="Sales Tax %"
-                                        type="number"
-                                        value={appDraft.salesTaxRate}
-                                        onChange={(event) => setAppDraft({ ...appDraft, salesTaxRate: Number(event.target.value) })}
-                                        inputProps={{ min: 0, max: 100, step: 0.01 }}
-                                    />
-                                    <FormControlLabel
-                                        control={
-                                            <Switch
-                                                checked={appDraft.installmentsEnabled}
-                                                onChange={(event) => setAppDraft({ ...appDraft, installmentsEnabled: event.target.checked })}
-                                            />
-                                        }
-                                        label="Enable installments for permitted accounts"
-                                    />
+                                    {user?.role === 'super_admin' && <>
+                                        <TextField
+                                            size="small"
+                                            label="Sales Tax %"
+                                            type="number"
+                                            value={appDraft.salesTaxRate}
+                                            onChange={(event) => setAppDraft({ ...appDraft, salesTaxRate: Number(event.target.value) })}
+                                            inputProps={{ min: 0, max: 100, step: 0.01 }}
+                                        />
+                                        <FormControlLabel
+                                            control={
+                                                <Switch
+                                                    checked={appDraft.installmentsEnabled}
+                                                    onChange={(event) => setAppDraft({ ...appDraft, installmentsEnabled: event.target.checked })}
+                                                />
+                                            }
+                                            label="Enable installments for permitted accounts"
+                                        />
+                                    </>}
                                     <FormControlLabel
                                         control={
                                             <Switch
@@ -580,14 +583,16 @@ const SettingsPage: React.FC = () => {
                                         </Box>
                                     )}
                                     <Typography variant="caption" color="text.secondary">
-                                        Super admin always keeps access. Enable this switch before granting installment access to selected accounts in Team Management.
+                                        {user?.role === 'super_admin'
+                                            ? 'Super admin always keeps access. Enable this switch before granting installment access to selected accounts in Team Management.'
+                                            : 'These discount options will be available to users in your business workspace.'}
                                     </Typography>
                                     <Button
                                         variant="contained"
                                         onClick={() => persistSettings(country, currency, notifications, appDraft)}
                                         disabled={loading}
                                     >
-                                        Save POS Settings
+                                        Save Discount Settings
                                     </Button>
                                 </Stack>
                             </AccordionDetails>

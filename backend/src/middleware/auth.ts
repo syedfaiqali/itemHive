@@ -15,6 +15,7 @@ export interface AuthRequest extends Request {
         isActive: boolean;
         isVisible: boolean;
         installmentAccess: boolean;
+        discountAccess: boolean;
         userCreationLimit: number;
         businessId: string;
         businessName: string;
@@ -62,7 +63,7 @@ const attachUserFromToken = async (req: AuthRequest) => {
     }
 
     const decoded: any = jwt.verify(token, process.env.JWT_SECRET || 'secret');
-    const user = await User.findById(decoded.id).select('name email role isActive isVisible installmentAccess userCreationLimit businessId');
+    const user = await User.findById(decoded.id).select('name email role isActive isVisible installmentAccess discountAccess userCreationLimit businessId');
 
     if (!user) {
         throw new Error('Not authorized, user not found');
@@ -83,6 +84,7 @@ const attachUserFromToken = async (req: AuthRequest) => {
         isActive: user.isActive,
         isVisible: user.isVisible,
         installmentAccess: normalizedRole === 'super_admin' || Boolean(user.installmentAccess),
+        discountAccess: normalizedRole === 'super_admin' || Boolean(user.discountAccess),
         userCreationLimit: user.userCreationLimit ?? 0,
         businessId: String(business._id),
         businessName: business.name,
