@@ -1398,20 +1398,7 @@ const POSTerminal: React.FC = () => {
                         >
                             <InvoiceLetterhead
                                 title="Invoice"
-                                billToLabel={paymentMethod === 'credit' || paymentMethod === 'installment' ? 'Invoice to' : 'Served by'}
-                                billTo={paymentMethod === 'credit'
-                                    ? creditCustomerName
-                                    : paymentMethod === 'installment'
-                                        ? installmentCustomerName
-                                        : user?.name || 'Staff'}
-                                billToSubtitle={paymentMethod === 'credit' || paymentMethod === 'installment'
-                                    ? `${regionalIdLabel}: ${paymentMethod === 'credit' ? creditCustomerCnic || '-' : installmentCustomerCnic || '-'}`
-                                    : undefined}
-                                meta={[
-                                    { label: 'Invoice date', value: receiptTime ? new Date(receiptTime).toLocaleDateString() : '-' },
-                                    { label: 'Invoice time', value: receiptTime ? new Date(receiptTime).toLocaleTimeString() : '-' },
-                                    { label: 'Invoice number', value: `#${receiptId}` },
-                                ]}
+                                showShopDetails={false}
                             />
 
                             <Divider />
@@ -1475,6 +1462,14 @@ const POSTerminal: React.FC = () => {
                                 ]}
                                 amountInWords={amountToWords(paymentMethod === 'installment' ? draftInstallmentTotal : total)}
                             />
+                            <Box className="receipt-powered-by" sx={{ pt: 1, textAlign: 'center' }}>
+                                <Typography variant="caption" color="text.secondary" display="block">
+                                    Thank you for your purchase
+                                </Typography>
+                                <Typography variant="caption" fontWeight={800}>
+                                    Powered by ItemHive
+                                </Typography>
+                            </Box>
                         </Stack>
 
                         <Box sx={{ display: 'none' }}>

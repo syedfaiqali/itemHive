@@ -18,6 +18,8 @@ interface InvoiceLetterheadProps {
     billToSubtitle?: string;
     /** Right-aligned label/value pairs: invoice date, due date, invoice number... */
     meta?: LetterheadMeta[];
+    /** Whether to render the shop name, address and phone block. */
+    showShopDetails?: boolean;
     sx?: SxProps<Theme>;
 }
 
@@ -32,12 +34,14 @@ const InvoiceLetterhead: React.FC<InvoiceLetterheadProps> = ({
     billTo,
     billToSubtitle,
     meta = [],
+    showShopDetails = true,
     sx,
 }) => {
     const { app } = useSelector((state: RootState) => state.settings);
     const appSettings = app || DEFAULT_APP_SETTINGS;
     const bannerUrl = appSettings.invoiceLogoUrl || appSettings.receiptBannerUrl;
     const shopName = appSettings.shopName || DEFAULT_APP_SETTINGS.shopName;
+    const hasDetails = Boolean(billToLabel || billTo || billToSubtitle || meta.length > 0 || showShopDetails);
 
     return (
         <Box
@@ -81,16 +85,17 @@ const InvoiceLetterhead: React.FC<InvoiceLetterheadProps> = ({
                 )}
             </Box>
 
-            <Box
-                sx={{
-                    mt: 4,
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    justifyContent: 'space-between',
-                    gap: 3,
-                    flexWrap: 'wrap',
-                }}
-            >
+            {hasDetails && (
+                <Box
+                    sx={{
+                        mt: 4,
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        justifyContent: 'space-between',
+                        gap: 3,
+                        flexWrap: 'wrap',
+                    }}
+                >
                 <Box sx={{ minWidth: 0 }}>
                     {billToLabel && (
                         <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
@@ -125,30 +130,33 @@ const InvoiceLetterhead: React.FC<InvoiceLetterheadProps> = ({
                         </Box>
                     )}
 
-                    <Box
-                        sx={{
-                            pl: 2.5,
-                            borderLeft: '1px solid',
-                            borderColor: 'divider',
-                            maxWidth: 260,
-                        }}
-                    >
-                        <Typography variant="body2" fontWeight={800} sx={{ textTransform: 'uppercase' }}>
-                            {shopName}
-                        </Typography>
-                        {appSettings.shopAddress && (
-                            <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'pre-line' }}>
-                                {appSettings.shopAddress}
+                    {showShopDetails && (
+                        <Box
+                            sx={{
+                                pl: 2.5,
+                                borderLeft: '1px solid',
+                                borderColor: 'divider',
+                                maxWidth: 260,
+                            }}
+                        >
+                            <Typography variant="body2" fontWeight={800} sx={{ textTransform: 'uppercase' }}>
+                                {shopName}
                             </Typography>
-                        )}
-                        {appSettings.shopPhone && (
-                            <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'pre-line' }}>
-                                {appSettings.shopPhone}
-                            </Typography>
-                        )}
-                    </Box>
+                            {appSettings.shopAddress && (
+                                <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'pre-line' }}>
+                                    {appSettings.shopAddress}
+                                </Typography>
+                            )}
+                            {appSettings.shopPhone && (
+                                <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'pre-line' }}>
+                                    {appSettings.shopPhone}
+                                </Typography>
+                            )}
+                        </Box>
+                    )}
                 </Box>
-            </Box>
+                </Box>
+            )}
         </Box>
     );
 };

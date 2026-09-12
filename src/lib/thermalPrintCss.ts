@@ -160,9 +160,9 @@ export const thermalInvoicePrintCss = (selector: string, rollWidthMm = DEFAULT_R
 
     /* Column 1 is the serial number and column 4 the unit price. */
     ${selector} th:nth-child(1),
-    ${selector} td:nth-child(1),
+    ${selector} td:not([colspan]):nth-child(1),
     ${selector} th:nth-child(4),
-    ${selector} td:nth-child(4) {
+    ${selector} td:not([colspan]):nth-child(4) {
         display: none !important;
     }
 
@@ -177,6 +177,13 @@ export const thermalInvoicePrintCss = (selector: string, rollWidthMm = DEFAULT_R
     ${selector} th.num {
         white-space: nowrap !important;
         word-break: normal !important;
+    }
+
+    ${selector} .receipt-powered-by {
+        margin-top: 2mm !important;
+        padding-top: 1.5mm !important;
+        border-top: 1px dashed #000 !important;
+        text-align: center !important;
     }
 
     /* Totals rows span the hidden columns too, so re-point their colspan. */
