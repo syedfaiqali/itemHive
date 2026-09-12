@@ -41,6 +41,8 @@ const InvoiceLetterhead: React.FC<InvoiceLetterheadProps> = ({
 
     return (
         <Box
+            // The class is the hook thermal print CSS uses to stack this block.
+            className="invoice-letterhead"
             sx={[
                 {
                     // Keep the logo and its colours in the printed output.
@@ -109,7 +111,7 @@ const InvoiceLetterhead: React.FC<InvoiceLetterheadProps> = ({
 
                 <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2.5, ml: 'auto' }}>
                     {meta.length > 0 && (
-                        <Box sx={{ textAlign: 'right' }}>
+                        <Box className="invoice-letterhead-meta" sx={{ textAlign: 'right' }}>
                             {meta.map((entry) => (
                                 <Box key={entry.label} sx={{ mb: 1.25 }}>
                                     <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>

@@ -56,6 +56,7 @@ import InvoiceLetterhead from '../../components/Common/InvoiceLetterhead';
 import InvoiceItemsTable from '../../components/Common/InvoiceItemsTable';
 import { amountToWords } from '../../lib/numberToWords';
 import { buildInvoicePdfBlob, shareOrDownloadPdf } from '../../lib/invoicePdf';
+import { thermalInvoicePrintCss } from '../../lib/thermalPrintCss';
 import { DEFAULT_APP_SETTINGS } from '../../features/settings/settingsSlice';
 import api from '../../api/axios';
 
@@ -1267,7 +1268,7 @@ const OrderDesk: React.FC = () => {
             <style>
                 {`
                 @media print {
-                    @page { margin: 12mm; }
+                    ${printTarget === 'invoice' ? '' : '@page { margin: 12mm; }'}
 
                     /* Drop everything outside the printed document from the layout.
                        Hiding by visibility alone keeps the page's full height and
@@ -1291,6 +1292,7 @@ const OrderDesk: React.FC = () => {
                         background: #fff !important;
                     }
 
+                    ${printTarget === 'invoice' ? thermalInvoicePrintCss(printTargetId) : `
                     ${printTargetId} {
                         display: block !important;
                         width: 100%;
@@ -1298,6 +1300,7 @@ const OrderDesk: React.FC = () => {
                         color: #000 !important;
                     }
                     ${printTargetId} * { color: #000 !important; }
+                    `}
                 }
                 `}
             </style>

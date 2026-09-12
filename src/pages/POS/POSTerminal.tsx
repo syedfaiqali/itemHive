@@ -58,6 +58,7 @@ import InvoiceLetterhead from '../../components/Common/InvoiceLetterhead';
 import InvoiceItemsTable from '../../components/Common/InvoiceItemsTable';
 import { amountToWords } from '../../lib/numberToWords';
 import { buildInvoicePdfBlob, shareOrDownloadPdf } from '../../lib/invoicePdf';
+import { thermalInvoicePrintCss } from '../../lib/thermalPrintCss';
 
 
 type CheckoutMethod = 'cash' | 'card' | 'credit' | 'installment';
@@ -1353,7 +1354,14 @@ const POSTerminal: React.FC = () => {
                                 : `0 24px 46px -30px ${alpha(theme.palette.primary.dark, 0.32)}`,
                         }}
                     >
-                        <Stack spacing={2.5} sx={{ minWidth: { xs: 620, sm: 0 } }}>
+                        <Stack
+                            spacing={2.5}
+                            sx={{
+                                // Horizontal-scroll affordance on phones; a 72mm slip must not inherit it.
+                                minWidth: { xs: 620, sm: 0 },
+                                '@media print': { minWidth: 0 },
+                            }}
+                        >
                             <InvoiceLetterhead
                                 title="Invoice"
                                 billToLabel={paymentMethod === 'credit' || paymentMethod === 'installment' ? 'Invoice to' : 'Served by'}
@@ -1691,12 +1699,10 @@ const POSTerminal: React.FC = () => {
                 </Alert>
             </Snackbar>
 
-            {/* Print Friendly Style */}
+            {/* Invoices print on an 80mm thermal roll, not A4. */}
             <style>
                 {`
                 @media print {
-                    @page { margin: 10mm; }
-
                     /* Everything outside the slip leaves the layout entirely, otherwise
                        the terminal behind it prints as extra blank pages. */
                     body *:not(:has(#pos-receipt)):not(#pos-receipt):not(#pos-receipt *) {
@@ -1717,37 +1723,7 @@ const POSTerminal: React.FC = () => {
                         background: #fff !important;
                     }
 
-                    #pos-receipt {
-                        display: block !important;
-                        margin: 0 auto !important;
-                        width: 760px;
-                        max-width: 100%;
-                        color-scheme: light !important;
-                        color: #111827 !important;
-                        background: white !important;
-                        border: 1px solid #d7deea !important;
-                        border-radius: 18px !important;
-                        padding: 0 !important;
-                        box-shadow: none !important;
-                    }
-
-                    #pos-receipt * {
-                        color: #111827 !important;
-                        text-shadow: none !important;
-                    }
-
-                    #pos-receipt th,
-                    #pos-receipt td {
-                        border-color: #9ca3af !important;
-                    }
-
-                    #pos-receipt th {
-                        background: #f3f4f6 !important;
-                    }
-
-                    #pos-receipt .MuiDivider-root {
-                        border-color: #9ca3af !important;
-                    }
+                    ${thermalInvoicePrintCss('#pos-receipt')}
                 }
                 `}
             </style>

@@ -68,6 +68,7 @@ import InvoiceItemsTable from '../../components/Common/InvoiceItemsTable';
 import { DEFAULT_APP_SETTINGS } from '../../features/settings/settingsSlice';
 import { amountToWords } from '../../lib/numberToWords';
 import { buildInvoicePdfBlob, shareOrDownloadPdf } from '../../lib/invoicePdf';
+import { thermalInvoicePrintCss } from '../../lib/thermalPrintCss';
 
 const TransactionHistory: React.FC = () => {
     const theme = useTheme();
@@ -728,7 +729,6 @@ const TransactionHistory: React.FC = () => {
             <style>
                 {`
                 @media print {
-                    @page { margin: 12mm; }
 
                     /* Remove everything outside the invoice from the layout, not just
                        from view - hidden-but-present content prints as blank pages. */
@@ -750,13 +750,7 @@ const TransactionHistory: React.FC = () => {
                         background: #fff !important;
                     }
 
-                    #printable-invoice {
-                        display: block !important;
-                        width: 100%;
-                        background: #fff !important;
-                        color: #000 !important;
-                    }
-                    #printable-invoice * { color: #000 !important; }
+                    ${thermalInvoicePrintCss('#printable-invoice')}
                 }
                 `}
             </style>
