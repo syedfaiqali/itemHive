@@ -8,6 +8,8 @@ import StickyNote from '../models/StickyNote';
 import User from '../models/User';
 import AppSetting from '../models/AppSetting';
 import Business from '../models/Business';
+import Customer from '../models/Customer';
+import Category from '../models/Category';
 import { ensureLegacyBusiness } from './tenancy';
 
 const dropLegacyIndex = async (model: Model<unknown>, indexName: string) => {
@@ -60,4 +62,23 @@ export const ensureTenantIndexes = async () => {
     await Product.collection.createIndex({ businessId: 1, sku: 1 }, { unique: true });
     await Transaction.collection.createIndex({ businessId: 1, id: 1 }, { unique: true });
     await InstallmentPlan.collection.createIndex({ businessId: 1, planCode: 1 }, { unique: true });
+
+    // Match the actual tenant-scoped read patterns. These are compound indexes
+    // so MongoDB can filter and sort without scanning an entire collection.
+    await Promise.all([
+        Product.collection.createIndex({ businessId: 1, name: 1 }),
+        Product.collection.createIndex({ businessId: 1, category: 1 }),
+        Transaction.collection.createIndex({ businessId: 1, timestamp: -1 }),
+        Transaction.collection.createIndex({ businessId: 1, type: 1, timestamp: -1 }),
+        Transaction.collection.createIndex({ businessId: 1, paymentMethod: 1, type: 1, timestamp: -1 }),
+        CreditPayment.collection.createIndex({ businessId: 1, timestamp: -1 }),
+        CreditPayment.collection.createIndex({ businessId: 1, customerName: 1, customerCnic: 1, timestamp: -1 }),
+        Customer.collection.createIndex({ businessId: 1, updatedAt: -1 }),
+        InstallmentPlan.collection.createIndex({ businessId: 1, createdAt: -1 }),
+        InventoryRequest.collection.createIndex({ businessId: 1, createdAt: -1 }),
+        InventoryRequest.collection.createIndex({ businessId: 1, requestedBy: 1, createdAt: -1 }),
+        InventoryRequest.collection.createIndex({ businessId: 1, requestedBy: 1, status: 1, 'productData.sku': 1 }),
+        StickyNote.collection.createIndex({ businessId: 1, user: 1, pinned: -1, updatedAt: -1 }),
+        Category.collection.createIndex({ businessId: 1, normalizedName: 1 }, { unique: true }),
+    ]);
 };

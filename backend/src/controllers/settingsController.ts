@@ -3,7 +3,7 @@ import User from '../models/User';
 import type { AuthRequest } from '../middleware/auth';
 import { normalizeRole } from '../utils/accessControl';
 import type { IUser } from '../models/User';
-import { getAppSettingsForTenant, getGlobalAppSettings } from '../utils/tenancy';
+import { getAppSettingsForTenant, getGlobalAppSettings, invalidateAppSettingsCache } from '../utils/tenancy';
 import type { IAppSetting } from '../models/AppSetting';
 
 const serializeAppSettings = (appSettings: IAppSetting, globalAppSettings: IAppSetting) => ({
@@ -99,6 +99,7 @@ export const updateSettings = async (req: AuthRequest, res: Response) => {
             }
             if (appSettings.isModified()) {
                 await appSettings.save();
+                invalidateAppSettingsCache(req.user!);
             }
             if (isSuperAdmin && typeof req.body.app.autoRegistrationEnabled === 'boolean') {
                 globalAppSettings.autoRegistrationEnabled = req.body.app.autoRegistrationEnabled;

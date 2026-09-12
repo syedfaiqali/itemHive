@@ -4,11 +4,11 @@ import Product from '../models/Product';
 import mongoose from 'mongoose';
 import type { AuthRequest } from '../middleware/auth';
 import { normalizeRole } from '../utils/accessControl';
-import { buildTenantFilter, getAppSettingsForTenant, getTenantObjectId } from '../utils/tenancy';
+import { buildTenantFilter, getCachedAppSettingsForTenant, getTenantObjectId } from '../utils/tenancy';
 
 export const getTransactions = async (req: AuthRequest, res: Response) => {
     try {
-        const transactions = await Transaction.find(buildTenantFilter(req.user!)).sort({ timestamp: -1 });
+        const transactions = await Transaction.find(buildTenantFilter(req.user!)).sort({ timestamp: -1 }).lean();
         res.json(transactions);
     } catch (error: any) {
         res.status(500).json({ message: error.message });
@@ -64,7 +64,7 @@ export const createTransaction = async (req: AuthRequest, res: Response) => {
         // The explicit field identifies a POS checkout. Other stock/order flows
         // retain their existing totals and do not gain POS tax/discount handling.
         const isPosCheckout = type === 'reduction' && discountPercent != null;
-        const appSettings = isPosCheckout ? await getAppSettingsForTenant(req.user!) : null;
+        const appSettings = isPosCheckout ? await getCachedAppSettingsForTenant(req.user!) : null;
         const resolvedSubtotal = resolvedUnitPrice * amount;
         const requestedDiscountPercent = Number(discountPercent || 0);
         const allowedDiscountOptions = (appSettings?.discountOptions || []).map(Number);

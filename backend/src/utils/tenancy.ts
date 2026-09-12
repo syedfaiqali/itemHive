@@ -1,7 +1,15 @@
 import mongoose from 'mongoose';
 import Business from '../models/Business';
-import AppSetting from '../models/AppSetting';
+import AppSetting, { type IAppSetting } from '../models/AppSetting';
 import type { IUser } from '../models/User';
+
+type CheckoutSettings = Pick<
+    IAppSetting,
+    'salesTaxRate' | 'installmentsEnabled' | 'discountsEnabled' | 'discountOptions'
+>;
+
+const CHECKOUT_SETTINGS_CACHE_TTL_MS = 15 * 1000;
+const checkoutSettingsCache = new Map<string, { expiresAt: number; value: CheckoutSettings }>();
 
 export interface TenantContext {
     businessId: string;
@@ -70,4 +78,32 @@ export const getAppSettingsForTenant = async (tenant: TenantContext) => {
     }
 
     return settings;
+};
+
+// Checkout can be one of the busiest API paths. These settings change rarely,
+// so a short cache removes a database read from each sale without delaying a
+// setting update (the update endpoint explicitly clears this cache).
+export const getCachedAppSettingsForTenant = async (tenant: TenantContext): Promise<CheckoutSettings> => {
+    const tenantKey = tenant.businessId;
+    const cached = checkoutSettingsCache.get(tenantKey);
+    if (cached && cached.expiresAt > Date.now()) {
+        return cached.value;
+    }
+
+    const settings = await getAppSettingsForTenant(tenant);
+    const value: CheckoutSettings = {
+        salesTaxRate: settings.salesTaxRate,
+        installmentsEnabled: settings.installmentsEnabled,
+        discountsEnabled: settings.discountsEnabled,
+        discountOptions: settings.discountOptions || [],
+    };
+    checkoutSettingsCache.set(tenantKey, {
+        expiresAt: Date.now() + CHECKOUT_SETTINGS_CACHE_TTL_MS,
+        value,
+    });
+    return value;
+};
+
+export const invalidateAppSettingsCache = (tenant: TenantContext) => {
+    checkoutSettingsCache.delete(tenant.businessId);
 };

@@ -53,7 +53,7 @@ const refreshInstallmentStatus = (plan: any) => {
 
 export const getInstallmentPlans = async (req: AuthRequest, res: Response) => {
     try {
-        const plans = await InstallmentPlan.find(buildTenantFilter(req.user!)).sort({ createdAt: -1 });
+        const plans = await InstallmentPlan.find(buildTenantFilter(req.user!)).sort({ createdAt: -1 }).lean();
         res.json(plans);
     } catch (error: any) {
         res.status(500).json({ message: error.message || 'Failed to fetch installment plans' });

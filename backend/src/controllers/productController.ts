@@ -103,7 +103,14 @@ const SOURCE_BOOSTS: Record<ProductImageSource, number> = {
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const fetchJson = <T>(url: string, timeoutMs = 8000) =>
+const IMAGE_SUGGESTION_CACHE_TTL_MS = 10 * 60 * 1000;
+const IMAGE_SUGGESTION_CACHE_MAX_ENTRIES = 100;
+const imageSuggestionCache = new Map<string, {
+    expiresAt: number;
+    value: Array<Omit<ProductImageSuggestion, 'score'>>;
+}>();
+
+const fetchJson = <T>(url: string, timeoutMs = 4500) =>
     new Promise<T>((resolve, reject) => {
         const request = https.get(
             url,
@@ -143,7 +150,7 @@ const fetchJson = <T>(url: string, timeoutMs = 8000) =>
         });
     });
 
-const fetchJsonWithRetry = async <T>(url: string, retries = 2) => {
+const fetchJsonWithRetry = async <T>(url: string, retries = 1) => {
     let lastError: Error | null = null;
 
     for (let attempt = 0; attempt <= retries; attempt += 1) {
@@ -409,7 +416,7 @@ const fetchSourceSuggestions = async (
 
 export const getProducts = async (req: AuthRequest, res: Response) => {
     try {
-        const products = await Product.find(buildTenantFilter(req.user!)).sort({ name: 1 });
+        const products = await Product.find(buildTenantFilter(req.user!)).sort({ name: 1 }).lean();
         res.json(products);
     } catch (error: any) {
         res.status(500).json({ message: error.message });
@@ -418,7 +425,7 @@ export const getProducts = async (req: AuthRequest, res: Response) => {
 
 export const getProductById = async (req: AuthRequest, res: Response) => {
     try {
-        const product = await Product.findOne({ id: req.params.id, ...buildTenantFilter(req.user!) });
+        const product = await Product.findOne({ id: req.params.id, ...buildTenantFilter(req.user!) }).lean();
         if (!product) return res.status(404).json({ message: 'Product not found' });
         res.json(product);
     } catch (error: any) {
@@ -435,6 +442,12 @@ export const getProductImageSuggestions = async (req: Request, res: Response) =>
     }
 
     try {
+        const cacheKey = `${normalizeText(name)}|${normalizeText(category)}`;
+        const cached = imageSuggestionCache.get(cacheKey);
+        if (cached && cached.expiresAt > Date.now()) {
+            return res.json({ query: name, category, suggestions: cached.value });
+        }
+
         const sourcePlan = getSourcePlan(name, category);
         const settledResults = await Promise.allSettled(
             sourcePlan.map((sourceConfig) => fetchSourceSuggestions(sourceConfig, name, category))
@@ -471,6 +484,15 @@ export const getProductImageSuggestions = async (req: Request, res: Response) =>
                 });
             }
         }
+
+        if (imageSuggestionCache.size >= IMAGE_SUGGESTION_CACHE_MAX_ENTRIES) {
+            const oldestKey = imageSuggestionCache.keys().next().value;
+            if (oldestKey) imageSuggestionCache.delete(oldestKey);
+        }
+        imageSuggestionCache.set(cacheKey, {
+            expiresAt: Date.now() + IMAGE_SUGGESTION_CACHE_TTL_MS,
+            value: suggestions,
+        });
 
         return res.json({
             query: name,

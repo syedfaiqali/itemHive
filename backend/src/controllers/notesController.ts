@@ -7,7 +7,7 @@ const sanitizeText = (value: unknown) => String(value ?? '').trim();
 
 export const getNotes = async (req: AuthRequest, res: Response) => {
     try {
-        const notes = await StickyNote.find({ user: req.user?.id, ...buildTenantFilter(req.user!) }).sort({ pinned: -1, updatedAt: -1 });
+        const notes = await StickyNote.find({ user: req.user?.id, ...buildTenantFilter(req.user!) }).sort({ pinned: -1, updatedAt: -1 }).lean();
         return res.json(notes);
     } catch (error: any) {
         return res.status(500).json({ message: error.message || 'Failed to fetch notes' });

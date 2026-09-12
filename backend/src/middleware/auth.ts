@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import User from '../models/User';
 import Business from '../models/Business';
 import { normalizeRole } from '../utils/accessControl';
-import { ensureUserBusiness, getAppSettingsForTenant } from '../utils/tenancy';
+import { ensureUserBusiness, getCachedAppSettingsForTenant } from '../utils/tenancy';
 
 export interface AuthRequest extends Request {
     user?: {
@@ -143,7 +143,7 @@ export const requireInstallmentAccess = async (req: AuthRequest, res: Response, 
         return res.status(401).json({ message: 'Not authorized, no token' });
     }
 
-    const appSettings = await getAppSettingsForTenant(req.user);
+    const appSettings = await getCachedAppSettingsForTenant(req.user);
     if (!appSettings?.installmentsEnabled || !req.user?.installmentAccess) {
         return res.status(403).json({ message: 'Installment access has not been enabled for this account' });
     }

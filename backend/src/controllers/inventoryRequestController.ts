@@ -33,7 +33,7 @@ export const getInventoryRequests = async (req: AuthRequest, res: Response) => {
             ? { requestedBy: req.user?.id, ...buildTenantFilter(req.user!) }
             : buildTenantFilter(req.user!);
 
-        const requests = await InventoryRequest.find(query).sort({ createdAt: -1 });
+        const requests = await InventoryRequest.find(query).sort({ createdAt: -1 }).lean();
         return res.json(requests);
     } catch (error: any) {
         return res.status(500).json({ message: error.message || 'Failed to fetch inventory requests' });
