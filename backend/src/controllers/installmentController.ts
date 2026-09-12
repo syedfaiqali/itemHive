@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import mongoose from 'mongoose';
+import { randomUUID } from 'crypto';
 import InstallmentPlan from '../models/InstallmentPlan';
 import Product from '../models/Product';
 import Transaction from '../models/Transaction';
@@ -122,7 +123,7 @@ export const createInstallmentPlan = async (req: AuthRequest, res: Response) => 
         const planId = String(planCode || `INS-${Date.now()}`);
 
         const transaction = new Transaction({
-            id: `INS-${Date.now().toString().slice(-6)}-${String(productId).slice(0, 3)}`,
+            id: `INS-${randomUUID()}`,
             productId,
             productName,
             type: 'reduction',

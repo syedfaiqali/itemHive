@@ -125,6 +125,19 @@ export const createTransaction = async (req: AuthRequest, res: Response) => {
 
         return res.status(201).json(savedTransaction);
     } catch (error: any) {
+        // A UUID-based checkout ID makes this path extraordinarily rare. If a
+        // browser retries the exact same checkout after a lost response, return
+        // the original transaction instead of treating the sale as a failure.
+        if (error?.code === 11000) {
+            const existingTransaction = await Transaction.findOne({
+                id: req.body.id,
+                ...buildTenantFilter(req.user!),
+            }).lean();
+
+            if (existingTransaction) {
+                return res.status(200).json(existingTransaction);
+            }
+        }
         res.status(400).json({ message: error.message });
     } finally {
         await session.endSession();

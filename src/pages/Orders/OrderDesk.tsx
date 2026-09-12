@@ -231,7 +231,7 @@ const OrderDesk: React.FC = () => {
         const cleanCustomerName = customerName.trim() || ANONYMOUS_CUSTOMER_NAME;
 
         if (!enoughStock) {
-            const orderId = Math.random().toString(36).slice(2, 9).toUpperCase();
+            const orderId = crypto.randomUUID();
             const timestamp = new Date().toISOString();
             const requestedBy = user?.name || 'Admin';
 
@@ -262,7 +262,7 @@ const OrderDesk: React.FC = () => {
             return;
         }
 
-        const orderId = Math.random().toString(36).slice(2, 9).toUpperCase();
+        const orderId = crypto.randomUUID();
         const timestamp = new Date().toISOString();
         const requestedBy = user?.name || 'Admin';
 

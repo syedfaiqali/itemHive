@@ -368,7 +368,9 @@ const POSTerminal: React.FC = () => {
         }
 
         checkoutInFlightRef.current = true;
-        const id = `R${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 10)}`;
+        // The previous timestamp suffix repeated every ~17 minutes. A UUID is
+        // generated once per checkout for its receipt and transaction IDs.
+        const id = `R-${crypto.randomUUID()}`;
         const receiptTimeIso = new Date().toISOString();
         const currentMethod = pendingMethod;
         setConfirmingPayment(true);
@@ -379,7 +381,7 @@ const POSTerminal: React.FC = () => {
 
             try {
                 await api.post('/installments', {
-                    planCode: `INS-${Date.now()}`,
+                    planCode: `INS-${crypto.randomUUID()}`,
                     productId: item.id,
                     productName: item.name,
                     amount: item.quantity,
@@ -423,9 +425,11 @@ const POSTerminal: React.FC = () => {
             }
         }
 
-        const results = await Promise.all(cart.map((item) => {
+        const results = await Promise.all(cart.map((item, index) => {
             const tx = {
-                id: `${id}-${item.id.substr(0, 3)}`,
+                // Each product line is a separate database transaction, so it
+                // needs its own ID even when product IDs share a prefix.
+                id: `${id}-L${index + 1}`,
                 productId: item.id,
                 productName: item.name,
                 type: 'reduction' as const,
