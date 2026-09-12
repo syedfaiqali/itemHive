@@ -45,7 +45,7 @@ export const printReceipt = async (receipt: HTMLElement) => {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 ${inheritedStyles}
-<style>${thermalInvoicePrintCss('#pos-receipt')}</style>
+<style>${thermalInvoicePrintCss('#pos-receipt', 58)}</style>
 </head>
 <body>${receipt.outerHTML}</body>
 </html>`);

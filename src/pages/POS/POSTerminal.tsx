@@ -65,6 +65,14 @@ import { printReceipt } from '../../lib/printReceipt';
 type CheckoutMethod = 'cash' | 'card' | 'credit' | 'installment';
 type OrderType = 'dine_in' | 'takeaway' | 'foodpanda' | 'other';
 
+const getOrderTypeLabel = (type: OrderType | '', customType: string) => {
+    if (type === 'dine_in') return 'Dine In';
+    if (type === 'takeaway') return 'Takeaway';
+    if (type === 'foodpanda') return 'Foodpanda';
+    if (type === 'other') return customType.trim() || 'Other';
+    return 'Not specified';
+};
+
 const POSTerminal: React.FC = () => {
     const { categories: productCategories } = useProductCategories();
     const categories = ['All', ...productCategories];
@@ -166,6 +174,7 @@ const POSTerminal: React.FC = () => {
         : 0;
     const isOrderTypeComplete = Boolean(orderType && (orderType !== 'other' || otherOrderType.trim()));
     const canChoosePayment = cart.length > 0 && isOrderTypeComplete;
+    const orderTypeLabel = getOrderTypeLabel(orderType, otherOrderType);
 
     /** POS invoice PDF: uses the same document structure as Order Desk. */
     const buildReceiptPdf = (id: string, method: CheckoutMethod, receiptTimeIso: string) => {
@@ -212,9 +221,18 @@ const POSTerminal: React.FC = () => {
                 ];
             }),
             totals: [
-                { label: 'Subtotal', value: formatCurrency(subtotal) },
-                ...(method !== 'installment' ? [{ label: taxLabel, value: formatCurrency(tax) }] : []),
-                ...(method !== 'installment' && activeDiscount > 0 ? [{ label: `Discount (${appliedDiscountPercent}%)`, value: `-${formatCurrency(activeDiscount)}` }] : []),
+                ...(method !== 'installment'
+                    ? activeDiscount > 0
+                        ? [{ label: 'Original Total (Before Discount)', value: formatCurrency(subtotal + tax) }]
+                        : [
+                            { label: 'Subtotal', value: formatCurrency(subtotal) },
+                            ...(tax > 0 ? [{ label: taxLabel, value: formatCurrency(tax) }] : []),
+                        ]
+                    : []),
+                ...(method !== 'installment' && activeDiscount > 0 ? [
+                    { label: `Discount (${appliedDiscountPercent}%)`, value: `-${formatCurrency(activeDiscount)}` },
+                    { label: 'You Saved', value: formatCurrency(activeDiscount) },
+                ] : []),
                 ...(method === 'credit' ? [
                     { label: 'Paid Now', value: formatCurrency(creditPaidNow) },
                     { label: 'Remaining Due', value: formatCurrency(creditDue) },
@@ -231,7 +249,7 @@ const POSTerminal: React.FC = () => {
                 },
             ],
             amountInWords: amountToWords(pdfTotal),
-            footer: `Payment method: ${paymentLabel}  |  Cashier: ${user?.name || 'Staff'}`,
+            footer: `Payment method: ${paymentLabel}  |  Order type: ${orderTypeLabel}  |  Cashier: ${user?.name || 'Staff'}`,
         });
     };
 
@@ -1407,6 +1425,10 @@ const POSTerminal: React.FC = () => {
                                     <Typography variant="caption" color="text.secondary">Cashier</Typography>
                                     <Typography fontWeight={900}>{user?.name || 'Staff'}</Typography>
                                 </Grid>
+                                <Grid size={{ xs: 12 }}>
+                                    <Typography variant="caption" color="text.secondary">Order Type</Typography>
+                                    <Typography fontWeight={900}>{orderTypeLabel}</Typography>
+                                </Grid>
                             </Grid>
 
                             <InvoiceItemsTable
@@ -1420,14 +1442,17 @@ const POSTerminal: React.FC = () => {
                                     };
                                 })}
                                 totals={[
-                                    ...(paymentMethod !== 'installment' && tax > 0
-                                        ? [
-                                            { label: 'Subtotal', value: formatCurrency(subtotal) },
-                                            { label: taxLabel, value: formatCurrency(tax) },
-                                        ]
-                                        : []),
-                                    ...(paymentMethod !== 'installment' && activeDiscount > 0
-                                        ? [{ label: `Discount (${appliedDiscountPercent}%)`, value: `-${formatCurrency(activeDiscount)}` }]
+                                    ...(paymentMethod !== 'installment'
+                                        ? activeDiscount > 0
+                                            ? [
+                                                { label: 'Original Total (Before Discount)', value: formatCurrency(subtotal + tax), strong: true },
+                                                { label: `Discount (${appliedDiscountPercent}%)`, value: `-${formatCurrency(activeDiscount)}` },
+                                                { label: 'You Saved', value: formatCurrency(activeDiscount) },
+                                            ]
+                                            : [
+                                                { label: 'Subtotal', value: formatCurrency(subtotal) },
+                                                ...(tax > 0 ? [{ label: taxLabel, value: formatCurrency(tax) }] : []),
+                                            ]
                                         : []),
                                     ...(paymentMethod === 'credit'
                                         ? [
@@ -1740,7 +1765,7 @@ const POSTerminal: React.FC = () => {
                         background: #fff !important;
                     }
 
-                    ${thermalInvoicePrintCss('#pos-receipt')}
+                    ${thermalInvoicePrintCss('#pos-receipt', 58)}
                 }
                 `}
             </style>

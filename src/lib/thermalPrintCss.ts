@@ -1,32 +1,34 @@
 /**
- * Print CSS that turns an on-screen invoice into an 80mm thermal slip.
+ * Print CSS that turns an on-screen invoice into a thermal slip.
  *
  * Receipt printers feed a fixed-width, continuous roll, so the page box is
- * declared 80mm wide with an auto height - a fixed height would eject a full
+ * declared to the target roll width with an auto height - a fixed height would eject a full
  * sheet's worth of blank paper after every short sale. The screen layout puts
  * the letterhead, meta column and shop block side by side and prices the table
  * in five columns; none of that survives 72mm of printable width, so the rules
- * below stack every row and drop the columns that a slip does not need.
+ * below stack every row and drop the columns that a narrow slip does not need.
  *
  * Only invoices use this. The orders list and the analytics report stay on A4.
  */
 
-/** The physical roll. The page box must match it or the driver scales the slip. */
-const ROLL_WIDTH_MM = 80;
-
-/** What the head can actually mark: the roll minus ~4mm of dead edge per side. */
-const SLIP_WIDTH_MM = 72;
+/** Default 80mm roll dimensions for the wider invoice screens. */
+const DEFAULT_ROLL_WIDTH_MM = 80;
 
 /**
  * @param selector CSS selector of the invoice root, e.g. `#pos-receipt`.
  */
-export const thermalInvoicePrintCss = (selector: string) => `
+export const thermalInvoicePrintCss = (selector: string, rollWidthMm = DEFAULT_ROLL_WIDTH_MM) => {
+    // A 58mm printer has about 48mm of usable print area. Keep a small edge
+    // allowance so drivers with a narrower printable width cannot crop totals.
+    const slipWidthMm = rollWidthMm - 6;
+
+    return `
     /* A continuous roll: match the paper width, let the height follow the content
        so a three-line sale does not feed a full sheet of blank paper. */
-    @page { size: ${ROLL_WIDTH_MM}mm auto; margin: 0; }
+    @page { size: ${rollWidthMm}mm auto; margin: 0; }
 
     html, body {
-        width: ${ROLL_WIDTH_MM}mm !important;
+        width: ${rollWidthMm}mm !important;
         margin: 0 !important;
         padding: 0 !important;
         background: #fff !important;
@@ -34,8 +36,8 @@ export const thermalInvoicePrintCss = (selector: string) => `
 
     ${selector} {
         display: block !important;
-        width: ${SLIP_WIDTH_MM}mm !important;
-        max-width: ${SLIP_WIDTH_MM}mm !important;
+        width: ${slipWidthMm}mm !important;
+        max-width: ${slipWidthMm}mm !important;
         min-width: 0 !important;
         margin: 0 auto !important;
         padding: 2mm !important;
@@ -61,7 +63,7 @@ export const thermalInvoicePrintCss = (selector: string) => `
         overflow: visible !important;
     }
 
-    /* Anything the screen lays out in a row has to stack on a 72mm slip. */
+    /* Anything the screen lays out in a row has to stack on a narrow slip. */
     ${selector} .MuiStack-root,
     ${selector} .MuiGrid-container,
     ${selector} .MuiBox-root {
@@ -131,7 +133,7 @@ export const thermalInvoicePrintCss = (selector: string) => `
         border-bottom-style: dashed !important;
     }
 
-    /* Line items: 72mm has no room for a serial column or per-unit pricing
+    /* Narrow rolls have no room for a serial column or per-unit pricing
        beside the total, so keep description, qty and amount only. */
     ${selector} table {
         width: 100% !important;
@@ -145,7 +147,7 @@ export const thermalInvoicePrintCss = (selector: string) => `
         border: none !important;
         border-bottom: 1px dotted #000 !important;
         padding: 0.8mm 0 !important;
-        font-size: 8pt !important;
+        font-size: 7.5pt !important;
         line-height: 1.2 !important;
         word-break: break-word !important;
         background: transparent !important;
@@ -171,6 +173,12 @@ export const thermalInvoicePrintCss = (selector: string) => `
     ${selector} th:nth-child(5),
     ${selector} td:nth-child(5) { width: 34% !important; }
 
+    ${selector} td.num,
+    ${selector} th.num {
+        white-space: nowrap !important;
+        word-break: normal !important;
+    }
+
     /* Totals rows span the hidden columns too, so re-point their colspan. */
     ${selector} td[colspan] {
         width: auto !important;
@@ -190,3 +198,4 @@ export const thermalInvoicePrintCss = (selector: string) => `
         break-inside: avoid !important;
     }
 `;
+};
