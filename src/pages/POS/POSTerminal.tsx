@@ -59,6 +59,7 @@ import InvoiceItemsTable from '../../components/Common/InvoiceItemsTable';
 import { amountToWords } from '../../lib/numberToWords';
 import { buildInvoicePdfBlob, shareOrDownloadPdf } from '../../lib/invoicePdf';
 import { thermalInvoicePrintCss } from '../../lib/thermalPrintCss';
+import { printReceipt } from '../../lib/printReceipt';
 
 
 type CheckoutMethod = 'cash' | 'card' | 'credit' | 'installment';
@@ -101,6 +102,7 @@ const POSTerminal: React.FC = () => {
     const [receiptTime, setReceiptTime] = useState('');
     const [stockToast, setStockToast] = useState({ open: false, message: '' });
     const [sharingReceipt, setSharingReceipt] = useState(false);
+    const [printingReceipt, setPrintingReceipt] = useState(false);
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [pendingMethod, setPendingMethod] = useState<CheckoutMethod | null>(null);
     const [confirmingPayment, setConfirmingPayment] = useState(false);
@@ -520,8 +522,18 @@ const POSTerminal: React.FC = () => {
         setInstallmentAdvanceInput('0');
     };
 
-    const handlePrint = () => {
-        window.print();
+    const handlePrint = async () => {
+        const receipt = document.getElementById('pos-receipt');
+        if (!receipt || printingReceipt) return;
+
+        setPrintingReceipt(true);
+        try {
+            await printReceipt(receipt);
+        } catch {
+            setStockToast({ open: true, message: 'Could not prepare the receipt for printing.' });
+        } finally {
+            setPrintingReceipt(false);
+        }
     };
 
     return (
@@ -1672,11 +1684,12 @@ const POSTerminal: React.FC = () => {
                     <Button
                         fullWidth
                         variant="contained"
-                        startIcon={<Printer size={18} />}
+                        startIcon={printingReceipt ? <CircularProgress size={18} color="inherit" /> : <Printer size={18} />}
                         onClick={handlePrint}
+                        disabled={printingReceipt}
                         sx={{ borderRadius: 2 }}
                     >
-                        Print
+                        {printingReceipt ? 'Preparing...' : 'Print'}
                     </Button>
                 </DialogActions>
                 <IconButton
