@@ -20,6 +20,8 @@ export interface AppSettings {
     discountsEnabled: boolean;
     /** Super-admin configured discount percentages shown to cashiers. */
     discountOptions: number[];
+    /** Turns on restaurant-only POS functionality for this workspace. */
+    restaurantEnabled: boolean;
     autoRegistrationEnabled: boolean;
 }
 
@@ -33,6 +35,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     installmentsEnabled: false,
     discountsEnabled: false,
     discountOptions: [],
+    restaurantEnabled: false,
     autoRegistrationEnabled: true,
 };
 

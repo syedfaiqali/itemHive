@@ -81,6 +81,7 @@ export const createTransaction = async (req: AuthRequest, res: Response) => {
         const resolvedGrossProfit = type === 'reduction'
             ? (resolvedSubtotal - resolvedDiscountAmount) - (resolvedUnitCost * amount)
             : 0;
+        const isRestaurantOrder = Boolean(appSettings?.restaurantEnabled);
 
         // 1. Record the transaction
         const transaction = new Transaction({
@@ -101,8 +102,8 @@ export const createTransaction = async (req: AuthRequest, res: Response) => {
             dueAmount: dueAmount || 0,
             customerName,
             customerCnic,
-            orderType,
-            otherOrderType,
+            orderType: isRestaurantOrder ? orderType : undefined,
+            otherOrderType: isRestaurantOrder && orderType === 'other' ? otherOrderType : undefined,
             unitCost: resolvedUnitCost,
             unitPrice: resolvedUnitPrice,
             grossProfit: resolvedGrossProfit,

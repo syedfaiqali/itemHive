@@ -14,6 +14,8 @@ export interface User {
     isVisible?: boolean;
     installmentAccess?: boolean;
     discountAccess?: boolean;
+    /** Workspace-level flag provided to client-admin rows in Team Management. */
+    restaurantEnabled?: boolean;
     userCreationLimit?: number;
     businessId?: string;
     businessName?: string;

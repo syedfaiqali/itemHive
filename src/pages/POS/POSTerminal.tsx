@@ -95,6 +95,7 @@ const POSTerminal: React.FC = () => {
     const taxRate = Number(appSettings.salesTaxRate || 0) / 100;
     const taxLabel = `Tax (${Number(appSettings.salesTaxRate || 0).toLocaleString()}%)`;
     const discountsEnabled = Boolean(appSettings.discountsEnabled);
+    const isRestaurant = Boolean(appSettings.restaurantEnabled);
     const discountOptions = Array.from(new Set((appSettings.discountOptions || [])
         .map(Number)
         .filter((option) => Number.isFinite(option) && option > 0 && option <= 100)))
@@ -112,6 +113,7 @@ const POSTerminal: React.FC = () => {
     const [stockToast, setStockToast] = useState({ open: false, message: '' });
     const [sharingReceipt, setSharingReceipt] = useState(false);
     const [printingReceipt, setPrintingReceipt] = useState(false);
+    const [printingKot, setPrintingKot] = useState(false);
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [pendingMethod, setPendingMethod] = useState<CheckoutMethod | null>(null);
     const [confirmingPayment, setConfirmingPayment] = useState(false);
@@ -173,9 +175,17 @@ const POSTerminal: React.FC = () => {
     const draftInstallmentProfit = installmentItem
         ? (draftInstallmentUnitPrice - installmentItem.purchasePrice) * installmentQuantity
         : 0;
-    const isOrderTypeComplete = Boolean(orderType && (orderType !== 'other' || otherOrderType.trim()));
+    const isOrderTypeComplete = !isRestaurant || Boolean(orderType && (orderType !== 'other' || otherOrderType.trim()));
     const canChoosePayment = cart.length > 0 && isOrderTypeComplete;
-    const orderTypeLabel = getOrderTypeLabel(orderType, otherOrderType);
+    const orderTypeLabel = isRestaurant ? getOrderTypeLabel(orderType, otherOrderType) : '';
+
+    React.useEffect(() => {
+        if (!isRestaurant) {
+            setOrderType('');
+            setOtherOrderType('');
+            setDeliveryNumber('');
+        }
+    }, [isRestaurant]);
 
     /** POS invoice PDF: uses the same document structure as Order Desk. */
     const buildReceiptPdf = (id: string, method: CheckoutMethod, receiptTimeIso: string) => {
@@ -250,7 +260,7 @@ const POSTerminal: React.FC = () => {
                 },
             ],
             amountInWords: amountToWords(pdfTotal),
-            footer: `Payment method: ${paymentLabel}  |  Order type: ${orderTypeLabel}  |  Cashier: ${user?.name || 'Staff'}`,
+            footer: `Payment method: ${paymentLabel}${isRestaurant ? `  |  Order type: ${orderTypeLabel}` : ''}  |  Cashier: ${user?.name || 'Staff'}`,
         });
     };
 
@@ -383,7 +393,7 @@ const POSTerminal: React.FC = () => {
 
     const handleConfirmCheckout = async () => {
         if (!pendingMethod || confirmingPayment || checkoutInFlightRef.current) return;
-        if (!isOrderTypeComplete) {
+        if (isRestaurant && !isOrderTypeComplete) {
             setStockToast({ open: true, message: 'Select an order type before taking payment.' });
             return;
         }
@@ -416,8 +426,8 @@ const POSTerminal: React.FC = () => {
                     saleDate: installmentSaleDate,
                     installmentMonths,
                     userName: user?.name || 'Staff',
-                    orderType,
-                    otherOrderType: orderType === 'other' ? otherOrderType.trim() : undefined,
+                    orderType: isRestaurant ? orderType : undefined,
+                    otherOrderType: isRestaurant && orderType === 'other' ? otherOrderType.trim() : undefined,
                     witnesses: [
                         { name: witnessOneName.trim(), cnic: witnessOneCnic.trim(), address: witnessOneAddress.trim() },
                         { name: witnessTwoName.trim(), cnic: witnessTwoCnic.trim(), address: witnessTwoAddress.trim() },
@@ -465,8 +475,8 @@ const POSTerminal: React.FC = () => {
                 dueAmount: pendingMethod === 'credit' ? creditDue : 0,
                 customerName: pendingMethod === 'credit' ? creditCustomerName.trim() : undefined,
                 customerCnic: pendingMethod === 'credit' ? creditCustomerCnic.trim() : undefined,
-                orderType,
-                otherOrderType: orderType === 'other' ? otherOrderType.trim() : undefined,
+                orderType: isRestaurant ? orderType : undefined,
+                otherOrderType: isRestaurant && orderType === 'other' ? otherOrderType.trim() : undefined,
                 unitPrice: item.price,
             };
             return dispatch(reduceStockApi({ id: item.id, amount: item.quantity, transaction: tx }));
@@ -518,6 +528,8 @@ const POSTerminal: React.FC = () => {
     const handleCloseOrder = () => {
         dispatch(clearCart());
         setOrderDone(false);
+        setPrintingReceipt(false);
+        setPrintingKot(false);
         setPaymentMethod(null);
         setOrderType('');
         setOtherOrderType('');
@@ -553,6 +565,20 @@ const POSTerminal: React.FC = () => {
             setStockToast({ open: true, message: 'Could not prepare the receipt for printing.' });
         } finally {
             setPrintingReceipt(false);
+        }
+    };
+
+    const handlePrintKot = async () => {
+        const kitchenTicket = document.getElementById('pos-kot');
+        if (!kitchenTicket || printingKot) return;
+
+        setPrintingKot(true);
+        try {
+            await printReceipt(kitchenTicket, '#pos-kot');
+        } catch {
+            setStockToast({ open: true, message: 'Could not prepare the kitchen ticket for printing.' });
+        } finally {
+            setPrintingKot(false);
         }
     };
 
@@ -1049,7 +1075,7 @@ const POSTerminal: React.FC = () => {
                     </Stack>
 
                     <Stack spacing={1} sx={{ mb: 1.25 }}>
-                        <TextField
+                        {isRestaurant && <TextField
                             select
                             fullWidth
                             size="small"
@@ -1062,8 +1088,8 @@ const POSTerminal: React.FC = () => {
                             <MenuItem value="takeaway">Takeaway</MenuItem>
                             <MenuItem value="foodpanda">Foodpanda</MenuItem>
                             <MenuItem value="other">Other</MenuItem>
-                        </TextField>
-                        {orderType === 'other' && (
+                        </TextField>}
+                        {isRestaurant && orderType === 'other' && (
                             <TextField
                                 fullWidth
                                 size="small"
@@ -1078,7 +1104,7 @@ const POSTerminal: React.FC = () => {
                                 required
                             />
                         )}
-                        <TextField
+                        {isRestaurant && <TextField
                             fullWidth
                             size="small"
                             label="Delivery No. (optional)"
@@ -1086,7 +1112,7 @@ const POSTerminal: React.FC = () => {
                             value={deliveryNumber}
                             onChange={(event) => setDeliveryNumber(event.target.value)}
                             inputProps={{ maxLength: 40 }}
-                        />
+                        />}
                     </Stack>
 
                     <Grid container spacing={1}>
@@ -1243,6 +1269,37 @@ const POSTerminal: React.FC = () => {
                             Profit / Loss: {formatCurrency(projectedProfit)}
                         </Typography>
                     </Box>
+
+                    {false && isRestaurant && (
+                        <Box
+                            id="pos-kot"
+                            sx={{
+                                display: 'none',
+                                '@media print': { display: 'block', p: 2, color: '#000', bgcolor: '#fff' },
+                            }}
+                        >
+                            <Typography align="center" fontWeight={900} sx={{ fontSize: '1.1rem', letterSpacing: 1 }}>KITCHEN TICKET</Typography>
+                            <Typography align="center" variant="caption" display="block" sx={{ mb: 1.5 }}>{appSettings.shopName || 'ItemHive POS'}</Typography>
+                            <Divider sx={{ borderStyle: 'dashed', borderColor: 'currentColor', mb: 1.25 }} />
+                            <Box sx={{ display: 'grid', gap: 0.45, fontSize: '0.75rem', mb: 1.25 }}>
+                                <Typography variant="caption">Order: #{receiptId.replace(/^R-/, '').slice(-8).toUpperCase()}</Typography>
+                                <Typography variant="caption">Time: {receiptTime ? new Date(receiptTime).toLocaleString() : '-'}</Typography>
+                                <Typography variant="caption">Type: {orderTypeLabel}</Typography>
+                                {deliveryNumber.trim() && <Typography variant="caption">Delivery: {deliveryNumber.trim()}</Typography>}
+                            </Box>
+                            <Divider sx={{ borderStyle: 'dashed', borderColor: 'currentColor', mb: 1 }} />
+                            <Box sx={{ display: 'grid', gap: 1 }}>
+                                {cart.map((item, index) => (
+                                    <Box key={item.id} sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}>
+                                        <Typography variant="body2" fontWeight={700}>{index + 1}. {item.name}</Typography>
+                                        <Typography variant="body2" fontWeight={900} sx={{ whiteSpace: 'nowrap' }}>x{item.quantity}</Typography>
+                                    </Box>
+                                ))}
+                            </Box>
+                            <Divider sx={{ borderStyle: 'dashed', borderColor: 'currentColor', my: 1.5 }} />
+                            <Typography align="center" variant="caption" fontWeight={700}>Kitchen copy — no prices</Typography>
+                        </Box>
+                    )}
                 </DialogContent>
                 <DialogActions sx={{ p: 2 }}>
                     <Button variant="outlined" onClick={() => setCreditOpen(false)}>Cancel</Button>
@@ -1467,8 +1524,8 @@ const POSTerminal: React.FC = () => {
                                 <Box className="receipt-meta-row"><Typography component="span">Date/Time:</Typography><Typography component="span" fontWeight={900}>{receiptTime ? new Date(receiptTime).toLocaleString() : '-'}</Typography></Box>
                                 <Box className="receipt-meta-row"><Typography component="span">Cashier:</Typography><Typography component="span" fontWeight={900}>{user?.name || 'Staff'}</Typography></Box>
                                 <Box className="receipt-meta-row"><Typography component="span">Method:</Typography><Typography component="span" fontWeight={900} sx={{ textTransform: 'capitalize' }}>{paymentMethod || '-'}</Typography></Box>
-                                <Box className="receipt-meta-row"><Typography component="span">Order Type:</Typography><Typography component="span" fontWeight={900}>{orderTypeLabel}</Typography></Box>
-                                {deliveryNumber.trim() && <Box className="receipt-meta-row"><Typography component="span">Delivery No:</Typography><Typography component="span" fontWeight={900}>{deliveryNumber.trim()}</Typography></Box>}
+                                {isRestaurant && <Box className="receipt-meta-row"><Typography component="span">Order Type:</Typography><Typography component="span" fontWeight={900}>{orderTypeLabel}</Typography></Box>}
+                                {isRestaurant && deliveryNumber.trim() && <Box className="receipt-meta-row"><Typography component="span">Delivery No:</Typography><Typography component="span" fontWeight={900}>{deliveryNumber.trim()}</Typography></Box>}
                             </Box>
 
                             <InvoiceItemsTable
@@ -1727,6 +1784,33 @@ const POSTerminal: React.FC = () => {
                         </Box>
                         </Box>
                     </Box>
+                    {isRestaurant && (
+                        <Box
+                            id="pos-kot"
+                            sx={{ display: 'none', '@media print': { display: 'block', p: 2, color: '#000', bgcolor: '#fff' } }}
+                        >
+                            <Typography align="center" fontWeight={900} sx={{ fontSize: '1.1rem', letterSpacing: 1 }}>KITCHEN TICKET</Typography>
+                            <Typography align="center" variant="caption" display="block" sx={{ mb: 1.5 }}>{appSettings.shopName || 'ItemHive POS'}</Typography>
+                            <Divider sx={{ borderStyle: 'dashed', borderColor: 'currentColor', mb: 1.25 }} />
+                            <Stack spacing={0.45} sx={{ mb: 1.25 }}>
+                                <Typography variant="caption">Order: #{receiptId.replace(/^R-/, '').slice(-8).toUpperCase()}</Typography>
+                                <Typography variant="caption">Time: {receiptTime ? new Date(receiptTime).toLocaleString() : '-'}</Typography>
+                                <Typography variant="caption">Type: {orderTypeLabel}</Typography>
+                                {deliveryNumber.trim() && <Typography variant="caption">Delivery: {deliveryNumber.trim()}</Typography>}
+                            </Stack>
+                            <Divider sx={{ borderStyle: 'dashed', borderColor: 'currentColor', mb: 1 }} />
+                            <Stack spacing={1}>
+                                {cart.map((item, index) => (
+                                    <Box key={item.id} sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}>
+                                        <Typography variant="body2" fontWeight={700}>{index + 1}. {item.name}</Typography>
+                                        <Typography variant="body2" fontWeight={900} sx={{ whiteSpace: 'nowrap' }}>x{item.quantity}</Typography>
+                                    </Box>
+                                ))}
+                            </Stack>
+                            <Divider sx={{ borderStyle: 'dashed', borderColor: 'currentColor', my: 1.5 }} />
+                            <Typography align="center" variant="caption" fontWeight={700}>Kitchen copy - no prices</Typography>
+                        </Box>
+                    )}
                 </DialogContent>
                 <DialogActions sx={{ p: 3, gap: 1 }}>
                     <Button
@@ -1764,6 +1848,19 @@ const POSTerminal: React.FC = () => {
                     >
                         {printingReceipt ? 'Preparing...' : 'Print'}
                     </Button>
+                    {isRestaurant && (
+                        <Button
+                            fullWidth
+                            color="secondary"
+                            variant="contained"
+                            startIcon={printingKot ? <CircularProgress size={18} color="inherit" /> : <Receipt size={18} />}
+                            onClick={handlePrintKot}
+                            disabled={printingKot}
+                            sx={{ borderRadius: 2 }}
+                        >
+                            {printingKot ? 'Preparing...' : 'Print KOT'}
+                        </Button>
+                    )}
                 </DialogActions>
                 <IconButton
                     onClick={handleCloseOrder}
@@ -1795,7 +1892,7 @@ const POSTerminal: React.FC = () => {
                 @media print {
                     /* Everything outside the slip leaves the layout entirely, otherwise
                        the terminal behind it prints as extra blank pages. */
-                    body *:not(:has(#pos-receipt)):not(#pos-receipt):not(#pos-receipt *) {
+                    body *:not(:has(#pos-receipt)):not(:has(#pos-kot)):not(#pos-receipt):not(#pos-receipt *):not(#pos-kot):not(#pos-kot *) {
                         display: none !important;
                     }
 

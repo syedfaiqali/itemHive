@@ -5,7 +5,7 @@ import type { IUser } from '../models/User';
 
 type CheckoutSettings = Pick<
     IAppSetting,
-    'salesTaxRate' | 'installmentsEnabled' | 'discountsEnabled' | 'discountOptions'
+    'salesTaxRate' | 'installmentsEnabled' | 'discountsEnabled' | 'discountOptions' | 'restaurantEnabled'
 >;
 
 const CHECKOUT_SETTINGS_CACHE_TTL_MS = 15 * 1000;
@@ -96,6 +96,7 @@ export const getCachedAppSettingsForTenant = async (tenant: TenantContext): Prom
         installmentsEnabled: settings.installmentsEnabled,
         discountsEnabled: settings.discountsEnabled,
         discountOptions: settings.discountOptions || [],
+        restaurantEnabled: settings.restaurantEnabled,
     };
     checkoutSettingsCache.set(tenantKey, {
         expiresAt: Date.now() + CHECKOUT_SETTINGS_CACHE_TTL_MS,

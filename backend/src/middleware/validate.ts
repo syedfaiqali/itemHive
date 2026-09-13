@@ -184,6 +184,7 @@ export const settingsSchema = Joi.object({
         installmentsEnabled: Joi.boolean().required(),
         discountsEnabled: Joi.boolean().required(),
         discountOptions: Joi.array().items(Joi.number().greater(0).max(100)).max(20).unique().required(),
+        restaurantEnabled: Joi.boolean().optional(),
         autoRegistrationEnabled: Joi.boolean().optional(),
     }).optional(),
 });
@@ -193,7 +194,8 @@ export const updateUserStatusSchema = Joi.object({
     isVisible: Joi.boolean().optional(),
     installmentAccess: Joi.boolean().optional(),
     discountAccess: Joi.boolean().optional(),
-}).or('isActive', 'isVisible', 'installmentAccess', 'discountAccess');
+    restaurantEnabled: Joi.boolean().optional(),
+}).or('isActive', 'isVisible', 'installmentAccess', 'discountAccess', 'restaurantEnabled');
 
 export const updateAdminLimitSchema = Joi.object({
     userCreationLimit: Joi.number().integer().min(0).required(),

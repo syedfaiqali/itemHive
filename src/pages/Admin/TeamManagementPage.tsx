@@ -157,7 +157,7 @@ const TeamManagementPage: React.FC = () => {
         loadBusinesses();
     }, [loadBusinesses]);
 
-    const handleStatusChange = async (target: User, updates: { isActive?: boolean; isVisible?: boolean; installmentAccess?: boolean; discountAccess?: boolean }) => {
+    const handleStatusChange = async (target: User, updates: { isActive?: boolean; isVisible?: boolean; installmentAccess?: boolean; discountAccess?: boolean; restaurantEnabled?: boolean }) => {
         setSavingId(target.id);
         try {
             await api.patch(`/users/${target.id}/status`, updates);
@@ -308,7 +308,7 @@ const TeamManagementPage: React.FC = () => {
             />
 
             <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3 }}>
-                <Table size="small" sx={{ minWidth: 1140 }}>
+                <Table size="small" sx={{ minWidth: 1260 }}>
                     <TableHead>
                         <TableRow>
                             <TableCell>Account</TableCell>
@@ -318,6 +318,7 @@ const TeamManagementPage: React.FC = () => {
                             <TableCell align="center">Visible</TableCell>
                             <TableCell align="center">Installments</TableCell>
                             <TableCell align="center">Discount Access</TableCell>
+                            <TableCell align="center">Restaurant / KOT</TableCell>
                             <TableCell align="center">User Limit</TableCell>
                             <TableCell align="right">Actions</TableCell>
                         </TableRow>
@@ -325,12 +326,13 @@ const TeamManagementPage: React.FC = () => {
                     <TableBody>
                         {loading && (
                             <TableRow>
-                                <TableCell colSpan={9} align="center" sx={{ py: 8 }}><CircularProgress size={30} /></TableCell>
+                                <TableCell colSpan={10} align="center" sx={{ py: 8 }}><CircularProgress size={30} /></TableCell>
                             </TableRow>
                         )}
                         {!loading && users.map((teamUser) => {
                             const isBusy = savingId === teamUser.id;
                             const isManageable = isSuperAdmin && teamUser.role !== 'super_admin';
+                            const canManageRestaurantMode = isSuperAdmin && (teamUser.role === 'admin' || teamUser.role === 'super_admin');
                             const canDelete = teamUser.id !== currentUser?.id && (
                                 isSuperAdmin
                                     ? teamUser.role !== 'super_admin'
@@ -368,6 +370,17 @@ const TeamManagementPage: React.FC = () => {
                                             />
                                         ) : '-'}
                                     </TableCell>
+                                    <TableCell align="center">
+                                        {canManageRestaurantMode ? (
+                                            <Switch
+                                                size="small"
+                                                checked={Boolean(teamUser.restaurantEnabled)}
+                                                disabled={isBusy}
+                                                onChange={(_, checked) => handleStatusChange(teamUser, { restaurantEnabled: checked })}
+                                                inputProps={{ 'aria-label': `Restaurant mode for ${teamUser.businessName || teamUser.name}` }}
+                                            />
+                                        ) : '-'}
+                                    </TableCell>
                                     <TableCell align="center">{teamUser.role === 'admin' ? teamUser.userCreationLimit ?? 0 : '-'}</TableCell>
                                     <TableCell align="right">
                                         <Stack direction="row" spacing={1} justifyContent="flex-end">
@@ -395,7 +408,7 @@ const TeamManagementPage: React.FC = () => {
                         })}
                         {!loading && !users.length && (
                             <TableRow>
-                                <TableCell colSpan={9} align="center" sx={{ py: 8 }}>
+                                <TableCell colSpan={10} align="center" sx={{ py: 8 }}>
                                     <Users size={34} style={{ opacity: 0.45, marginBottom: 8 }} />
                                     <Typography variant="body2" color="text.secondary">No matching accounts found.</Typography>
                                 </TableCell>

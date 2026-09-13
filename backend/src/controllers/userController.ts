@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import User from '../models/User';
 import Business from '../models/Business';
+import AppSetting from '../models/AppSetting';
 import type { AuthRequest } from '../middleware/auth';
 import { normalizeRole, serializeUser } from '../utils/accessControl';
 
@@ -35,12 +36,17 @@ const ensureDeleteAllowed = (actor: AuthRequest['user'], target: any) => {
 
 const serializeUsersWithBusinessNames = async (users: any[]) => {
     const businessIds = [...new Set(users.map((user) => String(user.businessId || '')).filter(Boolean))];
-    const businesses = await Business.find({ _id: { $in: businessIds } }).select('name');
+    const [businesses, businessSettings] = await Promise.all([
+        Business.find({ _id: { $in: businessIds } }).select('name'),
+        AppSetting.find({ businessId: { $in: businessIds } }).select('businessId restaurantEnabled'),
+    ]);
     const businessNameById = new Map(businesses.map((business) => [String(business._id), business.name]));
+    const restaurantEnabledByBusinessId = new Map(businessSettings.map((setting) => [String(setting.businessId), Boolean(setting.restaurantEnabled)]));
 
     return users.map((user) => ({
         ...serializeUser(user),
         businessName: businessNameById.get(String(user.businessId || '')) || '',
+        restaurantEnabled: restaurantEnabledByBusinessId.get(String(user.businessId || '')) || false,
     }));
 };
 
@@ -102,7 +108,12 @@ export const updateUserStatus = async (req: AuthRequest, res: Response) => {
             return res.status(404).json({ message: 'User not found' });
         }
 
-        ensureManageableTarget(user.role);
+        const isRestaurantModeUpdate = typeof req.body.restaurantEnabled === 'boolean';
+        // Restaurant mode belongs to a workspace. A super admin must be able
+        // to configure it for the legacy workspace as well.
+        if (!isRestaurantModeUpdate) {
+            ensureManageableTarget(user.role);
+        }
 
         if (typeof req.body.isActive === 'boolean') {
             user.isActive = req.body.isActive;
@@ -124,6 +135,21 @@ export const updateUserStatus = async (req: AuthRequest, res: Response) => {
                 return res.status(400).json({ message: 'Discount access can only be assigned to admin accounts' });
             }
             user.discountAccess = req.body.discountAccess;
+        }
+
+        if (typeof req.body.restaurantEnabled === 'boolean') {
+            if (!['admin', 'super_admin'].includes(normalizeRole(user.role)) || !user.businessId) {
+                return res.status(400).json({ message: 'Restaurant mode can only be assigned to client admin accounts' });
+            }
+
+            await AppSetting.findOneAndUpdate(
+                { key: `business:${user.businessId}` },
+                {
+                    $set: { restaurantEnabled: req.body.restaurantEnabled },
+                    $setOnInsert: { businessId: user.businessId },
+                },
+                { new: true, upsert: true, setDefaultsOnInsert: true }
+            );
         }
 
         await user.save();

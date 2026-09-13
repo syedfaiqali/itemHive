@@ -16,6 +16,7 @@ const serializeAppSettings = (appSettings: IAppSetting, globalAppSettings: IAppS
     installmentsEnabled: appSettings.installmentsEnabled,
     discountsEnabled: appSettings.discountsEnabled,
     discountOptions: appSettings.discountOptions || [],
+    restaurantEnabled: appSettings.restaurantEnabled,
     autoRegistrationEnabled: globalAppSettings.autoRegistrationEnabled,
 });
 
