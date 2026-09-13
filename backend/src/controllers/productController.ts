@@ -4,6 +4,11 @@ import Product from '../models/Product';
 import type { AuthRequest } from '../middleware/auth';
 import { buildTenantFilter, getTenantObjectId } from '../utils/tenancy';
 
+const PRODUCT_LIST_CACHE_TTL_MS = 60 * 1000;
+const productListCache = new Map<string, { expiresAt: number; value: unknown[] }>();
+
+const invalidateProductListCache = (businessId: string) => productListCache.delete(businessId);
+
 interface OpenFoodFactsProduct {
     code?: string;
     product_name?: string;
@@ -416,7 +421,24 @@ const fetchSourceSuggestions = async (
 
 export const getProducts = async (req: AuthRequest, res: Response) => {
     try {
-        const products = await Product.find(buildTenantFilter(req.user!)).sort({ name: 1 }).lean();
+        const tenantId = String(req.user!.businessId);
+        const fresh = req.query.fresh === '1';
+        const cached = !fresh ? productListCache.get(tenantId) : undefined;
+        if (cached && cached.expiresAt > Date.now()) {
+            res.set('X-ItemHive-Cache', 'HIT');
+            return res.json(cached.value);
+        }
+
+        const startedAt = performance.now();
+        // Every legacy record is assigned a businessId at server boot. Using the
+        // simple tenant predicate lets MongoDB use { businessId, name } index;
+        // the old legacy $or predicate prevented this efficient index plan.
+        const products = await Product.find({ businessId: getTenantObjectId(req.user!) })
+            .sort({ name: 1 })
+            .lean();
+        productListCache.set(tenantId, { expiresAt: Date.now() + PRODUCT_LIST_CACHE_TTL_MS, value: products });
+        res.set('X-ItemHive-Cache', 'MISS');
+        res.set('Server-Timing', `products-db;dur=${(performance.now() - startedAt).toFixed(1)}`);
         res.json(products);
     } catch (error: any) {
         res.status(500).json({ message: error.message });
@@ -516,6 +538,7 @@ export const createProduct = async (req: AuthRequest, res: Response) => {
             businessName: req.user?.businessName || '',
         });
         const savedProduct = await product.save();
+        invalidateProductListCache(String(req.user!.businessId));
         res.status(201).json(savedProduct);
     } catch (error: any) {
         res.status(400).json({ message: error.message });
@@ -581,6 +604,8 @@ export const bulkCreateProducts = async (req: AuthRequest, res: Response) => {
             lastUpdated: new Date(),
         })));
 
+        invalidateProductListCache(String(req.user!.businessId));
+
         return res.status(201).json({ message: `${savedProducts.length} products imported successfully.`, products: savedProducts });
     } catch (error: any) {
         if (error?.code === 11000) {
@@ -601,6 +626,7 @@ export const updateProduct = async (req: AuthRequest, res: Response) => {
             { new: true, runValidators: true }
         );
         if (!updatedProduct) return res.status(404).json({ message: 'Product not found' });
+        invalidateProductListCache(String(req.user!.businessId));
         res.json(updatedProduct);
     } catch (error: any) {
         res.status(400).json({ message: error.message });
@@ -611,6 +637,7 @@ export const deleteProduct = async (req: AuthRequest, res: Response) => {
     try {
         const deletedProduct = await Product.findOneAndDelete({ id: req.params.id, ...buildTenantFilter(req.user!) });
         if (!deletedProduct) return res.status(404).json({ message: 'Product not found' });
+        invalidateProductListCache(String(req.user!.businessId));
         res.json({ message: 'Product deleted successfully' });
     } catch (error: any) {
         res.status(500).json({ message: error.message });
