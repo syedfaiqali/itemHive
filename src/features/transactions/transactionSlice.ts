@@ -66,6 +66,18 @@ export const addTransactionApi = createAsyncThunk(
     }
 );
 
+export const deleteTransactionApi = createAsyncThunk(
+    'transactions/deleteTransaction',
+    async (id: string, { rejectWithValue }) => {
+        try {
+            await api.delete(`/transactions/${encodeURIComponent(id)}`);
+            return id;
+        } catch (error: any) {
+            return rejectWithValue(error.response?.data?.message || 'Failed to delete transaction');
+        }
+    }
+);
+
 const transactionSlice = createSlice({
     name: 'transactions',
     initialState,
@@ -111,6 +123,18 @@ const transactionSlice = createSlice({
                 state.transactions.unshift(action.payload);
             })
             .addCase(addTransactionApi.rejected, (state, action: PayloadAction<any>) => {
+                state.loading = false;
+                state.error = action.payload;
+            })
+            .addCase(deleteTransactionApi.pending, (state) => {
+                state.loading = true;
+                state.error = null;
+            })
+            .addCase(deleteTransactionApi.fulfilled, (state, action: PayloadAction<string>) => {
+                state.loading = false;
+                state.transactions = state.transactions.filter((transaction) => transaction.id !== action.payload);
+            })
+            .addCase(deleteTransactionApi.rejected, (state, action: PayloadAction<any>) => {
                 state.loading = false;
                 state.error = action.payload;
             });

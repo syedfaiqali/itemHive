@@ -24,7 +24,9 @@ import {
     TableContainer,
     Alert,
     MenuItem,
-    Stack
+    Stack,
+    IconButton,
+    Tooltip
 } from '@mui/material';
 import {
     BadgeDollarSign,
@@ -41,13 +43,14 @@ import {
     ShoppingBag,
     UserRound,
     UserRoundPlus,
-    XCircle
+    XCircle,
+    Trash2
 } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState } from '../../store';
 import { addOrder, type OrderStatus, type Order, type OrderPaymentMethod } from '../../features/orders/ordersSlice';
 import { fetchProducts, resolveProductImage, placeholderFallback, type Product } from '../../features/inventory/inventorySlice';
-import { addTransactionApi, fetchTransactions } from '../../features/transactions/transactionSlice';
+import { addTransactionApi, deleteTransactionApi, fetchTransactions } from '../../features/transactions/transactionSlice';
 import { alpha, useTheme } from '@mui/material/styles';
 import type { AppDispatch } from '../../store';
 import useAppCurrency from '../../hooks/useAppCurrency';
@@ -163,6 +166,7 @@ const OrderDesk: React.FC = () => {
     const [sharingInvoice, setSharingInvoice] = useState(false);
     const [filterText, setFilterText] = useState('');
     const [statusFilter, setStatusFilter] = useState<'all' | OrderStatus>('all');
+    const [transactionToDelete, setTransactionToDelete] = useState<{ id: string; productName: string } | null>(null);
 
     useEffect(() => {
         dispatch(fetchProducts());
@@ -385,6 +389,7 @@ const OrderDesk: React.FC = () => {
                 paymentMethod: tx.paymentMethod || 'cash',
                 paidNow: tx.paidNow,
                 dueAmount: tx.dueAmount,
+                sourceTransactionId: tx.id,
             }))
     ), [transactions]);
 
@@ -406,6 +411,23 @@ const OrderDesk: React.FC = () => {
             );
         });
     }, [orders, fulfilledOrdersFromTransactions, filterText, statusFilter]);
+
+    const handleDeleteTransaction = async () => {
+        if (!transactionToDelete) return;
+
+        const result = await dispatch(deleteTransactionApi(transactionToDelete.id));
+        if (deleteTransactionApi.fulfilled.match(result)) {
+            setFeedback({ type: 'success', message: 'Transaction deleted and product stock restored.' });
+            dispatch(fetchProducts({ force: true }));
+            setTransactionToDelete(null);
+            return;
+        }
+
+        setFeedback({
+            type: 'error',
+            message: typeof result.payload === 'string' ? result.payload : 'Unable to delete transaction.',
+        });
+    };
 
     const exportOrdersToCSV = () => {
         const headers = ['Order ID', 'Customer', 'Product', 'Quantity', 'Amount', 'Payment', 'Status', 'Reason', 'Requested By', 'Time'];
@@ -977,15 +999,33 @@ const OrderDesk: React.FC = () => {
                                 sx={{
                                     borderRadius: 0,
                                     overflowX: 'auto',
-                                    scrollbarWidth: 'none',
-                                    '&::-webkit-scrollbar': { display: 'none' }
+                                    overflowY: 'hidden',
+                                    scrollbarWidth: 'thin',
+                                    scrollbarColor: (theme) => `${theme.palette.primary.main} ${theme.palette.action.hover}`,
+                                    '&::-webkit-scrollbar': { height: 10 },
+                                    '&::-webkit-scrollbar-thumb': {
+                                        bgcolor: 'primary.main',
+                                        borderRadius: 8,
+                                    },
+                                    '&::-webkit-scrollbar-track': { bgcolor: 'action.hover' },
                                 }}
                                 id="orders-print-area"
                             >
                                 <DocumentBanner
                                     sx={{ display: 'none', mb: 2, '@media print': { display: 'block' } }}
                                 />
-                                <Table sx={{ minWidth: 1260 }}>
+                                <Table
+                                    sx={{
+                                        width: '100%',
+                                        minWidth: 1440,
+                                        '& .MuiTableCell-root': {
+                                            px: { xs: 0.75, md: 1 },
+                                            py: { xs: 1.25, md: 1.5 },
+                                            overflowWrap: 'anywhere',
+                                            verticalAlign: 'middle',
+                                        },
+                                    }}
+                                >
                                     <TableHead>
                                         <TableRow>
                                             <TableCell sx={{ fontWeight: 700 }}>ORDER ID</TableCell>
@@ -1060,15 +1100,30 @@ const OrderDesk: React.FC = () => {
                                                         </Typography>
                                                     </TableCell>
                                                     <TableCell align="right">
-                                                        <Button
-                                                            size="small"
-                                                            variant="outlined"
-                                                            startIcon={<ReceiptText size={16} />}
-                                                            onClick={() => setInvoiceOrder(order)}
-                                                            sx={{ fontWeight: 800, whiteSpace: 'nowrap' }}
-                                                        >
-                                                            Invoice
-                                                        </Button>
+                                                        <Stack direction="row" spacing={0.5} justifyContent="flex-end" flexWrap="nowrap">
+                                                            <Tooltip title="Invoice">
+                                                                <IconButton
+                                                                    size="small"
+                                                                    color="primary"
+                                                                    onClick={() => setInvoiceOrder(order)}
+                                                                    aria-label="View invoice"
+                                                                >
+                                                                    <ReceiptText size={19} />
+                                                                </IconButton>
+                                                            </Tooltip>
+                                                            {isManager && order.sourceTransactionId && (
+                                                                <Tooltip title="Delete transaction">
+                                                                    <IconButton
+                                                                    size="small"
+                                                                    color="error"
+                                                                    onClick={() => setTransactionToDelete({ id: order.sourceTransactionId!, productName: order.productName })}
+                                                                    aria-label="Delete transaction"
+                                                                    >
+                                                                        <Trash2 size={19} />
+                                                                    </IconButton>
+                                                                </Tooltip>
+                                                            )}
+                                                        </Stack>
                                                     </TableCell>
                                                 </TableRow>
                                             ))
@@ -1080,6 +1135,21 @@ const OrderDesk: React.FC = () => {
                     </Card>
                 </Grid>
             </Grid>
+
+            <Dialog open={Boolean(transactionToDelete)} onClose={() => setTransactionToDelete(null)} maxWidth="xs" fullWidth>
+                <DialogTitle>Delete transaction?</DialogTitle>
+                <DialogContent>
+                    <Typography color="text.secondary">
+                        This will permanently remove the transaction for {transactionToDelete?.productName} and restore its stock.
+                    </Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setTransactionToDelete(null)}>Cancel</Button>
+                    <Button color="error" variant="contained" onClick={handleDeleteTransaction} disabled={transactionLoading}>
+                        {transactionLoading ? 'Deleting...' : 'Delete transaction'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
 
             <Dialog open={Boolean(invoiceOrder)} onClose={() => setInvoiceOrder(null)} maxWidth="sm" fullWidth>
                 <DialogTitle sx={{ fontWeight: 900, display: 'flex', alignItems: 'center', gap: 1 }}>

@@ -40,12 +40,14 @@ import {
     Calendar,
     Filter,
     Share2,
-    X
+    X,
+    Trash2
 } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from '../../store';
 import type { Transaction } from '../../features/transactions/transactionSlice';
-import { fetchTransactions } from '../../features/transactions/transactionSlice';
+import { deleteTransactionApi, fetchTransactions } from '../../features/transactions/transactionSlice';
+import { fetchProducts } from '../../features/inventory/inventorySlice';
 import {
     addDays,
     endOfMonth,
@@ -74,6 +76,7 @@ const TransactionHistory: React.FC = () => {
     const theme = useTheme();
     const dispatch = useDispatch<AppDispatch>();
     const { transactions, loading, error } = useSelector((state: RootState) => state.transactions || { transactions: [], loading: false, error: null });
+    const { user } = useSelector((state: RootState) => state.auth);
     const { country, app } = useSelector((state: RootState) => state.settings);
     const appSettings = app || DEFAULT_APP_SETTINGS;
     const { formatCurrency } = useAppCurrency();
@@ -89,6 +92,8 @@ const TransactionHistory: React.FC = () => {
     const [exportSnackOpen, setExportSnackOpen] = useState(false);
     const [sharingInvoice, setSharingInvoice] = useState(false);
     const [shareMessage, setShareMessage] = useState<string | null>(null);
+    const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
+    const isManager = user?.role === 'super_admin' || user?.role === 'admin';
     const isInvalidRange = Boolean(fromDate && toDate && fromDate > toDate);
     const isDatePickerOpen = Boolean(datePickerAnchorEl);
     const TopSlideTransition = (props: SlideProps) => <Slide {...props} direction="down" />;
@@ -153,6 +158,20 @@ const TransactionHistory: React.FC = () => {
 
     const handlePrint = () => {
         window.print();
+    };
+
+    const handleDeleteTransaction = async () => {
+        if (!transactionToDelete) return;
+
+        const result = await dispatch(deleteTransactionApi(transactionToDelete.id));
+        if (deleteTransactionApi.fulfilled.match(result)) {
+            setTransactionToDelete(null);
+            dispatch(fetchProducts({ force: true }));
+            setShareMessage('Transaction deleted and product stock restored.');
+            return;
+        }
+
+        setShareMessage(typeof result.payload === 'string' ? result.payload : 'Unable to delete transaction.');
     };
 
     const invoiceMoney = (value: number) => formatCurrency(value, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
@@ -435,9 +454,21 @@ const TransactionHistory: React.FC = () => {
                                                 </Typography>
                                             </TableCell>
                                             <TableCell align="right">
-                                                <IconButton size="small" onClick={() => setSelectedTx(tx)}>
-                                                    <Printer size={18} />
-                                                </IconButton>
+                                                <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                                                    <IconButton size="small" onClick={() => setSelectedTx(tx)} aria-label="View invoice">
+                                                        <Printer size={18} />
+                                                    </IconButton>
+                                                    {isManager && (
+                                                        <IconButton
+                                                            size="small"
+                                                            color="error"
+                                                            onClick={() => setTransactionToDelete(tx)}
+                                                            aria-label="Delete transaction"
+                                                        >
+                                                            <Trash2 size={18} />
+                                                        </IconButton>
+                                                    )}
+                                                </Stack>
                                             </TableCell>
                                         </TableRow>
                                     ))
@@ -589,6 +620,21 @@ const TransactionHistory: React.FC = () => {
                     </Box>
                 </Stack>
             </Popover>
+
+            <Dialog open={Boolean(transactionToDelete)} onClose={() => setTransactionToDelete(null)} maxWidth="xs" fullWidth>
+                <DialogTitle>Delete transaction?</DialogTitle>
+                <DialogContent>
+                    <Typography color="text.secondary">
+                        This will permanently remove the transaction for {transactionToDelete?.productName} and restore its stock.
+                    </Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setTransactionToDelete(null)}>Cancel</Button>
+                    <Button color="error" variant="contained" onClick={handleDeleteTransaction} disabled={loading}>
+                        {loading ? 'Deleting...' : 'Delete transaction'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
 
             {/* Print Friendly Invoice Dialog */}
             <Dialog

@@ -143,3 +143,61 @@ export const createTransaction = async (req: AuthRequest, res: Response) => {
         await session.endSession();
     }
 };
+
+/**
+ * Removes a transaction and restores the inventory to the state it was in
+ * before that transaction. This is intentionally atomic: an order must never
+ * disappear while its stock adjustment remains (or vice versa).
+ */
+export const deleteTransaction = async (req: AuthRequest, res: Response) => {
+    const session = await mongoose.startSession();
+
+    try {
+        let deletedTransaction: any;
+
+        await session.withTransaction(async () => {
+            const transaction = await Transaction.findOne({
+                id: req.params.id,
+                ...buildTenantFilter(req.user!),
+            }).session(session);
+
+            if (!transaction) {
+                const error: any = new Error('Transaction not found');
+                error.statusCode = 404;
+                throw error;
+            }
+
+            const product = await Product.findOne({
+                id: transaction.productId,
+                ...buildTenantFilter(req.user!),
+            }).session(session);
+
+            if (!product) {
+                const error: any = new Error('The linked product was not found, so this transaction cannot be reversed');
+                error.statusCode = 409;
+                throw error;
+            }
+
+            const stockChange = transaction.type === 'reduction'
+                ? transaction.amount
+                : -transaction.amount;
+
+            if (product.stock + stockChange < 0) {
+                const error: any = new Error('This transaction cannot be deleted because it would make the product stock negative');
+                error.statusCode = 409;
+                throw error;
+            }
+
+            product.stock += stockChange;
+            await product.save({ session });
+            await transaction.deleteOne({ session });
+            deletedTransaction = transaction;
+        });
+
+        res.json({ message: 'Transaction deleted and inventory restored', transaction: deletedTransaction });
+    } catch (error: any) {
+        res.status(error.statusCode || 400).json({ message: error.message });
+    } finally {
+        await session.endSession();
+    }
+};

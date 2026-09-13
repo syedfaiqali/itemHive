@@ -17,6 +17,8 @@ export interface Order {
     paymentMethod?: OrderPaymentMethod;
     paidNow?: number;
     dueAmount?: number;
+    /** Set only for fulfilled orders derived from an inventory transaction. */
+    sourceTransactionId?: string;
 }
 
 interface OrdersState {
