@@ -11,17 +11,28 @@ import ScrollToTopFab from '../Common/ScrollToTopFab';
 
 const MainLayout: React.FC = () => {
     const [initiallyLoading, setInitiallyLoading] = useState(true);
+    const [initialRequestStarted, setInitialRequestStarted] = useState(false);
     const [mobileOpen, setMobileOpen] = useState(false);
     const { isSidebarCollapsed } = useSelector((state: RootState) => state.theme);
+    const { loading: productsLoading } = useSelector((state: RootState) => state.inventory);
+    const { loading: transactionsLoading } = useSelector((state: RootState) => state.transactions);
+    const { loading: settingsLoading } = useSelector((state: RootState) => state.settings);
 
     const drawerWidth = 260;
     const collapsedWidth = 80;
     const currentWidth = isSidebarCollapsed ? collapsedWidth : drawerWidth;
 
+    const apiLoading = productsLoading || transactionsLoading || settingsLoading;
+
     useEffect(() => {
-        const timer = setTimeout(() => setInitiallyLoading(false), 1200);
-        return () => clearTimeout(timer);
-    }, []);
+        if (apiLoading) setInitialRequestStarted(true);
+    }, [apiLoading]);
+
+    // Keep the branded full-page loader through the first post-login data
+    // bootstrap. Later requests only cover the page content.
+    useEffect(() => {
+        if (initialRequestStarted && !apiLoading) setInitiallyLoading(false);
+    }, [apiLoading, initialRequestStarted]);
 
     const handleDrawerToggle = () => {
         setMobileOpen(!mobileOpen);
@@ -30,7 +41,8 @@ const MainLayout: React.FC = () => {
     return (
         <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
             <CssBaseline />
-            {initiallyLoading && <ModernLoader />}
+            {/* One consistent app-wide loader for initial data and API refreshes. */}
+            {initiallyLoading && <ModernLoader fullPage />}
             <Navbar onMenuClick={handleDrawerToggle} />
             <Sidebar mobileOpen={mobileOpen} onDrawerToggle={handleDrawerToggle} />
             <Box
@@ -46,9 +58,11 @@ const MainLayout: React.FC = () => {
                         easing: theme.transitions.easing.sharp,
                         duration: theme.transitions.duration.enteringScreen,
                     }),
+                    position: 'relative',
                 }}
             >
                 <Outlet />
+                {!initiallyLoading && apiLoading && <ModernLoader fullPage={false} />}
             </Box>
             <ScrollToTopFab />
         </Box>

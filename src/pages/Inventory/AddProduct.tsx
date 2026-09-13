@@ -37,6 +37,7 @@ import { motion } from 'framer-motion';
 import useAppCurrency from '../../hooks/useAppCurrency';
 import api from '../../api/axios';
 import { DEFAULT_PRODUCT_UNIT, getProductUnit, PRODUCT_UNITS } from '../../lib/productUnits';
+import { optimizeProductImage, PRODUCT_IMAGE_HELPER_TEXT } from '../../lib/productImage';
 
 
 
@@ -152,31 +153,13 @@ const AddProduct: React.FC = () => {
         applyImageUrl(suggestion.imageUrl, 'suggestion');
     };
 
-    const readFileAsDataUrl = (file: File) =>
-        new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(String(reader.result || ''));
-            reader.onerror = () => reject(new Error('Unable to read the selected file'));
-            reader.readAsDataURL(file);
-        });
-
     const handleImageFile = async (file?: File) => {
         if (!file) {
             return;
         }
 
-        if (!file.type.startsWith('image/')) {
-            setImageError('Please choose an image file.');
-            return;
-        }
-
-        if (file.size > 1_500_000) {
-            setImageError('Please use an image smaller than 1.5 MB for now.');
-            return;
-        }
-
         try {
-            const dataUrl = await readFileAsDataUrl(file);
+            const dataUrl = await optimizeProductImage(file);
             applyImageUrl(dataUrl, 'manual');
         } catch (error: unknown) {
             setImageError(getErrorMessage(error, 'Unable to read the image file.'));
@@ -525,7 +508,7 @@ const AddProduct: React.FC = () => {
                                                 Drag and drop an image, or click to browse
                                             </Typography>
                                             <Typography variant="body2" color="text.secondary">
-                                                JPG, PNG, WEBP up to 1.5 MB. Stored directly with the product for now.
+                                                {PRODUCT_IMAGE_HELPER_TEXT} Source file limit: 10 MB.
                                             </Typography>
                                             <input
                                                 ref={fileInputRef}

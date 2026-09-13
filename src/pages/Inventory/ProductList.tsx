@@ -150,11 +150,9 @@ const ProductList: React.FC = () => {
     const location = useLocation();
 
     React.useEffect(() => {
-        const loadProducts = () => {
-            dispatch(fetchProducts());
-        };
+        const loadProducts = () => dispatch(fetchProducts({ force: true }));
 
-        loadProducts();
+        dispatch(fetchProducts());
         window.addEventListener('itemhive-workspace-changed', loadProducts);
         return () => window.removeEventListener('itemhive-workspace-changed', loadProducts);
     }, [dispatch]);

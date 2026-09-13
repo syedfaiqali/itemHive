@@ -27,8 +27,11 @@ import {
     CalendarDays,
     BadgeDollarSign
 } from 'lucide-react';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import type { RootState } from '../../store';
+import type { AppDispatch } from '../../store';
+import { fetchProducts } from '../../features/inventory/inventorySlice';
+import { fetchTransactions } from '../../features/transactions/transactionSlice';
 import {
     AreaChart,
     Area,
@@ -53,6 +56,16 @@ type StatColor = 'primary' | 'success' | 'error' | 'warning';
 const Dashboard: React.FC = () => {
     const theme = useTheme();
     const navigate = useNavigate();
+    const dispatch = useDispatch<AppDispatch>();
+
+    // Dashboard is the first route after login. Populate the shared store here
+    // so its stats do not wait for the user to visit Inventory or POS first.
+    // Product fetches are cache-aware, so later navigation does not duplicate it.
+    React.useEffect(() => {
+        dispatch(fetchProducts());
+        dispatch(fetchTransactions());
+    }, [dispatch]);
+
     const { products } = useSelector((state: RootState) => state.inventory);
     const { transactions = [] } = useSelector((state: RootState) => state.transactions || { transactions: [] });
     const { user } = useSelector((state: RootState) => state.auth);

@@ -146,7 +146,7 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
             localStorage.removeItem('itemhive-workspace-id');
         }
         window.dispatchEvent(new Event('itemhive-workspace-changed'));
-        dispatch(fetchProducts());
+        dispatch(fetchProducts({ force: true }));
     };
 
     const allNotifications = React.useMemo(

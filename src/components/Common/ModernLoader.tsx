@@ -1,18 +1,15 @@
 import React from 'react';
 import { Box, CircularProgress, Typography, alpha } from '@mui/material';
 
-const ModernLoader: React.FC = () => {
+const ModernLoader: React.FC<{ fullPage?: boolean }> = ({ fullPage = true }) => {
     return (
         <Box
             sx={{
-                position: 'fixed',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: '100%',
+                position: fullPage ? 'fixed' : 'absolute',
+                inset: 0,
                 bgcolor: (theme) => alpha(theme.palette.background.default, 0.8),
                 backdropFilter: 'blur(12px)',
-                zIndex: 9999,
+                zIndex: fullPage ? 9999 : 10,
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',

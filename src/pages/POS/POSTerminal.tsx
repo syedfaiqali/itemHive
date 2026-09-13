@@ -44,7 +44,7 @@ import {
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
 import { addToCart, updateCartItemPrice, updateQuantity, clearCart, setCartDiscountPercent } from '../../features/pos/posSlice';
-import { reduceStockApi, resolveProductImage, fetchProducts } from '../../features/inventory/inventorySlice';
+import { reduceStockApi, resolveProductImage, fetchProducts, placeholderFallback } from '../../features/inventory/inventorySlice';
 import { fetchTransactions } from '../../features/transactions/transactionSlice';
 import type { Product } from '../../features/inventory/inventorySlice';
 import type { AppDispatch } from '../../store';
@@ -84,7 +84,7 @@ const POSTerminal: React.FC = () => {
     }, [dispatch]);
 
     const { user } = useSelector((state: RootState) => state.auth);
-    const { products } = useSelector((state: RootState) => state.inventory);
+    const { products, error: productsError } = useSelector((state: RootState) => state.inventory);
     const { cart, discountPercent } = useSelector((state: RootState) => state.pos);
     const { app, country } = useSelector((state: RootState) => state.settings);
     const appSettings = app || DEFAULT_APP_SETTINGS;
@@ -424,7 +424,7 @@ const POSTerminal: React.FC = () => {
                 });
 
                 await Promise.all([
-                    dispatch(fetchProducts()),
+                    dispatch(fetchProducts({ force: true })),
                     dispatch(fetchTransactions()),
                 ]);
 
@@ -481,7 +481,7 @@ const POSTerminal: React.FC = () => {
         }
 
         await Promise.all([
-            dispatch(fetchProducts()),
+            dispatch(fetchProducts({ force: true })),
             dispatch(fetchTransactions()),
         ]);
 
@@ -599,6 +599,20 @@ const POSTerminal: React.FC = () => {
                 </Tabs>
 
                 <Box sx={{ flexGrow: 1, overflowY: 'auto', pr: { xs: 0.5, sm: 1 }, pt: 1.25, pb: 1, px: { xs: 0.5, sm: 1.5 } }}>
+                    {productsError ? (
+                        <Alert
+                            severity="error"
+                            action={<Button color="inherit" size="small" onClick={() => dispatch(fetchProducts({ force: true }))}>Retry</Button>}
+                            sx={{ m: 1 }}
+                        >
+                            {productsError}
+                        </Alert>
+                    ) : filteredProducts.length === 0 ? (
+                        <Stack alignItems="center" justifyContent="center" spacing={1} sx={{ minHeight: 300 }}>
+                            <Typography fontWeight={700}>No products found</Typography>
+                            <Typography variant="body2" color="text.secondary">Try another category or search term.</Typography>
+                        </Stack>
+                    ) : (
                     <Grid container spacing={{ xs: 2, sm: 2.5, md: 3 }}>
                         {filteredProducts.map((product) => (
                             <Grid
@@ -661,6 +675,12 @@ const POSTerminal: React.FC = () => {
                                                 component="img"
                                                 src={resolveProductImage(product)}
                                                 alt={product.name}
+                                                loading="lazy"
+                                                decoding="async"
+                                                onError={(event) => {
+                                                    const image = event.currentTarget;
+                                                    if (image.src !== placeholderFallback) image.src = placeholderFallback;
+                                                }}
                                                 sx={{
                                                     position: 'absolute',
                                                     top: 0,
@@ -830,6 +850,7 @@ const POSTerminal: React.FC = () => {
                             </Grid>
                         ))}
                     </Grid>
+                    )}
                 </Box>
             </Box>
 

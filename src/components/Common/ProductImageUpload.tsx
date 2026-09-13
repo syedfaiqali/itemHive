@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Alert, Box, Button, Stack, TextField, Typography } from '@mui/material';
 import { Upload, Trash2, Link as LinkIcon } from 'lucide-react';
+import { optimizeProductImage, PRODUCT_IMAGE_HELPER_TEXT } from '../../lib/productImage';
 
 export default function ProductImageUpload({ value, onChange, disabled = false }: { value?: string; onChange: (value: string) => void; disabled?: boolean }) {
     const [url, setUrl] = useState(value?.startsWith('http') ? value : '');
@@ -9,13 +10,11 @@ export default function ProductImageUpload({ value, onChange, disabled = false }
     const upload = (file?: File) => {
         if (!file) return;
         setError('');
-        if (!file.type.startsWith('image/')) { setError('Please choose an image file.'); return; }
-        if (file.size > 1_500_000) { setError('Please use an image smaller than 1.5 MB.'); return; }
-        const reader = new FileReader();
         setReading(true);
-        reader.onload = () => { onChange(String(reader.result)); setReading(false); };
-        reader.onerror = () => { setError('Unable to read this image. Please retry.'); setReading(false); };
-        reader.readAsDataURL(file);
+        optimizeProductImage(file)
+            .then(onChange)
+            .catch((uploadError: unknown) => setError(uploadError instanceof Error ? uploadError.message : 'Unable to optimize this image. Please retry.'))
+            .finally(() => setReading(false));
     };
     return <Stack spacing={2}>
         <Typography fontWeight={700}>Product Image</Typography>
@@ -27,7 +26,7 @@ export default function ProductImageUpload({ value, onChange, disabled = false }
             </Button>
             {value && <Button color="error" startIcon={<Trash2 size={18} />} disabled={disabled || reading} onClick={() => { onChange(''); setError(''); }}>Remove</Button>}
         </Stack>
-        <Typography variant="caption" color="text.secondary">Choose an image up to 1.5 MB. Save the product to apply your changes.</Typography>
+        <Typography variant="caption" color="text.secondary">{PRODUCT_IMAGE_HELPER_TEXT} Source file limit: 10 MB.</Typography>
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
             <TextField fullWidth label="Image URL" placeholder="https://example.com/image.jpg" value={url} disabled={disabled || reading} onChange={event => setUrl(event.target.value)} />
             <Button

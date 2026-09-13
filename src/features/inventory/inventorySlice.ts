@@ -38,6 +38,7 @@ export interface ProductImageSuggestion {
 interface InventoryState {
     products: Product[];
     loading: boolean;
+    loaded: boolean;
     error: string | null;
 }
 
@@ -54,6 +55,7 @@ type ApiError = {
 const initialState: InventoryState = {
     products: [],
     loading: false,
+    loaded: false,
     error: null,
 };
 
@@ -80,13 +82,25 @@ const normalizeProduct = (product: ProductResponse): Product => {
 // Async Thunks
 export const fetchProducts = createAsyncThunk(
     'inventory/fetchProducts',
-    async (_, { rejectWithValue }) => {
+    async (_options: { force?: boolean } | undefined, { rejectWithValue }) => {
         try {
-            const response = await api.get<ProductResponse[]>('/products');
+            const response = await api.get<ProductResponse[]>('/products', {
+                // A forced reload follows a stock/product mutation and must not
+                // receive the backend's short-lived read cache.
+                params: _options?.force ? { fresh: 1 } : undefined,
+            });
             return response.data.map(normalizeProduct);
         } catch (error: unknown) {
             return rejectWithValue(getApiErrorMessage(error, 'Failed to fetch products'));
         }
+    },
+    {
+        // All pages share this slice. Do not re-fetch merely because the user
+        // navigated from Inventory to POS (or React remounted a component).
+        condition: (options, { getState }) => {
+            const inventory = (getState() as { inventory: InventoryState }).inventory;
+            return !inventory.loading && (Boolean(options?.force) || !inventory.loaded);
+        },
     }
 );
 
@@ -207,11 +221,14 @@ const inventorySlice = createSlice({
             })
             .addCase(fetchProducts.fulfilled, (state, action: PayloadAction<Product[]>) => {
                 state.loading = false;
+                state.loaded = true;
                 state.products = action.payload;
             })
             .addCase(fetchProducts.rejected, (state, action) => {
                 state.loading = false;
-                state.error = typeof action.payload === 'string' ? action.payload : 'Failed to fetch products';
+                // A condition-cancelled request is expected when another page
+                // has already populated the shared cache.
+                if (!action.meta.condition) state.error = typeof action.payload === 'string' ? action.payload : 'Failed to fetch products';
             })
             // Add
             .addCase(addProductApi.fulfilled, (state, action: PayloadAction<Product>) => {

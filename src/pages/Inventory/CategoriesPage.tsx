@@ -24,7 +24,7 @@ export default function CategoriesPage() {
         try {
             if (editing) await api.put('/categories', { oldName: editing, name: trimmed });
             else await api.post('/categories', { name: trimmed });
-            setName(''); setEditing(null); setMessage(editing ? 'Category updated successfully.' : 'Category added successfully.'); await reload();
+            setName(''); setEditing(null); setMessage(editing ? 'Category updated successfully.' : 'Category added successfully.'); await reload(true);
         } catch (error) { setSaveError(error instanceof Error && 'response' in error ? (error as { response?: { data?: { message?: string } } }).response?.data?.message || error.message : 'Unable to save category. Please retry.'); }
         finally { setSaving(false); }
     };
@@ -40,7 +40,7 @@ export default function CategoriesPage() {
                 {saveError && <Alert severity="error">{saveError}</Alert>}
             </Stack>
         </CardContent></Card>
-        {error && <Alert severity="error" action={<Button onClick={reload}>Retry</Button>} sx={{ mb: 2 }}>{error}</Alert>}
+        {error && <Alert severity="error" action={<Button onClick={() => void reload(true)}>Retry</Button>} sx={{ mb: 2 }}>{error}</Alert>}
         <Card sx={{ borderRadius: 4 }}><CardContent>
             <Typography variant="h6" fontWeight={700} gutterBottom>Available categories</Typography>
             {loading ? <Typography>Loading categories...</Typography> : <Stack spacing={1}>{categories.map(category => <Stack key={category} direction="row" alignItems="center" justifyContent="space-between" gap={1} sx={{ borderBottom: '1px solid', borderColor: 'divider', py: 1 }}>
@@ -54,7 +54,7 @@ export default function CategoriesPage() {
             <DialogTitle>Delete category?</DialogTitle><DialogContent>Delete {deleting}? Categories used by inventory items or pending requests cannot be deleted.</DialogContent>
             <DialogActions><Button disabled={saving} onClick={() => setDeleting(null)}>Cancel</Button><Button disabled={saving} color="error" onClick={async () => {
                 setSaving(true); setSaveError(''); setMessage('');
-                try { await api.delete('/categories', { data: { name: deleting } }); setMessage('Category deleted.'); if (editing === deleting) { setEditing(null); setName(''); } setDeleting(null); await reload(); }
+                try { await api.delete('/categories', { data: { name: deleting } }); setMessage('Category deleted.'); if (editing === deleting) { setEditing(null); setName(''); } setDeleting(null); await reload(true); }
                 catch (error) { setDeleting(null); setSaveError(error instanceof Error && 'response' in error ? (error as { response?: { data?: { message?: string } } }).response?.data?.message || error.message : 'Unable to delete category.'); }
                 finally { setSaving(false); }
             }}>Delete</Button></DialogActions>

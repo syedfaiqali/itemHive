@@ -300,7 +300,7 @@ const OrderDesk: React.FC = () => {
                 paidNow,
                 dueAmount,
             }));
-            dispatch(fetchProducts());
+            dispatch(fetchProducts({ force: true }));
             dispatch(fetchTransactions());
             setFeedback({ type: 'success', message: `Order ${orderId} placed and stock updated.` });
             setSelectedProduct(null);
