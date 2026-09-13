@@ -12,6 +12,7 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "seed": "ts-node-dev src/seed.ts",
+    "migrate:product-images": "npm run build && node dist/scripts/optimizeProductImages.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -33,6 +34,7 @@
     "joi": "^18.0.2",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.2.4",
+    "sharp": "^0.35.4",
     "typescript": "^5.9.3"
   },
   "devDependencies": {

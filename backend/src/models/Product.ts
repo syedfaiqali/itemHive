@@ -37,7 +37,15 @@ const ProductSchema: Schema<IProduct> = new Schema({
     productUnit: { type: String, default: 'Piece', trim: true },
     productUnitUrdu: { type: String, default: 'عدد', trim: true },
     description: { type: String, default: '' },
-    imageUrl: { type: String, default: '' },
+    imageUrl: {
+        type: String,
+        default: '',
+        maxlength: [250000, 'Product image is too large.'],
+        validate: {
+            validator: (value: string) => !value || /^https?:\/\/.+/.test(value) || /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(value),
+            message: 'Product image must be a valid HTTP(S) URL or PNG, JPEG or WebP data URL.',
+        },
+    },
     lastUpdated: { type: Date, default: Date.now },
     batchNumber: { type: String, default: '' },
     expiryDate: { type: String, default: '' },

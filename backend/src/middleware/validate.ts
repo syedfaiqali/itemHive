@@ -85,7 +85,13 @@ export const productSchema = Joi.object({
     productUnit: Joi.string().allow('').max(80).optional(),
     productUnitUrdu: Joi.string().allow('').max(80).optional(),
     description: Joi.string().allow('').optional(),
-    imageUrl: Joi.string().allow('').optional(),
+    imageUrl: Joi.alternatives().try(
+        Joi.string().allow('').max(2048).pattern(/^https?:\/\/.+/),
+        Joi.string().max(250_000).pattern(/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/)
+    ).optional().messages({
+        'alternatives.match': 'Image must be a valid HTTP(S) URL or optimized PNG, JPEG or WebP image.',
+        'string.max': 'Product image is too large. Please use an image under 180 KB after optimization.',
+    }),
     batchNumber: Joi.string().allow('').optional(),
     expiryDate: Joi.string().allow('').optional(),
     supplier: Joi.string().allow('').optional(),
