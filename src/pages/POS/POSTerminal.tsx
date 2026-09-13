@@ -105,6 +105,7 @@ const POSTerminal: React.FC = () => {
     const [paymentMethod, setPaymentMethod] = useState<CheckoutMethod | null>(null);
     const [orderType, setOrderType] = useState<OrderType | ''>('');
     const [otherOrderType, setOtherOrderType] = useState('');
+    const [deliveryNumber, setDeliveryNumber] = useState('');
     const [orderDone, setOrderDone] = useState(false);
     const [receiptId, setReceiptId] = useState('');
     const [receiptTime, setReceiptTime] = useState('');
@@ -520,6 +521,7 @@ const POSTerminal: React.FC = () => {
         setPaymentMethod(null);
         setOrderType('');
         setOtherOrderType('');
+        setDeliveryNumber('');
         setPendingMethod(null);
         setCreditPaidNow(0);
         setCreditDue(0);
@@ -709,6 +711,33 @@ const POSTerminal: React.FC = () => {
                                                     }}
                                                 />
                                             )}
+                                            <Box
+                                                sx={{
+                                                    position: 'absolute',
+                                                    top: 10,
+                                                    right: 10,
+                                                    zIndex: 2,
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: 0.5,
+                                                    px: 1,
+                                                    py: 0.45,
+                                                    borderRadius: 2,
+                                                    bgcolor: alpha(theme.palette.background.paper, 0.92),
+                                                    border: '1px solid',
+                                                    borderColor: product.stock === 0
+                                                        ? alpha(theme.palette.error.main, 0.35)
+                                                        : product.stock <= 5
+                                                            ? alpha(theme.palette.warning.main, 0.4)
+                                                            : alpha(theme.palette.success.main, 0.35),
+                                                    boxShadow: `0 3px 10px ${alpha('#000', 0.12)}`,
+                                                }}
+                                            >
+                                                <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: product.stock === 0 ? 'error.main' : product.stock <= 5 ? 'warning.main' : 'success.main' }} />
+                                                <Typography variant="caption" fontWeight={900} sx={{ fontSize: '0.67rem', color: product.stock === 0 ? 'error.main' : product.stock <= 5 ? 'warning.main' : 'success.main', whiteSpace: 'nowrap' }}>
+                                                    {product.stock === 0 ? 'Out' : `${product.stock} left`}
+                                                </Typography>
+                                            </Box>
                                             {product.stock === 0 && (
                                                 <Box
                                                     sx={{
@@ -800,7 +829,7 @@ const POSTerminal: React.FC = () => {
                                                 </Typography>
 
                                                 <Box sx={{
-                                                    display: 'flex',
+                                                    display: 'none',
                                                     alignItems: 'center',
                                                     gap: 0.5,
                                                     px: 1.1,
@@ -1049,6 +1078,15 @@ const POSTerminal: React.FC = () => {
                                 required
                             />
                         )}
+                        <TextField
+                            fullWidth
+                            size="small"
+                            label="Delivery No. (optional)"
+                            placeholder="e.g. 0312 1234567"
+                            value={deliveryNumber}
+                            onChange={(event) => setDeliveryNumber(event.target.value)}
+                            inputProps={{ maxLength: 40 }}
+                        />
                     </Stack>
 
                     <Grid container spacing={1}>
@@ -1424,20 +1462,14 @@ const POSTerminal: React.FC = () => {
 
                             <Divider />
 
-                            <Grid container spacing={2}>
-                                <Grid size={{ xs: 6 }}>
-                                    <Typography variant="caption" color="text.secondary">Payment Method</Typography>
-                                    <Typography fontWeight={900} sx={{ textTransform: 'capitalize' }}>{paymentMethod || '-'}</Typography>
-                                </Grid>
-                                <Grid size={{ xs: 6 }}>
-                                    <Typography variant="caption" color="text.secondary">Cashier</Typography>
-                                    <Typography fontWeight={900}>{user?.name || 'Staff'}</Typography>
-                                </Grid>
-                                <Grid size={{ xs: 12 }}>
-                                    <Typography variant="caption" color="text.secondary">Order Type</Typography>
-                                    <Typography fontWeight={900}>{orderTypeLabel}</Typography>
-                                </Grid>
-                            </Grid>
+                            <Box className="receipt-meta">
+                                <Box className="receipt-meta-row"><Typography component="span">Order ID:</Typography><Typography component="span" fontWeight={900}>#{receiptId.replace(/^R-/, '').slice(-8).toUpperCase()}</Typography></Box>
+                                <Box className="receipt-meta-row"><Typography component="span">Date/Time:</Typography><Typography component="span" fontWeight={900}>{receiptTime ? new Date(receiptTime).toLocaleString() : '-'}</Typography></Box>
+                                <Box className="receipt-meta-row"><Typography component="span">Cashier:</Typography><Typography component="span" fontWeight={900}>{user?.name || 'Staff'}</Typography></Box>
+                                <Box className="receipt-meta-row"><Typography component="span">Method:</Typography><Typography component="span" fontWeight={900} sx={{ textTransform: 'capitalize' }}>{paymentMethod || '-'}</Typography></Box>
+                                <Box className="receipt-meta-row"><Typography component="span">Order Type:</Typography><Typography component="span" fontWeight={900}>{orderTypeLabel}</Typography></Box>
+                                {deliveryNumber.trim() && <Box className="receipt-meta-row"><Typography component="span">Delivery No:</Typography><Typography component="span" fontWeight={900}>{deliveryNumber.trim()}</Typography></Box>}
+                            </Box>
 
                             <InvoiceItemsTable
                                 items={cart.map((item) => {
@@ -1453,9 +1485,9 @@ const POSTerminal: React.FC = () => {
                                     ...(paymentMethod !== 'installment'
                                         ? activeDiscount > 0
                                             ? [
-                                                { label: 'Original Total (Before Discount)', value: formatCurrency(subtotal + tax), strong: true },
+                                                { label: 'Subtotal', value: formatCurrency(subtotal) },
+                                                ...(tax > 0 ? [{ label: taxLabel, value: formatCurrency(tax) }] : []),
                                                 { label: `Discount (${appliedDiscountPercent}%)`, value: `-${formatCurrency(activeDiscount)}` },
-                                                { label: 'You Saved', value: formatCurrency(activeDiscount) },
                                             ]
                                             : [
                                                 { label: 'Subtotal', value: formatCurrency(subtotal) },
@@ -1481,7 +1513,7 @@ const POSTerminal: React.FC = () => {
                                         strong: true,
                                     },
                                 ]}
-                                amountInWords={amountToWords(paymentMethod === 'installment' ? draftInstallmentTotal : total)}
+                                amountInWords={undefined}
                             />
                             <Box className="receipt-powered-by" sx={{ pt: 1, textAlign: 'center' }}>
                                 <Typography variant="caption" color="text.secondary" display="block">
@@ -1493,7 +1525,7 @@ const POSTerminal: React.FC = () => {
                             </Box>
                         </Stack>
 
-                        <Box sx={{ display: 'none' }}>
+                        <Box className="legacy-payment-slip" sx={{ display: 'none' }}>
                         {appSettings.receiptBannerUrl && (
                             <Box
                                 sx={{

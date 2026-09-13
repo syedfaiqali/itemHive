@@ -70,23 +70,31 @@ const InvoiceItemsTable: React.FC<InvoiceItemsTableProps> = ({ items, totals = [
                             <Box component="td" className="num">{item.total}</Box>
                         </Box>
                     ))}
+                </Box>
+            </Box>
+
+            {totals.length > 0 && (
+                <Box className="receipt-totals" sx={{ mt: 1.25, ml: 'auto', maxWidth: 360 }}>
                     {totals.map((total) => (
-                        <Box component="tr" key={total.label}>
-                            <Box
-                                component="td"
-                                colSpan={4}
-                                className="num"
-                                sx={{ fontWeight: total.strong ? 800 : 400, border: 'none !important' }}
-                            >
-                                {total.label}
-                            </Box>
-                            <Box component="td" className="num" sx={{ fontWeight: total.strong ? 900 : 500 }}>
-                                {total.value}
-                            </Box>
+                        <Box
+                            className="receipt-total-row"
+                            key={total.label}
+                            sx={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                gap: 2,
+                                py: 0.35,
+                                fontWeight: total.strong ? 900 : 500,
+                                borderTop: total.strong ? '1px solid' : 'none',
+                                borderColor: 'text.primary',
+                            }}
+                        >
+                            <Typography component="span" variant="body2" fontWeight="inherit">{total.label}</Typography>
+                            <Typography component="span" variant="body2" fontWeight="inherit" sx={{ whiteSpace: 'nowrap' }}>{total.value}</Typography>
                         </Box>
                     ))}
                 </Box>
-            </Box>
+            )}
 
             {amountInWords && (
                 <Box sx={{ mt: 2 }}>

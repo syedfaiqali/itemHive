@@ -29,6 +29,8 @@ export const thermalInvoicePrintCss = (selector: string, rollWidthMm = DEFAULT_R
 
     html, body {
         width: ${rollWidthMm}mm !important;
+        height: auto !important;
+        min-height: 0 !important;
         margin: 0 !important;
         padding: 0 !important;
         background: #fff !important;
@@ -39,7 +41,8 @@ export const thermalInvoicePrintCss = (selector: string, rollWidthMm = DEFAULT_R
         width: ${slipWidthMm}mm !important;
         max-width: ${slipWidthMm}mm !important;
         min-width: 0 !important;
-        margin: 0 auto !important;
+        /* Top-left is crucial if a browser/printer falls back to A4. */
+        margin: 0 !important;
         padding: 2mm !important;
         box-sizing: border-box !important;
         border: none !important;
@@ -179,6 +182,40 @@ export const thermalInvoicePrintCss = (selector: string, rollWidthMm = DEFAULT_R
         word-break: normal !important;
     }
 
+    ${selector} .receipt-meta {
+        display: block !important;
+        width: 100% !important;
+        margin: 0 !important;
+    }
+
+    ${selector} .receipt-meta-row {
+        display: flex !important;
+        width: 100% !important;
+        justify-content: space-between !important;
+        align-items: baseline !important;
+        gap: 2mm !important;
+        margin: 0 0 0.6mm 0 !important;
+        font-size: 8pt !important;
+        line-height: 1.2 !important;
+    }
+
+    ${selector} .receipt-meta-row > *:first-child {
+        color: #333 !important;
+        flex: 0 0 auto !important;
+    }
+
+    ${selector} .receipt-meta-row > *:last-child {
+        text-align: right !important;
+        min-width: 0 !important;
+        overflow-wrap: anywhere !important;
+    }
+
+    /* Legacy screen-only payment-slip markup must never become a second
+       receipt in a thermal print frame. */
+    ${selector} .legacy-payment-slip {
+        display: none !important;
+    }
+
     ${selector} .receipt-powered-by {
         margin-top: 2mm !important;
         padding-top: 1.5mm !important;
@@ -186,12 +223,33 @@ export const thermalInvoicePrintCss = (selector: string, rollWidthMm = DEFAULT_R
         text-align: center !important;
     }
 
-    /* Totals rows span the hidden columns too, so re-point their colspan. */
-    ${selector} td[colspan] {
-        width: auto !important;
+    /* Totals are deliberately outside the table: hidden table columns and
+       colspan calculations are unreliable in several thermal print drivers. */
+    ${selector} .receipt-totals {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 1mm 0 0 !important;
+    }
+
+    ${selector} .receipt-total-row {
+        display: flex !important;
+        width: 100% !important;
+        justify-content: space-between !important;
+        gap: 2mm !important;
+        padding: 0.45mm 0 !important;
+        font-size: 8pt !important;
+        box-sizing: border-box !important;
+    }
+
+    ${selector} .receipt-total-row > *:first-child {
+        min-width: 0 !important;
+        overflow-wrap: break-word !important;
+    }
+
+    ${selector} .receipt-total-row > *:last-child {
+        flex: 0 0 auto !important;
+        white-space: nowrap !important;
         text-align: right !important;
-        border-bottom: none !important;
-        padding-right: 1.5mm !important;
     }
 
     ${selector} tbody tr:last-child td {

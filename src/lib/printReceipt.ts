@@ -52,7 +52,6 @@ ${inheritedStyles}
     printDocument.close();
 
     await waitForReceiptImages(printDocument);
-
     await new Promise<void>((resolve) => {
         let cleanedUp = false;
         const cleanup = () => {
