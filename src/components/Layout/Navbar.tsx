@@ -32,7 +32,8 @@ import { useDispatch, useSelector } from 'react-redux';
 import type { RootState } from '../../store';
 import { logout } from '../../features/auth/authSlice';
 import { toggleDarkMode, setDarkMode } from '../../features/theme/themeSlice';
-import { fetchProducts } from '../../features/inventory/inventorySlice';
+import { fetchProducts, resetInventory } from '../../features/inventory/inventorySlice';
+import { resetTransactions } from '../../features/transactions/transactionSlice';
 import { useLocation, useNavigate } from 'react-router-dom';
 import api from '../../api/axios';
 import { buildNotifications, type InstallmentNotificationPlan, type NotificationItem } from '../../lib/notifications';
@@ -145,6 +146,10 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
         } else {
             localStorage.removeItem('itemhive-workspace-id');
         }
+        // Remove the previous workspace immediately; do not leave another
+        // client's inventory visible while the new tenant request is pending.
+        dispatch(resetInventory());
+        dispatch(resetTransactions());
         window.dispatchEvent(new Event('itemhive-workspace-changed'));
         dispatch(fetchProducts({ force: true }));
     };

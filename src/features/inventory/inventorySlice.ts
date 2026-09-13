@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk, type PayloadAction } from '@reduxjs/toolkit';
 import api from '../../api/axios';
 import { DEFAULT_PRODUCT_UNIT } from '../../lib/productUnits';
+import { loginUser, logout } from '../auth/authSlice';
 
 export interface Product {
     _id?: string;
@@ -211,10 +212,30 @@ const inventorySlice = createSlice({
     reducers: {
         clearInventoryError: (state) => {
             state.error = null;
+        },
+        resetInventory: (state) => {
+            state.products = [];
+            state.loading = false;
+            state.loaded = false;
+            state.error = null;
         }
     },
     extraReducers: (builder) => {
         builder
+            // Never carry an in-memory product cache from one account/session
+            // into another tenant's login.
+            .addCase(loginUser.fulfilled, (state) => {
+                state.products = [];
+                state.loading = false;
+                state.loaded = false;
+                state.error = null;
+            })
+            .addCase(logout, (state) => {
+                state.products = [];
+                state.loading = false;
+                state.loaded = false;
+                state.error = null;
+            })
             // Fetch
             .addCase(fetchProducts.pending, (state) => {
                 state.loading = true;
@@ -259,5 +280,5 @@ const inventorySlice = createSlice({
     },
 });
 
-export const { clearInventoryError } = inventorySlice.actions;
+export const { clearInventoryError, resetInventory } = inventorySlice.actions;
 export default inventorySlice.reducer;
