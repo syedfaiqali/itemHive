@@ -13,7 +13,7 @@ import ScrollToTop from './components/Common/ScrollToTop';
 import { useDispatch } from 'react-redux';
 import type { AppDispatch } from './store';
 import { fetchSettings } from './features/settings/settingsSlice';
-import { logout } from './features/auth/authSlice';
+import { logout, refreshCurrentUser } from './features/auth/authSlice';
 
 // Lazy load pages for better performance i LOVE YOU
 import Login from './pages/Auth/Login';
@@ -40,6 +40,8 @@ const StickyNotes = React.lazy(() => import('./pages/Notes/StickyNotes'));
 const TeamManagementPage = React.lazy(() => import('./pages/Admin/TeamManagementPage'));
 const SignupRequestsPage = React.lazy(() => import('./pages/Admin/SignupRequestsPage'));
 const InventoryRequestsPage = React.lazy(() => import('./pages/Inventory/InventoryRequestsPage'));
+const PermissionManagementPage = React.lazy(() => import('./pages/Admin/PermissionManagementPage'));
+const AccessDeniedPage = React.lazy(() => import('./pages/Auth/AccessDeniedPage'));
 const AppContent: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const { mode } = useSelector((state: RootState) => state.theme);
@@ -49,6 +51,7 @@ const AppContent: React.FC = () => {
 
   useEffect(() => {
     if (isAuthenticated) {
+      dispatch(refreshCurrentUser());
       dispatch(fetchSettings());
     }
   }, [dispatch, isAuthenticated]);
@@ -73,64 +76,68 @@ const AppContent: React.FC = () => {
                 <MainLayout />
               </ProtectedRoute>
             }>
-              <Route index element={<Dashboard />} />
-              <Route path="inventory" element={<ProductList />} />
-              <Route path="inventory/categories" element={<ProtectedRoute allowedRoles={['super_admin', 'admin']}><CategoriesPage /></ProtectedRoute>} />
-              <Route path="inventory/add" element={<AddProduct />} />
-              <Route path="inventory/import" element={<ImportProducts />} />
-              <Route path="inventory/units" element={<ProductUnitsPage />} />
-              <Route path="inventory/requests" element={<InventoryRequestsPage />} />
+              <Route index element={<ProtectedRoute requiredScreen="dashboard"><Dashboard /></ProtectedRoute>} />
+              <Route path="inventory" element={<ProtectedRoute requiredScreen="inventory"><ProductList /></ProtectedRoute>} />
+              <Route path="inventory/categories" element={<ProtectedRoute allowedRoles={['super_admin', 'admin']} requiredScreen="inventory_categories"><CategoriesPage /></ProtectedRoute>} />
+              <Route path="inventory/add" element={<ProtectedRoute requiredScreen="inventory_add"><AddProduct /></ProtectedRoute>} />
+              <Route path="inventory/import" element={<ProtectedRoute requiredScreen="inventory_import"><ImportProducts /></ProtectedRoute>} />
+              <Route path="inventory/units" element={<ProtectedRoute requiredScreen="inventory_units"><ProductUnitsPage /></ProtectedRoute>} />
+              <Route path="inventory/requests" element={<ProtectedRoute requiredScreen="inventory_requests"><InventoryRequestsPage /></ProtectedRoute>} />
               <Route path="inventory/reduce" element={
-                <ProtectedRoute allowedRoles={['super_admin', 'admin']}>
+                <ProtectedRoute allowedRoles={['super_admin', 'admin']} requiredScreen="inventory_reduce">
                   <ReduceStock />
                 </ProtectedRoute>
               } />
               <Route path="pos" element={
-                <ProtectedRoute allowedRoles={['super_admin', 'admin', 'user']}>
+                <ProtectedRoute allowedRoles={['super_admin', 'admin', 'user']} requiredScreen="pos">
                   <POSTerminal />
                 </ProtectedRoute>
               } />
               <Route path="orders" element={
-                <ProtectedRoute allowedRoles={['super_admin', 'admin', 'user']}>
+                <ProtectedRoute allowedRoles={['super_admin', 'admin', 'user']} requiredScreen="orders">
                   <OrderDesk />
                 </ProtectedRoute>
               } />
-              <Route path="transactions" element={<TransactionHistory />} />
-              <Route path="reports" element={<ReportsPage />} />
+              <Route path="transactions" element={<ProtectedRoute requiredScreen="transactions"><TransactionHistory /></ProtectedRoute>} />
+              <Route path="reports" element={<ProtectedRoute allowedRoles={['super_admin', 'admin']} requiredScreen="reports"><ReportsPage /></ProtectedRoute>} />
               <Route path="notes" element={
-                <ProtectedRoute allowedRoles={['super_admin', 'admin', 'user']}>
+                <ProtectedRoute allowedRoles={['super_admin', 'admin', 'user']} requiredScreen="notes">
                   <StickyNotes />
                 </ProtectedRoute>
               } />
               <Route path="customers" element={
-                <ProtectedRoute allowedRoles={['super_admin', 'admin', 'user']}>
+                <ProtectedRoute allowedRoles={['super_admin', 'admin', 'user']} requiredScreen="customers">
                   <CustomersPage />
                 </ProtectedRoute>
               } />
               <Route path="customer-records" element={
-                <ProtectedRoute allowedRoles={['super_admin', 'admin', 'user']}>
+                <ProtectedRoute allowedRoles={['super_admin', 'admin', 'user']} requiredScreen="customer_records">
                   <CustomerRecordsPage />
                 </ProtectedRoute>
               } />
               <Route path="credits" element={
-                <ProtectedRoute allowedRoles={['super_admin', 'admin', 'user']}>
+                <ProtectedRoute allowedRoles={['super_admin', 'admin', 'user']} requiredScreen="credits">
                   <CreditCustomersPage />
                 </ProtectedRoute>
               } />
               <Route path="installments" element={
-                <ProtectedRoute allowedRoles={['super_admin', 'admin', 'user']} requireInstallmentAccess>
+                <ProtectedRoute allowedRoles={['super_admin', 'admin', 'user']} requireInstallmentAccess requiredScreen="installments">
                   <InstallmentsPage />
                 </ProtectedRoute>
               } />
               <Route path="notifications" element={
-                <ProtectedRoute allowedRoles={['super_admin', 'admin', 'user']}>
+                <ProtectedRoute allowedRoles={['super_admin', 'admin', 'user']} requiredScreen="notifications">
                   <NotificationsPage />
                 </ProtectedRoute>
               } />
-              <Route path="reports" element={<ReportsPage />} />
               <Route path="team" element={
-                <ProtectedRoute allowedRoles={['super_admin', 'admin']}>
+                <ProtectedRoute allowedRoles={['super_admin', 'admin']} requiredScreen="team">
                   <TeamManagementPage />
+                </ProtectedRoute>
+              } />
+              <Route path="permission-management" element={
+                <ProtectedRoute allowedRoles={['super_admin']}>
+                  <PermissionManagementPage />
                 </ProtectedRoute>
               } />
               <Route path="signup-requests" element={
@@ -141,7 +148,7 @@ const AppContent: React.FC = () => {
                     </ProtectedRoute>
               } />
               <Route path="settings" element={
-                <ProtectedRoute allowedRoles={['super_admin', 'admin', 'user']}>
+                <ProtectedRoute allowedRoles={['super_admin', 'admin', 'user']} requiredScreen="settings">
                   <SettingsPage />
                 </ProtectedRoute>
               } />
@@ -150,6 +157,7 @@ const AppContent: React.FC = () => {
                   <ProfilePage />
                 </ProtectedRoute>
               } />
+              <Route path="access-denied" element={<AccessDeniedPage />} />
             </Route>
 
             <Route path="*" element={<Navigate to="/" replace />} />

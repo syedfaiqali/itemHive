@@ -5,6 +5,7 @@ import User from '../models/User';
 import Business from '../models/Business';
 import { normalizeRole } from '../utils/accessControl';
 import { ensureUserBusiness, getCachedAppSettingsForTenant } from '../utils/tenancy';
+import type { AdminScreenPermission } from '../utils/screenPermissions';
 
 export interface AuthRequest extends Request {
     user?: {
@@ -16,6 +17,7 @@ export interface AuthRequest extends Request {
         isVisible: boolean;
         installmentAccess: boolean;
         discountAccess: boolean;
+        screenPermissions: AdminScreenPermission[] | null;
         userCreationLimit: number;
         businessId: string;
         businessName: string;
@@ -63,7 +65,7 @@ const attachUserFromToken = async (req: AuthRequest) => {
     }
 
     const decoded: any = jwt.verify(token, process.env.JWT_SECRET || 'secret');
-    const user = await User.findById(decoded.id).select('name email role isActive isVisible installmentAccess discountAccess userCreationLimit businessId');
+    const user = await User.findById(decoded.id).select('name email role isActive isVisible installmentAccess discountAccess screenPermissions userCreationLimit businessId');
 
     if (!user) {
         throw new Error('Not authorized, user not found');
@@ -85,6 +87,7 @@ const attachUserFromToken = async (req: AuthRequest) => {
         isVisible: user.isVisible,
         installmentAccess: normalizedRole === 'super_admin' || Boolean(user.installmentAccess),
         discountAccess: normalizedRole === 'super_admin' || Boolean(user.discountAccess),
+        screenPermissions: user.screenPermissions == null ? null : [...user.screenPermissions],
         userCreationLimit: user.userCreationLimit ?? 0,
         businessId: String(business._id),
         businessName: business.name,
@@ -149,4 +152,23 @@ export const requireInstallmentAccess = async (req: AuthRequest, res: Response, 
     }
 
     next();
+};
+
+export const requireScreenAccess = (...permissions: AdminScreenPermission[]) => {
+    return (req: AuthRequest, res: Response, next: NextFunction) => {
+        if (!req.user) {
+            return res.status(401).json({ message: 'Not authorized, no token' });
+        }
+
+        if (req.user.role !== 'admin' || req.user.screenPermissions == null) {
+            next();
+            return;
+        }
+
+        if (!permissions.some((permission) => req.user?.screenPermissions?.includes(permission))) {
+            return res.status(403).json({ message: 'You do not have permission to access this screen' });
+        }
+
+        next();
+    };
 };

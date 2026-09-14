@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import mongoose from 'mongoose';
-import { protect, authorize, AuthRequest } from '../middleware/auth';
+import { protect, authorize, AuthRequest, requireScreenAccess } from '../middleware/auth';
 import Category from '../models/Category';
 import Product from '../models/Product';
 import InventoryRequest from '../models/InventoryRequest';
@@ -10,7 +10,7 @@ const defaults = ['Snacks & Candy', 'Gum & Mints', 'Health & Personal', 'Accesso
 const clean = (value: unknown) => typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : '';
 const router = Router();
 router.use(protect);
-router.get('/', async (req: AuthRequest, res) => {
+router.get('/', requireScreenAccess('inventory', 'inventory_categories', 'inventory_add', 'inventory_import', 'pos', 'orders'), async (req: AuthRequest, res) => {
     try {
         const [saved, existing] = await Promise.all([
             Category.find({ businessId: getTenantObjectId(req.user!) }).lean(),
@@ -24,7 +24,7 @@ router.get('/', async (req: AuthRequest, res) => {
         res.json([...names.values()]);
     } catch { res.status(500).json({ message: 'Unable to load categories.' }); }
 });
-router.post('/', authorize('super_admin', 'admin'), async (req: AuthRequest, res) => {
+router.post('/', authorize('super_admin', 'admin'), requireScreenAccess('inventory_categories'), async (req: AuthRequest, res) => {
     const name = clean(req.body.name);
     if (!name || name.length > 100) return res.status(400).json({ message: 'Enter a category name of up to 100 characters.' });
     try {
@@ -35,7 +35,7 @@ router.post('/', authorize('super_admin', 'admin'), async (req: AuthRequest, res
         res.status(201).json({ name });
     } catch { res.status(400).json({ message: 'Unable to save category. Please retry.' }); }
 });
-router.put('/', authorize('super_admin', 'admin'), async (req: AuthRequest, res) => {
+router.put('/', authorize('super_admin', 'admin'), requireScreenAccess('inventory_categories'), async (req: AuthRequest, res) => {
     const oldName = clean(req.body.oldName), name = clean(req.body.name);
     if (!oldName || !name || name.length > 100) return res.status(400).json({ message: 'Enter a category name of up to 100 characters.' });
     const session = await mongoose.startSession();
@@ -57,7 +57,7 @@ router.put('/', authorize('super_admin', 'admin'), async (req: AuthRequest, res)
     } catch (error) { res.status(400).json({ message: error instanceof Error ? error.message : 'Unable to edit category.' }); }
     finally { await session.endSession(); }
 });
-router.delete('/', authorize('super_admin', 'admin'), async (req: AuthRequest, res) => {
+router.delete('/', authorize('super_admin', 'admin'), requireScreenAccess('inventory_categories'), async (req: AuthRequest, res) => {
     const name = clean(req.body.name);
     if (!name) return res.status(400).json({ message: 'Choose a category.' });
     try {

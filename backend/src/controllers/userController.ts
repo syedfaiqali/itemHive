@@ -4,6 +4,7 @@ import Business from '../models/Business';
 import AppSetting from '../models/AppSetting';
 import type { AuthRequest } from '../middleware/auth';
 import { normalizeRole, serializeUser } from '../utils/accessControl';
+import { isAdminScreenPermission } from '../utils/screenPermissions';
 
 const ensureManageableTarget = (role: string) => {
     const normalizedRole = normalizeRole(role);
@@ -75,7 +76,7 @@ export const getUsers = async (req: AuthRequest, res: Response) => {
             : baseQuery;
 
         const usersQuery = User.find(query)
-            .select('name email role isActive isVisible installmentAccess discountAccess userCreationLimit createdBy businessId preferences avatar +visiblePassword')
+            .select('name email role isActive isVisible installmentAccess discountAccess screenPermissions userCreationLimit createdBy businessId preferences avatar +visiblePassword')
             .sort({ createdAt: -1 });
 
         if (!paginated) {
@@ -330,5 +331,41 @@ export const updateUserCreationLimit = async (req: AuthRequest, res: Response) =
         });
     } catch (error: any) {
         return res.status(400).json({ message: error.message || 'Failed to update admin limit' });
+    }
+};
+
+export const getAdminPermissionAssignments = async (_req: AuthRequest, res: Response) => {
+    try {
+        const admins = await User.find({ role: 'admin' })
+            .select('name email role isActive businessId screenPermissions')
+            .sort({ name: 1, email: 1 });
+
+        return res.json(await serializeUsersWithBusinessNames(admins));
+    } catch (error: any) {
+        return res.status(500).json({ message: error.message || 'Failed to load admin permission assignments' });
+    }
+};
+
+export const updateAdminScreenPermissions = async (req: AuthRequest, res: Response) => {
+    try {
+        const user = await User.findById(req.params.id);
+        if (!user) {
+            return res.status(404).json({ message: 'Admin user not found' });
+        }
+        if (normalizeRole(user.role) !== 'admin') {
+            return res.status(400).json({ message: 'Screen permissions can only be assigned to Admin users' });
+        }
+
+        const screenPermissions = Array.from(new Set(req.body.screenPermissions))
+            .filter(isAdminScreenPermission);
+        user.screenPermissions = screenPermissions;
+        await user.save();
+
+        return res.json({
+            message: 'Admin screen permissions updated successfully',
+            user: serializeUser(user),
+        });
+    } catch (error: any) {
+        return res.status(400).json({ message: error.message || 'Failed to update screen permissions' });
     }
 };

@@ -1,6 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose';
 import bcrypt from 'bcryptjs';
 import { normalizeRole, USER_ROLES, type UserRole } from '../utils/accessControl';
+import { ADMIN_SCREEN_PERMISSIONS, type AdminScreenPermission } from '../utils/screenPermissions';
 
 export interface IUser extends Document {
     name: string;
@@ -13,6 +14,7 @@ export interface IUser extends Document {
     isVisible: boolean;
     installmentAccess: boolean;
     discountAccess: boolean;
+    screenPermissions?: AdminScreenPermission[] | null;
     userCreationLimit: number;
     createdBy?: mongoose.Types.ObjectId;
     businessId?: mongoose.Types.ObjectId;
@@ -39,6 +41,12 @@ const UserSchema: Schema = new Schema({
     installmentAccess: { type: Boolean, default: false },
     // Allows a workspace administrator to configure the discounts available in POS.
     discountAccess: { type: Boolean, default: false },
+    // null means an existing Admin keeps legacy full access. Once configured,
+    // even an empty array is an explicit permission assignment.
+    screenPermissions: {
+        type: [{ type: String, enum: ADMIN_SCREEN_PERMISSIONS }],
+        default: null,
+    },
     userCreationLimit: { type: Number, default: 0, min: 0 },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     businessId: { type: Schema.Types.ObjectId, ref: 'Business', default: null, index: true },

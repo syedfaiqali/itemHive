@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import Joi from 'joi';
 import { USER_ROLES } from '../utils/accessControl';
+import { ADMIN_SCREEN_PERMISSIONS } from '../utils/screenPermissions';
 
 /**
  * Express middleware factory for validating request body against a Joi schema.
@@ -199,6 +200,13 @@ export const updateUserStatusSchema = Joi.object({
 
 export const updateAdminLimitSchema = Joi.object({
     userCreationLimit: Joi.number().integer().min(0).required(),
+});
+
+export const updateScreenPermissionsSchema = Joi.object({
+    screenPermissions: Joi.array()
+        .items(Joi.string().valid(...ADMIN_SCREEN_PERMISSIONS))
+        .unique()
+        .required(),
 });
 
 export const updateUserAccountSchema = Joi.object({

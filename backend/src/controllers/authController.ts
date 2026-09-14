@@ -134,6 +134,9 @@ export const register = async (req: AuthRequest, res: Response) => {
             createdBy = req.user.id;
 
             if (actorRole === 'admin') {
+                if (req.user.screenPermissions != null && !req.user.screenPermissions.includes('team')) {
+                    return res.status(403).json({ message: 'You do not have permission to access Team Management' });
+                }
                 if (requestedRole !== 'user') {
                     return res.status(403).json({ message: 'Admins can only create user accounts' });
                 }
@@ -227,5 +230,23 @@ export const login = async (req: AuthRequest, res: Response) => {
         });
     } catch (error: any) {
         res.status(500).json({ message: error.message });
+    }
+};
+
+export const getCurrentUser = async (req: AuthRequest, res: Response) => {
+    try {
+        const user = await User.findById(req.user?.id);
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        return res.json({
+            user: {
+                ...serializeUser(user),
+                businessName: req.user?.businessName || '',
+            },
+        });
+    } catch (error: any) {
+        return res.status(500).json({ message: error.message || 'Failed to load the current account' });
     }
 };

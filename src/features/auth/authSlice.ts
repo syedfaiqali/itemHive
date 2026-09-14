@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk, type PayloadAction } from '@reduxjs/toolkit';
 import { REHYDRATE } from 'redux-persist';
 import api from '../../api/axios';
+import type { ScreenPermission } from '../../lib/screenPermissions';
 
 export type UserRole = 'super_admin' | 'admin' | 'user';
 
@@ -14,6 +15,8 @@ export interface User {
     isVisible?: boolean;
     installmentAccess?: boolean;
     discountAccess?: boolean;
+    /** null/undefined means legacy full access; an array is an explicit Admin assignment. */
+    screenPermissions?: ScreenPermission[] | null;
     /** Workspace-level flag provided to client-admin rows in Team Management. */
     restaurantEnabled?: boolean;
     userCreationLimit?: number;
@@ -105,6 +108,18 @@ export const registerUser = createAsyncThunk(
     }
 );
 
+export const refreshCurrentUser = createAsyncThunk(
+    'auth/refreshCurrentUser',
+    async (_, { rejectWithValue }) => {
+        try {
+            const response = await api.get('/auth/me');
+            return response.data.user as User;
+        } catch (error: any) {
+            return rejectWithValue(error.response?.data?.message || 'Unable to refresh account access');
+        }
+    }
+);
+
 const authSlice = createSlice({
     name: 'auth',
     initialState,
@@ -145,6 +160,9 @@ const authSlice = createSlice({
             .addCase(registerUser.rejected, (state, action: PayloadAction<any>) => {
                 state.loading = false;
                 state.error = action.payload;
+            })
+            .addCase(refreshCurrentUser.fulfilled, (state, action: PayloadAction<User>) => {
+                state.user = normalizeUser(action.payload);
             })
             .addCase(REHYDRATE as any, (state, action: PayloadAction<any>) => {
                 const persistedAuth = action.payload?.auth;

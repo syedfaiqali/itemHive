@@ -56,6 +56,7 @@ import { motion } from 'framer-motion';
 import * as XLSX from 'xlsx';
 import useAppCurrency from '../../hooks/useAppCurrency';
 import { DEFAULT_PRODUCT_UNIT, getProductUnit, getProductUnitLabel, PRODUCT_UNITS } from '../../lib/productUnits';
+import { hasScreenAccess } from '../../lib/screenPermissions';
 
 const IconContainer = styled(Box)<{ color?: string }>(({ theme, color }) => ({
     width: 44,
@@ -184,6 +185,8 @@ const ProductList: React.FC = () => {
     }, [searchTerm]);
 
     const isManager = user?.role === 'super_admin' || user?.role === 'admin';
+    const canOpenAddProduct = hasScreenAccess(user, 'inventory_add');
+    const canOpenImportProducts = hasScreenAccess(user, 'inventory_import');
 
     const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, id: string) => {
         setAnchorEl(event.currentTarget);
@@ -402,14 +405,16 @@ const ProductList: React.FC = () => {
                         Track stock levels, pricing, and low-stock alerts in one view.
                     </Typography>
                 </Box>
-                <Button
-                    variant="contained"
-                    startIcon={<Plus size={20} />}
-                    onClick={() => navigate('/inventory/add')}
-                    sx={{ borderRadius: 2, px: 3, py: 1.2, fontWeight: 800 }}
-                >
-                    {isManager ? 'Add Product' : 'Request Inventory'}
-                </Button>
+                {(!isManager || canOpenAddProduct) && (
+                    <Button
+                        variant="contained"
+                        startIcon={<Plus size={20} />}
+                        onClick={() => navigate('/inventory/add')}
+                        sx={{ borderRadius: 2, px: 3, py: 1.2, fontWeight: 800 }}
+                    >
+                        {isManager ? 'Add Product' : 'Request Inventory'}
+                    </Button>
+                )}
             </Box>
 
             <Card className="section-rise-delay" sx={{ borderRadius: 4, overflow: 'hidden' }}>
@@ -440,7 +445,7 @@ const ProductList: React.FC = () => {
                         {isManager && <Button variant="outlined" startIcon={<Download size={18} />} sx={{ width: { xs: '100%', sm: 'auto' } }} onClick={exportToExcel}>
                             Export Excel
                         </Button>}
-                        {isManager && <Button variant="outlined" startIcon={<Download size={18} />} sx={{ width: { xs: '100%', sm: 'auto' } }} onClick={() => navigate('/inventory/import')}>
+                        {isManager && canOpenImportProducts && <Button variant="outlined" startIcon={<Download size={18} />} sx={{ width: { xs: '100%', sm: 'auto' } }} onClick={() => navigate('/inventory/import')}>
                             Import Excel
                         </Button>}
                     </Box>

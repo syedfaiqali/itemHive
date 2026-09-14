@@ -3,14 +3,16 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../../store';
 import type { UserRole } from '../../features/auth/authSlice';
+import { hasScreenAccess, type ScreenPermission } from '../../lib/screenPermissions';
 
 interface ProtectedRouteProps {
     children: React.ReactNode;
     allowedRoles?: UserRole[];
     requireInstallmentAccess?: boolean;
+    requiredScreen?: ScreenPermission;
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles, requireInstallmentAccess }) => {
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles, requireInstallmentAccess, requiredScreen }) => {
     const { isAuthenticated, user } = useSelector((state: RootState) => state.auth);
     const { app } = useSelector((state: RootState) => state.settings);
     const location = useLocation();
@@ -25,6 +27,10 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles,
 
     if (requireInstallmentAccess && user?.role !== 'super_admin' && (!app?.installmentsEnabled || !user?.installmentAccess)) {
         return <Navigate to="/" replace />;
+    }
+
+    if (requiredScreen && !hasScreenAccess(user, requiredScreen)) {
+        return <Navigate to="/access-denied" state={{ from: location.pathname }} replace />;
     }
 
     return <>{children}</>;

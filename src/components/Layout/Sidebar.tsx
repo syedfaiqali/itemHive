@@ -28,6 +28,7 @@ import {
     ReceiptText,
     UserPlus,
     ClipboardCheck,
+    ShieldCheck,
     Scale,
     ChevronLeft,
     ChevronRight
@@ -36,6 +37,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
 import { toggleSidebar } from '../../features/theme/themeSlice';
+import { hasScreenAccess, type ScreenPermission } from '../../lib/screenPermissions';
 
 const drawerWidth = 260;
 const collapsedWidth = 80;
@@ -57,21 +59,22 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onDrawerToggle }) => {
     const currentRole = user?.role || 'user';
     const canAccessInstallments = user?.role === 'super_admin' || Boolean(app?.installmentsEnabled && user?.installmentAccess);
 
-    const menuItems = [
-        { text: 'Dashboard', icon: <LayoutDashboard size={20} />, path: '/', roles: ['super_admin', 'admin', 'user'] },
-        { text: 'POS Terminal', icon: <TerminalIcon size={20} />, path: '/pos', roles: ['super_admin', 'admin', 'user'] },
-        { text: 'Inventory', icon: <Package size={20} />, path: '/inventory', roles: ['super_admin', 'admin', 'user'] },
-        { text: 'Categories', icon: <Package size={20} />, path: '/inventory/categories', roles: ['super_admin', 'admin'] },
-        { text: 'Product Units', icon: <Scale size={20} />, path: '/inventory/units', roles: ['super_admin', 'admin', 'user'] },
-        { text: 'Inventory Requests', icon: <ClipboardCheck size={20} />, path: '/inventory/requests', roles: ['super_admin', 'admin', 'user'] },
-        { text: 'Order Desk', icon: <ClipboardList size={20} />, path: '/orders', roles: ['super_admin', 'admin', 'user'] },
-        { text: 'Transactions', icon: <History size={20} />, path: '/transactions', roles: ['super_admin', 'admin', 'user'] },
-        { text: 'Customers', icon: <Contact size={20} />, path: '/customers', roles: ['super_admin', 'admin', 'user'] },
-        { text: 'Customer Records', icon: <ReceiptText size={20} />, path: '/customer-records', roles: ['super_admin', 'admin', 'user'] },
-        { text: 'Credit Customers', icon: <WalletCards size={20} />, path: '/credits', roles: ['super_admin', 'admin', 'user'] },
-        { text: 'Installments', icon: <CalendarClock size={20} />, path: '/installments', roles: ['super_admin', 'admin', 'user'], requiresInstallmentAccess: true },
-        { text: 'Reports', icon: <BarChart3 size={20} />, path: '/reports', roles: ['super_admin', 'admin'] },
-        { text: 'Team', icon: <Users size={20} />, path: '/team', roles: ['super_admin', 'admin'] },
+    const menuItems: Array<{ text: string; icon: React.ReactNode; path: string; roles: string[]; permission?: ScreenPermission; requiresInstallmentAccess?: boolean; requiresSignupApproval?: boolean }> = [
+        { text: 'Dashboard', icon: <LayoutDashboard size={20} />, path: '/', roles: ['super_admin', 'admin', 'user'], permission: 'dashboard' },
+        { text: 'POS Terminal', icon: <TerminalIcon size={20} />, path: '/pos', roles: ['super_admin', 'admin', 'user'], permission: 'pos' },
+        { text: 'Inventory', icon: <Package size={20} />, path: '/inventory', roles: ['super_admin', 'admin', 'user'], permission: 'inventory' },
+        { text: 'Categories', icon: <Package size={20} />, path: '/inventory/categories', roles: ['super_admin', 'admin'], permission: 'inventory_categories' },
+        { text: 'Product Units', icon: <Scale size={20} />, path: '/inventory/units', roles: ['super_admin', 'admin', 'user'], permission: 'inventory_units' },
+        { text: 'Inventory Requests', icon: <ClipboardCheck size={20} />, path: '/inventory/requests', roles: ['super_admin', 'admin', 'user'], permission: 'inventory_requests' },
+        { text: 'Order Desk', icon: <ClipboardList size={20} />, path: '/orders', roles: ['super_admin', 'admin', 'user'], permission: 'orders' },
+        { text: 'Transactions', icon: <History size={20} />, path: '/transactions', roles: ['super_admin', 'admin', 'user'], permission: 'transactions' },
+        { text: 'Customers', icon: <Contact size={20} />, path: '/customers', roles: ['super_admin', 'admin', 'user'], permission: 'customers' },
+        { text: 'Customer Records', icon: <ReceiptText size={20} />, path: '/customer-records', roles: ['super_admin', 'admin', 'user'], permission: 'customer_records' },
+        { text: 'Credit Customers', icon: <WalletCards size={20} />, path: '/credits', roles: ['super_admin', 'admin', 'user'], permission: 'credits' },
+        { text: 'Installments', icon: <CalendarClock size={20} />, path: '/installments', roles: ['super_admin', 'admin', 'user'], permission: 'installments', requiresInstallmentAccess: true },
+        { text: 'Reports', icon: <BarChart3 size={20} />, path: '/reports', roles: ['super_admin', 'admin'], permission: 'reports' },
+        { text: 'Team', icon: <Users size={20} />, path: '/team', roles: ['super_admin', 'admin'], permission: 'team' },
+        { text: 'Permissions', icon: <ShieldCheck size={20} />, path: '/permission-management', roles: ['super_admin'] },
         { text: 'Signup Requests', icon: <UserPlus size={20} />, path: '/signup-requests', roles: ['super_admin'], requiresSignupApproval: true },
     ];
 
@@ -159,6 +162,7 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onDrawerToggle }) => {
                 <List sx={{ px: 0 }}>
                     {menuItems
                         .filter(item => item.roles.includes(currentRole)
+                            && (!item.permission || hasScreenAccess(user, item.permission))
                             && (!item.requiresInstallmentAccess || canAccessInstallments)
                             && (!item.requiresSignupApproval || !app?.autoRegistrationEnabled))
                         .map((item) => {

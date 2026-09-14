@@ -38,6 +38,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import api from '../../api/axios';
 import { buildNotifications, type InstallmentNotificationPlan, type NotificationItem } from '../../lib/notifications';
 import type { AppDispatch } from '../../store';
+import { hasScreenAccess } from '../../lib/screenPermissions';
 
 interface NavbarProps {
     onMenuClick: () => void;
@@ -66,7 +67,11 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
     const { orders } = useSelector((state: RootState) => state.orders);
     const { products } = useSelector((state: RootState) => state.inventory);
     const { notifications, app } = useSelector((state: RootState) => state.settings);
-    const canAccessInstallments = user?.role === 'super_admin' || Boolean(app?.installmentsEnabled && user?.installmentAccess);
+    const canAccessInstallments = (user?.role === 'super_admin' || Boolean(app?.installmentsEnabled && user?.installmentAccess))
+        && hasScreenAccess(user, 'notifications');
+    const canAccessNotes = hasScreenAccess(user, 'notes');
+    const canAccessNotifications = hasScreenAccess(user, 'notifications');
+    const canAccessSettings = hasScreenAccess(user, 'settings');
     const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
     const [notifAnchorEl, setNotifAnchorEl] = React.useState<null | HTMLElement>(null);
     const [installmentPlans, setInstallmentPlans] = React.useState<InstallmentNotificationPlan[]>([]);
@@ -446,21 +451,25 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
                         {mode === 'light' ? <Moon size={20} /> : <Sun size={20} />}
                     </IconButton>
 
-                    <Tooltip title="Sticky Notes">
-                        <IconButton
-                            color={isActivePath('/notes') ? 'primary' : 'inherit'}
-                            onClick={() => navigate('/notes')}
-                            aria-label="Open sticky notes"
-                        >
-                            <Pin size={20} />
-                        </IconButton>
-                    </Tooltip>
+                    {canAccessNotes && (
+                        <Tooltip title="Sticky Notes">
+                            <IconButton
+                                color={isActivePath('/notes') ? 'primary' : 'inherit'}
+                                onClick={() => navigate('/notes')}
+                                aria-label="Open sticky notes"
+                            >
+                                <Pin size={20} />
+                            </IconButton>
+                        </Tooltip>
+                    )}
 
-                    <IconButton color="inherit" onClick={handleNotifOpen}>
-                        <Badge badgeContent={recentNotifications.length} color="secondary">
-                            <NotificationsIcon size={20} />
-                        </Badge>
-                    </IconButton>
+                    {canAccessNotifications && (
+                        <IconButton color="inherit" onClick={handleNotifOpen}>
+                            <Badge badgeContent={recentNotifications.length} color="secondary">
+                                <NotificationsIcon size={20} />
+                            </Badge>
+                        </IconButton>
+                    )}
 
                     <Tooltip title="Profile settings">
                         <IconButton onClick={handleMenu} sx={{ p: 0.5, ml: 1 }}>
@@ -547,11 +556,13 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
                             <Box sx={{ flexGrow: 1, ml: 1 }}>Profile</Box>
                             <ChevronRight size={16} className="menu-action-arrow" />
                         </MenuItem>
-                        <MenuItem onClick={() => handleNavigateTo('/settings')} sx={buildActionItemSx(false, isActivePath('/settings'))}>
-                            <Settings size={18} className="menu-action-icon" />
-                            <Box sx={{ flexGrow: 1, ml: 1 }}>Settings</Box>
-                            <ChevronRight size={16} className="menu-action-arrow" />
-                        </MenuItem>
+                        {canAccessSettings && (
+                            <MenuItem onClick={() => handleNavigateTo('/settings')} sx={buildActionItemSx(false, isActivePath('/settings'))}>
+                                <Settings size={18} className="menu-action-icon" />
+                                <Box sx={{ flexGrow: 1, ml: 1 }}>Settings</Box>
+                                <ChevronRight size={16} className="menu-action-arrow" />
+                            </MenuItem>
+                        )}
                         <MenuItem onClick={handleLogout} sx={buildActionItemSx(true, false)}>
                             <LogOut size={18} className="menu-action-icon" />
                             <Box sx={{ flexGrow: 1, ml: 1 }}>Logout</Box>
