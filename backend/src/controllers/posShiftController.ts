@@ -1,6 +1,13 @@
 import { Response } from 'express';
 import mongoose, { ClientSession } from 'mongoose';
-import POSShift, { type IPOSShift, type IShiftReportSnapshot, type IShiftReportTotals } from '../models/POSShift';
+import POSShift, {
+    type IPOSShift,
+    type IShiftOrderTypeSummary,
+    type IShiftPaymentSummary,
+    type IShiftReportSnapshot,
+    type IShiftReportTotals,
+    type IShiftSoldItemSummary,
+} from '../models/POSShift';
 import Transaction from '../models/Transaction';
 import CreditPayment from '../models/CreditPayment';
 import InstallmentPlan from '../models/InstallmentPlan';
@@ -31,6 +38,51 @@ const buildShiftReport = async (
         (plan.schedule || []).filter((item) => item.status === 'paid' && String(item.shiftId || '') === String(shift._id))
     );
 
+    const orders = new Map<string, { paymentMethod: IShiftPaymentSummary['method']; orderType: string; amount: number }>();
+    const soldItemMap = new Map<string, IShiftSoldItemSummary>();
+    transactions.forEach((transaction) => {
+        const orderKey = String(transaction.orderId || transaction.id);
+        const paymentMethod = ['cash', 'card', 'credit', 'installment'].includes(String(transaction.paymentMethod))
+            ? transaction.paymentMethod as IShiftPaymentSummary['method']
+            : 'cash';
+        const orderType = transaction.orderType === 'other'
+            ? String(transaction.otherOrderType || 'Other').trim() || 'Other'
+            : String(transaction.orderType || 'Not specified');
+        const order = orders.get(orderKey) || { paymentMethod, orderType, amount: 0 };
+        order.amount = round2(order.amount + Number(transaction.totalPrice || 0));
+        orders.set(orderKey, order);
+
+        const itemKey = String(transaction.productId || transaction.productName);
+        const soldItem = soldItemMap.get(itemKey) || {
+            productId: String(transaction.productId || ''),
+            productName: String(transaction.productName || 'Product'),
+            quantity: 0,
+            amount: 0,
+        };
+        soldItem.quantity += Number(transaction.amount || 0);
+        soldItem.amount = round2(soldItem.amount + Number(transaction.totalPrice || 0));
+        soldItemMap.set(itemKey, soldItem);
+    });
+
+    const paymentSummaryMap = new Map<IShiftPaymentSummary['method'], IShiftPaymentSummary>();
+    const orderTypeSummaryMap = new Map<string, IShiftOrderTypeSummary>();
+    orders.forEach((order) => {
+        const payment = paymentSummaryMap.get(order.paymentMethod) || { method: order.paymentMethod, orderCount: 0, amount: 0 };
+        payment.orderCount += 1;
+        payment.amount = round2(payment.amount + order.amount);
+        paymentSummaryMap.set(order.paymentMethod, payment);
+
+        const orderType = orderTypeSummaryMap.get(order.orderType) || { orderType: order.orderType, orderCount: 0, amount: 0 };
+        orderType.orderCount += 1;
+        orderType.amount = round2(orderType.amount + order.amount);
+        orderTypeSummaryMap.set(order.orderType, orderType);
+    });
+
+    const paymentOrder = ['cash', 'card', 'credit', 'installment'];
+    const paymentSummary = [...paymentSummaryMap.values()].sort((first, second) => paymentOrder.indexOf(first.method) - paymentOrder.indexOf(second.method));
+    const orderTypeSummary = [...orderTypeSummaryMap.values()].sort((first, second) => second.amount - first.amount);
+    const soldItems = [...soldItemMap.values()].sort((first, second) => second.amount - first.amount);
+
     const totals: IShiftReportTotals = {
         completedOrders: new Set(transactions.map((transaction) => transaction.orderId || transaction.id)).size,
         itemsSold: transactions.reduce((sum, transaction) => sum + Number(transaction.amount || 0), 0),
@@ -57,8 +109,21 @@ const buildShiftReport = async (
         installmentCardAdvance: round2(transactions.filter((transaction) => transaction.paymentMethod === 'installment' && transaction.paidVia === 'card').reduce((sum, transaction) => sum + Number(transaction.paidNow || 0), 0)),
         installmentCollectionsCash: round2(installmentCollections.filter((payment) => payment.paidVia === 'cash').reduce((sum, payment) => sum + Number(payment.amount || 0), 0)),
         installmentCollectionsCard: round2(installmentCollections.filter((payment) => payment.paidVia === 'card').reduce((sum, payment) => sum + Number(payment.amount || 0), 0)),
+        totalCollected: 0,
         expectedDrawerCash: 0,
     };
+    totals.totalCollected = round2(
+        totals.cashSales
+        + totals.cardSales
+        + totals.creditCashReceived
+        + totals.creditCardReceived
+        + totals.creditCollectionsCash
+        + totals.creditCollectionsCard
+        + totals.installmentCashAdvance
+        + totals.installmentCardAdvance
+        + totals.installmentCollectionsCash
+        + totals.installmentCollectionsCard,
+    );
     totals.expectedDrawerCash = round2(
         Number(shift.openingCash || 0)
         + totals.cashSales
@@ -82,6 +147,9 @@ const buildShiftReport = async (
         reportTime,
         status,
         totals,
+        paymentSummary,
+        orderTypeSummary,
+        soldItems,
     };
 };
 
@@ -123,11 +191,11 @@ export const openShift = async (req: AuthRequest, res: Response) => {
 export const getXReport = async (req: AuthRequest, res: Response) => {
     try {
         const shift = await POSShift.findOne({ ...buildTenantFilter(req.user!), status: 'open' });
-        if (!shift) return res.status(404).json({ message: 'Open a POS shift before generating an X Report' });
+        if (!shift) return res.status(404).json({ message: 'Open a POS shift before generating a Live Shift Summary' });
         const report = await buildShiftReport(req, shift, new Date(), 'open');
         return res.json({ shift, report });
     } catch (error: any) {
-        return res.status(500).json({ message: error.message || 'Failed to generate X Report' });
+        return res.status(500).json({ message: error.message || 'Failed to generate Live Shift Summary' });
     }
 };
 
@@ -164,12 +232,55 @@ export const closeShift = async (req: AuthRequest, res: Response) => {
 
 export const getShiftHistory = async (req: AuthRequest, res: Response) => {
     try {
-        const shifts = await POSShift.find({ ...buildTenantFilter(req.user!), status: 'closed' })
+        const page = Math.max(1, Number.parseInt(String(req.query.page || '1'), 10) || 1);
+        const limit = Math.min(100, Math.max(1, Number.parseInt(String(req.query.limit || '12'), 10) || 12));
+        const search = String(req.query.search || '').trim();
+        const from = String(req.query.from || '').trim();
+        const to = String(req.query.to || '').trim();
+        const filter: Record<string, unknown> = { ...buildTenantFilter(req.user!), status: 'closed' };
+
+        if (from || to) {
+            const closedAt: { $gte?: Date; $lte?: Date } = {};
+            if (from) {
+                const start = new Date(from.includes('T') ? from : `${from}T00:00:00.000`);
+                if (Number.isNaN(start.getTime())) return res.status(400).json({ message: 'Invalid history start date' });
+                closedAt.$gte = start;
+            }
+            if (to) {
+                const end = new Date(to.includes('T') ? to : `${to}T23:59:59.999`);
+                if (Number.isNaN(end.getTime())) return res.status(400).json({ message: 'Invalid history end date' });
+                closedAt.$lte = end;
+            }
+            filter.closedAt = closedAt;
+        }
+
+        if (search) {
+            const escapedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const matcher = new RegExp(escapedSearch, 'i');
+            filter.$or = [
+                { shiftCode: matcher },
+                { registerName: matcher },
+                { openedByName: matcher },
+                { closedByName: matcher },
+            ];
+        }
+
+        const [shifts, total] = await Promise.all([
+            POSShift.find(filter)
             .sort({ closedAt: -1 })
-            .limit(100)
-            .lean();
-        return res.json(shifts);
+            .skip((page - 1) * limit)
+            .limit(limit)
+            .lean(),
+            POSShift.countDocuments(filter),
+        ]);
+        return res.json({
+            items: shifts,
+            page,
+            limit,
+            total,
+            totalPages: Math.max(1, Math.ceil(total / limit)),
+        });
     } catch (error: any) {
-        return res.status(500).json({ message: error.message || 'Failed to load Z Report history' });
+        return res.status(500).json({ message: error.message || 'Failed to load Shift Closing Report history' });
     }
 };

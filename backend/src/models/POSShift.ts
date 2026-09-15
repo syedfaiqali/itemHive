@@ -19,9 +19,29 @@ export interface IShiftReportTotals {
     installmentCardAdvance: number;
     installmentCollectionsCash: number;
     installmentCollectionsCard: number;
+    totalCollected?: number;
     expectedDrawerCash: number;
     countedCash?: number;
     cashDifference?: number;
+}
+
+export interface IShiftPaymentSummary {
+    method: 'cash' | 'card' | 'credit' | 'installment';
+    orderCount: number;
+    amount: number;
+}
+
+export interface IShiftOrderTypeSummary {
+    orderType: string;
+    orderCount: number;
+    amount: number;
+}
+
+export interface IShiftSoldItemSummary {
+    productId: string;
+    productName: string;
+    quantity: number;
+    amount: number;
 }
 
 export interface IShiftReportSnapshot {
@@ -33,6 +53,9 @@ export interface IShiftReportSnapshot {
     reportTime: Date;
     status: 'open' | 'closed';
     totals: IShiftReportTotals;
+    paymentSummary?: IShiftPaymentSummary[];
+    orderTypeSummary?: IShiftOrderTypeSummary[];
+    soldItems?: IShiftSoldItemSummary[];
 }
 
 export interface IPOSShift extends Document {
@@ -72,9 +95,29 @@ const ShiftReportTotalsSchema = new Schema<IShiftReportTotals>({
     installmentCardAdvance: { type: Number, required: true },
     installmentCollectionsCash: { type: Number, required: true },
     installmentCollectionsCard: { type: Number, required: true },
+    totalCollected: { type: Number, default: 0 },
     expectedDrawerCash: { type: Number, required: true },
     countedCash: { type: Number, default: undefined },
     cashDifference: { type: Number, default: undefined },
+}, { _id: false });
+
+const ShiftPaymentSummarySchema = new Schema<IShiftPaymentSummary>({
+    method: { type: String, enum: ['cash', 'card', 'credit', 'installment'], required: true },
+    orderCount: { type: Number, required: true },
+    amount: { type: Number, required: true },
+}, { _id: false });
+
+const ShiftOrderTypeSummarySchema = new Schema<IShiftOrderTypeSummary>({
+    orderType: { type: String, required: true },
+    orderCount: { type: Number, required: true },
+    amount: { type: Number, required: true },
+}, { _id: false });
+
+const ShiftSoldItemSummarySchema = new Schema<IShiftSoldItemSummary>({
+    productId: { type: String, required: true },
+    productName: { type: String, required: true },
+    quantity: { type: Number, required: true },
+    amount: { type: Number, required: true },
 }, { _id: false });
 
 const ShiftReportSnapshotSchema = new Schema<IShiftReportSnapshot>({
@@ -86,6 +129,9 @@ const ShiftReportSnapshotSchema = new Schema<IShiftReportSnapshot>({
     reportTime: { type: Date, required: true },
     status: { type: String, enum: ['open', 'closed'], required: true },
     totals: { type: ShiftReportTotalsSchema, required: true },
+    paymentSummary: { type: [ShiftPaymentSummarySchema], default: [] },
+    orderTypeSummary: { type: [ShiftOrderTypeSummarySchema], default: [] },
+    soldItems: { type: [ShiftSoldItemSummarySchema], default: [] },
 }, { _id: false });
 
 const POSShiftSchema = new Schema<IPOSShift>({

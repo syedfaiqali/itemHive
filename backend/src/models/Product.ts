@@ -42,8 +42,11 @@ const ProductSchema: Schema<IProduct> = new Schema({
         default: '',
         maxlength: [250000, 'Product image is too large.'],
         validate: {
-            validator: (value: string) => !value || /^https?:\/\/.+/.test(value) || /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(value),
-            message: 'Product image must be a valid HTTP(S) URL or PNG, JPEG or WebP data URL.',
+            validator: (value: string) => !value
+                || /^https?:\/\/.+/.test(value)
+                || /^\/product-images\/[A-Za-z0-9/_-]+\.(png|jpe?g|webp)$/i.test(value)
+                || /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(value),
+            message: 'Product image must be a valid HTTP(S) URL, local product image path, or PNG, JPEG or WebP data URL.',
         },
     },
     lastUpdated: { type: Date, default: Date.now },

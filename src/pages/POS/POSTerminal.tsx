@@ -239,7 +239,6 @@ const POSTerminal: React.FC = () => {
         }
         if (!productsLoaded || loadedDraftRef.current === requestedDraftId) return;
 
-        loadedDraftRef.current = requestedDraftId;
         let cancelled = false;
         const loadDraft = async () => {
             try {
@@ -263,9 +262,10 @@ const POSTerminal: React.FC = () => {
                 setOrderType(response.data.orderType || '');
                 setOtherOrderType(response.data.otherOrderType || '');
                 setDeliveryNumber(response.data.deliveryNumber || '');
-                setPendingMethod(null);
+                setPendingMethod('cash');
                 setActiveDraftId(response.data._id);
                 setActiveDraftCode(response.data.draftCode);
+                loadedDraftRef.current = requestedDraftId;
                 if (unavailableNames.length > 0) {
                     setStockToast({ open: true, message: `${unavailableNames.join(', ')} could not be restored because they no longer exist.` });
                 }
@@ -425,18 +425,36 @@ const POSTerminal: React.FC = () => {
                 deliveryNumber: isRestaurant ? deliveryNumber.trim() : undefined,
             };
 
-            if (activeDraftId) {
-                await api.put(`/order-drafts/${activeDraftId}`, payload);
-            } else {
-                await api.post('/order-drafts', payload);
+            const wasUpdatingDraft = Boolean(activeDraftId);
+            const response = activeDraftId
+                ? await api.put<OrderDraft>(`/order-drafts/${activeDraftId}`, payload)
+                : await api.post<OrderDraft>('/order-drafts', payload);
+
+            if (wasUpdatingDraft) {
+                dispatch(clearCart());
+                setPendingMethod(null);
+                setOrderType('');
+                setOtherOrderType('');
+                setDeliveryNumber('');
+                setActiveDraftId(null);
+                setActiveDraftCode('');
+                loadedDraftRef.current = null;
+                navigate('/pos', { replace: true });
+                setStockToast({
+                    open: true,
+                    message: `${response.data.draftCode} updated. POS is ready for a new order.`,
+                });
+                return;
             }
 
-            dispatch(clearCart());
-            setPendingMethod(null);
-            setOrderType('');
-            setOtherOrderType('');
-            setDeliveryNumber('');
-            navigate('/order-drafts');
+            setActiveDraftId(response.data._id);
+            setActiveDraftCode(response.data.draftCode);
+            loadedDraftRef.current = response.data._id;
+            navigate(`/pos?draft=${response.data._id}`, { replace: true });
+            setStockToast({
+                open: true,
+                message: `${response.data.draftCode} saved. You can continue editing or take payment.`,
+            });
         } catch (requestError: unknown) {
             setStockToast({ open: true, message: getRequestErrorMessage(requestError, 'Order draft could not be saved.') });
         } finally {

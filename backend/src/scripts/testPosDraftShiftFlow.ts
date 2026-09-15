@@ -327,8 +327,9 @@ const run = async () => {
     await api('/pos-shifts/x-report', { ...authA, expectedStatus: 404 });
     await api('/pos-shifts/close', { ...authA, method: 'POST', body: { countedCash: 0 }, expectedStatus: 400 });
     const history = await api('/pos-shifts/history', { ...authA });
-    assert.equal(history.length, 1, 'Z history should contain the closed test shift');
-    nearlyEqual(history[0].finalReport.totals.netSales, 417.5, 'stored Z snapshot net sales');
+    assert.equal(history.total, 1, 'closing report history should contain the closed test shift');
+    assert.equal(history.items.length, 1, 'closing report history page should contain the closed test shift');
+    nearlyEqual(history.items[0].finalReport.totals.netSales, 417.5, 'stored closing report snapshot net sales');
 
     const firstClosedTransactionId = cashCheckout.transactions[0].id;
     await api(`/transactions/${firstClosedTransactionId}`, { ...authA, method: 'DELETE', expectedStatus: 409 });

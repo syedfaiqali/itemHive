@@ -322,7 +322,7 @@ export const deleteTransaction = async (req: AuthRequest, res: Response) => {
             if (transaction.shiftId) {
                 const shift = await POSShift.findById(transaction.shiftId).session(session);
                 if (shift?.status === 'closed') {
-                    const error: any = new Error('Transactions included in a closed Z Report cannot be deleted');
+                    const error: any = new Error('Transactions included in a finalized Shift Closing Report cannot be deleted');
                     error.statusCode = 409;
                     throw error;
                 }

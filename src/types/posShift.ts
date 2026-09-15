@@ -17,9 +17,29 @@ export interface ShiftReportTotals {
     installmentCardAdvance: number;
     installmentCollectionsCash: number;
     installmentCollectionsCard: number;
+    totalCollected?: number;
     expectedDrawerCash: number;
     countedCash?: number;
     cashDifference?: number;
+}
+
+export interface ShiftPaymentSummary {
+    method: 'cash' | 'card' | 'credit' | 'installment';
+    orderCount: number;
+    amount: number;
+}
+
+export interface ShiftOrderTypeSummary {
+    orderType: string;
+    orderCount: number;
+    amount: number;
+}
+
+export interface ShiftSoldItemSummary {
+    productId: string;
+    productName: string;
+    quantity: number;
+    amount: number;
 }
 
 export interface ShiftReport {
@@ -31,6 +51,9 @@ export interface ShiftReport {
     reportTime: string;
     status: 'open' | 'closed';
     totals: ShiftReportTotals;
+    paymentSummary?: ShiftPaymentSummary[];
+    orderTypeSummary?: ShiftOrderTypeSummary[];
+    soldItems?: ShiftSoldItemSummary[];
 }
 
 export interface POSShift {
