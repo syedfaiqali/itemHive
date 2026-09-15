@@ -18,6 +18,8 @@ import inventoryRequestRoutes from './routes/inventoryRequestRoutes';
 import notesRoutes from './routes/notesRoutes';
 import signupRequestRoutes from './routes/signupRequestRoutes';
 import customerRoutes from './routes/customerRoutes';
+import orderDraftRoutes from './routes/orderDraftRoutes';
+import posShiftRoutes from './routes/posShiftRoutes';
 import { errorHandler, notFound } from './middleware/errorHandler';
 import { ensureTenantIndexes } from './utils/tenantIndexes';
 
@@ -84,7 +86,7 @@ app.get('/', (_req: Request, res: Response) => {
         version: '1.0.0',
         commit: deploymentCommit,
         environment: process.env.NODE_ENV || 'development',
-        endpoints: ['/api/auth', '/api/products', '/api/transactions', '/api/reports', '/api/customers', '/api/credits', '/api/users', '/api/signup-requests']
+        endpoints: ['/api/auth', '/api/products', '/api/transactions', '/api/reports', '/api/customers', '/api/credits', '/api/users', '/api/order-drafts', '/api/pos-shifts', '/api/signup-requests']
     });
 });
 
@@ -110,6 +112,8 @@ app.use('/api/credit', creditRoutes);
 app.use('/api/installments', installmentRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/order-drafts', orderDraftRoutes);
+app.use('/api/pos-shifts', posShiftRoutes);
 app.use('/api/inventory-requests', inventoryRequestRoutes);
 app.use('/api/signup-requests', signupRequestRoutes);
 app.use('/api/notes', notesRoutes);

@@ -5,6 +5,7 @@ import mongoose from 'mongoose';
 import type { AuthRequest } from '../middleware/auth';
 import { normalizeRole } from '../utils/accessControl';
 import { buildTenantFilter, getCachedAppSettingsForTenant, getTenantObjectId } from '../utils/tenancy';
+import POSShift from '../models/POSShift';
 
 export const getTransactions = async (req: AuthRequest, res: Response) => {
     try {
@@ -15,10 +16,140 @@ export const getTransactions = async (req: AuthRequest, res: Response) => {
     }
 };
 
+export const createPOSCheckout = async (req: AuthRequest, res: Response) => {
+    const session = await mongoose.startSession();
+    const orderId = String(req.body.orderId || '').trim();
+
+    try {
+        if (!orderId) return res.status(400).json({ message: 'Order ID is required' });
+        const existingLines = await Transaction.find({ orderId, source: 'pos', ...buildTenantFilter(req.user!) }).sort({ id: 1 }).lean();
+        if (existingLines.length > 0) return res.status(200).json({ transactions: existingLines });
+
+        const requestedItems = Array.isArray(req.body.items) ? req.body.items : [];
+        if (requestedItems.length === 0) return res.status(400).json({ message: 'Add at least one product before payment' });
+        if (requestedItems.length > 100) return res.status(400).json({ message: 'An order cannot contain more than 100 products' });
+
+        let savedTransactions: any[] = [];
+        await session.withTransaction(async () => {
+            if (!mongoose.Types.ObjectId.isValid(String(req.body.shiftId || ''))) {
+                throw new Error('Open a POS shift before taking payment');
+            }
+            const activeShift = await POSShift.findOneAndUpdate(
+                { _id: req.body.shiftId, status: 'open', ...buildTenantFilter(req.user!) },
+                { $inc: { activityVersion: 1 } },
+                { new: true, session },
+            );
+            if (!activeShift) throw new Error('This POS shift is closed. Open a new shift before taking payment');
+
+            const appSettings = await getCachedAppSettingsForTenant(req.user!);
+            const actorRole = normalizeRole(req.user?.role);
+            const requestedDiscountPercent = Number(req.body.discountPercent || 0);
+            const allowedDiscountOptions = (appSettings?.discountOptions || []).map(Number);
+            const discountPercent = appSettings?.discountsEnabled
+                && Number.isFinite(requestedDiscountPercent)
+                && allowedDiscountOptions.includes(requestedDiscountPercent)
+                ? Math.min(100, Math.max(0, requestedDiscountPercent))
+                : 0;
+            const taxRate = Number(appSettings?.salesTaxRate || 0) / 100;
+            const productIds = requestedItems.map((item: any) => String(item.productId || ''));
+            if (new Set(productIds).size !== productIds.length) throw new Error('Duplicate products are not allowed in one checkout');
+            const products = await Product.find({ id: { $in: productIds }, ...buildTenantFilter(req.user!) }).session(session);
+            const productMap = new Map(products.map((product) => [product.id, product]));
+            if (productMap.size !== productIds.length) throw new Error('One or more products no longer exist');
+
+            const lineInputs = requestedItems.map((item: any) => {
+                const productId = String(item.productId || '');
+                const product = productMap.get(productId)!;
+                const quantity = Number(item.quantity);
+                if (!Number.isInteger(quantity) || quantity < 1) throw new Error(`Invalid quantity for ${product.name}`);
+                if (product.stock < quantity) throw new Error(`Insufficient stock for ${product.name}`);
+                const defaultPrice = Number(product.salePrice ?? product.price ?? 0);
+                const requestedPrice = Number(item.unitPrice ?? defaultPrice);
+                if (!Number.isFinite(requestedPrice) || requestedPrice < 0) throw new Error(`Invalid sale price for ${product.name}`);
+                if (actorRole === 'user' && requestedPrice !== defaultPrice) throw new Error('Users are not allowed to change the sale price');
+                const subtotal = requestedPrice * quantity;
+                const discountAmount = subtotal * (discountPercent / 100);
+                const taxAmount = subtotal * taxRate;
+                return {
+                    product,
+                    quantity,
+                    unitPrice: requestedPrice,
+                    subtotal,
+                    discountAmount,
+                    taxAmount,
+                    totalPrice: subtotal + taxAmount - discountAmount,
+                };
+            });
+
+            const orderTotal = lineInputs.reduce((sum: number, line: { totalPrice: number }) => sum + line.totalPrice, 0);
+            const paymentMethod = ['cash', 'card', 'credit'].includes(req.body.paymentMethod) ? req.body.paymentMethod : 'cash';
+            const requestedPaidNow = paymentMethod === 'credit' ? Number(req.body.paidNow || 0) : orderTotal;
+            const paidNow = Math.min(Math.max(Number.isFinite(requestedPaidNow) ? requestedPaidNow : 0, 0), orderTotal);
+            const dueAmount = paymentMethod === 'credit' ? Math.max(orderTotal - paidNow, 0) : 0;
+            if (paymentMethod === 'credit' && dueAmount <= 0) throw new Error('Use Cash or Card for full payment. Credit requires a due amount');
+            const paidVia = paymentMethod === 'credit'
+                ? (req.body.paidVia === 'card' ? 'card' : 'cash')
+                : paymentMethod;
+            const isRestaurantOrder = Boolean(appSettings?.restaurantEnabled);
+
+            const transactionDocuments = lineInputs.map((line: any, index: number) => ({
+                id: `${orderId}-L${index + 1}`,
+                orderId,
+                source: 'pos',
+                shiftId: activeShift._id,
+                productId: line.product.id,
+                productName: line.product.name,
+                type: 'reduction',
+                amount: line.quantity,
+                subtotal: line.subtotal,
+                discountPercent,
+                discountAmount: line.discountAmount,
+                taxAmount: line.taxAmount,
+                totalPrice: line.totalPrice,
+                userName: req.user?.name || 'Staff',
+                paymentMethod,
+                paidVia,
+                paidNow: index === 0 ? paidNow : 0,
+                dueAmount: index === 0 ? dueAmount : 0,
+                customerName: paymentMethod === 'credit' ? String(req.body.customerName || '').trim() : '',
+                customerCnic: paymentMethod === 'credit' ? String(req.body.customerCnic || '').trim() : '',
+                orderType: isRestaurantOrder ? req.body.orderType : undefined,
+                otherOrderType: isRestaurantOrder && req.body.orderType === 'other' ? String(req.body.otherOrderType || '').trim() : '',
+                unitCost: Number(line.product.purchasePrice || 0),
+                unitPrice: line.unitPrice,
+                grossProfit: (line.subtotal - line.discountAmount) - (Number(line.product.purchasePrice || 0) * line.quantity),
+                businessId: getTenantObjectId(req.user!),
+            }));
+
+            savedTransactions = await Transaction.insertMany(transactionDocuments, { session });
+            for (const line of lineInputs) {
+                line.product.stock -= line.quantity;
+                await line.product.save({ session });
+            }
+        });
+
+        return res.status(201).json({ transactions: savedTransactions });
+    } catch (error: any) {
+        if (error?.code === 11000 && orderId) {
+            const existingLines = await Transaction.find({ orderId, source: 'pos', ...buildTenantFilter(req.user!) }).sort({ id: 1 }).lean();
+            if (existingLines.length > 0) return res.status(200).json({ transactions: existingLines });
+        }
+        return res.status(400).json({ message: error.message || 'POS checkout could not be completed' });
+    } finally {
+        await session.endSession();
+    }
+};
+
 export const createTransaction = async (req: AuthRequest, res: Response) => {
     const session = await mongoose.startSession();
 
     try {
+        const alreadySaved = await Transaction.findOne({
+            id: req.body.id,
+            ...buildTenantFilter(req.user!),
+        }).lean();
+        if (alreadySaved) return res.status(200).json(alreadySaved);
+
         let savedTransaction: any;
 
         // withTransaction retries MongoDB transient write conflicts before it
@@ -42,7 +173,24 @@ export const createTransaction = async (req: AuthRequest, res: Response) => {
             otherOrderType,
             unitPrice,
             discountPercent,
+            source,
+            orderId,
+            shiftId,
         } = req.body;
+
+        let resolvedShiftId: mongoose.Types.ObjectId | undefined;
+        if (source === 'pos') {
+            if (!mongoose.Types.ObjectId.isValid(String(shiftId || ''))) {
+                throw new Error('Open a POS shift before taking payment');
+            }
+            const activeShift = await POSShift.findOneAndUpdate(
+                { _id: shiftId, status: 'open', ...buildTenantFilter(req.user!) },
+                { $inc: { activityVersion: 1 } },
+                { new: true, session },
+            );
+            if (!activeShift) throw new Error('This POS shift is closed. Open a new shift before taking payment');
+            resolvedShiftId = activeShift._id;
+        }
 
         const product = await Product.findOne({ id: productId, ...buildTenantFilter(req.user!) }).session(session);
         if (!product) {
@@ -107,6 +255,9 @@ export const createTransaction = async (req: AuthRequest, res: Response) => {
             unitCost: resolvedUnitCost,
             unitPrice: resolvedUnitPrice,
             grossProfit: resolvedGrossProfit,
+            source: source === 'pos' ? 'pos' : undefined,
+            orderId: source === 'pos' ? String(orderId || id) : '',
+            shiftId: resolvedShiftId,
             businessId: getTenantObjectId(req.user!),
         });
         await transaction.save({ session });
@@ -166,6 +317,15 @@ export const deleteTransaction = async (req: AuthRequest, res: Response) => {
                 const error: any = new Error('Transaction not found');
                 error.statusCode = 404;
                 throw error;
+            }
+
+            if (transaction.shiftId) {
+                const shift = await POSShift.findById(transaction.shiftId).session(session);
+                if (shift?.status === 'closed') {
+                    const error: any = new Error('Transactions included in a closed Z Report cannot be deleted');
+                    error.statusCode = 409;
+                    throw error;
+                }
             }
 
             const product = await Product.findOne({

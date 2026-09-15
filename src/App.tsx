@@ -29,6 +29,8 @@ const TransactionHistory = React.lazy(() => import('./pages/Transactions/Transac
 const ReportsPage = React.lazy(() => import('./pages/Reports/ReportsPage'));
 const Signup = React.lazy(() => import('./pages/Auth/Signup'));
 const OrderDesk = React.lazy(() => import('./pages/Orders/OrderDesk'));
+const OrderDraftsPage = React.lazy(() => import('./pages/Orders/OrderDraftsPage'));
+const POSShiftReportsPage = React.lazy(() => import('./pages/POS/POSShiftReportsPage'));
 const SettingsPage = React.lazy(() => import('./pages/Settings/SettingsPage'));
 const ProfilePage = React.lazy(() => import('./pages/Profile/ProfilePage'));
 const CustomersPage = React.lazy(() => import('./pages/Customers/CustomersPage'));
@@ -133,6 +135,16 @@ const AppContent: React.FC = () => {
               <Route path="team" element={
                 <ProtectedRoute allowedRoles={['super_admin', 'admin']} requiredScreen="team">
                   <TeamManagementPage />
+                </ProtectedRoute>
+              } />
+              <Route path="order-drafts" element={
+                <ProtectedRoute allowedRoles={['super_admin', 'admin', 'user']} requiredScreen="pos">
+                  <OrderDraftsPage />
+                </ProtectedRoute>
+              } />
+              <Route path="pos-reports" element={
+                <ProtectedRoute allowedRoles={['super_admin', 'admin', 'user']} requiredScreen="pos">
+                  <POSShiftReportsPage />
                 </ProtectedRoute>
               } />
               <Route path="permission-management" element={

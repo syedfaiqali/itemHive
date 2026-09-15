@@ -134,6 +134,11 @@ export const installmentPlanSchema = Joi.object({
     saleDate: Joi.date().required(),
     installmentMonths: Joi.number().valid(3, 6, 9, 12).required(),
     userName: Joi.string().min(2).required(),
+    shiftId: Joi.string().hex().length(24).optional(),
+    orderId: Joi.string().min(1).max(120).optional(),
+    advancePaidVia: Joi.string().valid('cash', 'card').optional(),
+    orderType: Joi.string().valid('dine_in', 'takeaway', 'foodpanda', 'other').optional(),
+    otherOrderType: Joi.string().allow('').max(80).optional(),
     witnesses: Joi.array().length(2).items(
         Joi.object({
             name: Joi.string().min(2).required(),

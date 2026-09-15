@@ -7,6 +7,7 @@ import Transaction from '../models/Transaction';
 import type { AuthRequest } from '../middleware/auth';
 import { normalizeRole } from '../utils/accessControl';
 import { buildTenantFilter, getTenantObjectId } from '../utils/tenancy';
+import POSShift from '../models/POSShift';
 
 const round2 = (value: number) => Math.round(value * 100) / 100;
 
@@ -84,7 +85,24 @@ export const createInstallmentPlan = async (req: AuthRequest, res: Response) => 
             userName,
             orderType,
             otherOrderType,
+            shiftId,
+            orderId,
+            advancePaidVia,
         } = req.body;
+
+        let resolvedShiftId: mongoose.Types.ObjectId | undefined;
+        if (shiftId) {
+            if (!mongoose.Types.ObjectId.isValid(String(shiftId))) {
+                throw new Error('Open a POS shift before taking payment');
+            }
+            const activeShift = await POSShift.findOneAndUpdate(
+                { _id: shiftId, status: 'open', ...buildTenantFilter(req.user!) },
+                { $inc: { activityVersion: 1 } },
+                { new: true, session },
+            );
+            if (!activeShift) throw new Error('This POS shift is closed. Open a new shift before taking payment');
+            resolvedShiftId = activeShift._id;
+        }
 
         const product = await Product.findOne({ id: productId, ...buildTenantFilter(req.user!) }).session(session);
         if (!product) {
@@ -128,6 +146,10 @@ export const createInstallmentPlan = async (req: AuthRequest, res: Response) => 
             productName,
             type: 'reduction',
             amount,
+            subtotal: resolvedTotalAmount,
+            discountPercent: 0,
+            discountAmount: 0,
+            taxAmount: 0,
             totalPrice: resolvedTotalAmount,
             userName: req.user?.name || userName || 'Staff',
             paymentMethod: 'installment',
@@ -141,6 +163,10 @@ export const createInstallmentPlan = async (req: AuthRequest, res: Response) => 
             unitPrice: resolvedUnitPrice,
             grossProfit: (resolvedUnitPrice - (product.purchasePrice ?? 0)) * Number(amount || 0),
             installmentPlanId: planId,
+            source: resolvedShiftId ? 'pos' : undefined,
+            orderId: resolvedShiftId ? String(orderId || planId) : '',
+            shiftId: resolvedShiftId,
+            paidVia: advancePaidVia === 'card' ? 'card' : 'cash',
             businessId: getTenantObjectId(req.user!),
         });
         await transaction.save({ session });
@@ -169,6 +195,9 @@ export const createInstallmentPlan = async (req: AuthRequest, res: Response) => 
             status: 'active',
             createdBy: req.user?.id || userName || 'Staff',
             schedule,
+            shiftId: resolvedShiftId,
+            orderId: resolvedShiftId ? String(orderId || planId) : '',
+            advancePaidVia: advancePaidVia === 'card' ? 'card' : 'cash',
             businessId: getTenantObjectId(req.user!),
         });
 
@@ -186,35 +215,40 @@ export const createInstallmentPlan = async (req: AuthRequest, res: Response) => 
 };
 
 export const payInstallment = async (req: AuthRequest, res: Response) => {
+    const session = await mongoose.startSession();
     try {
-        const plan = await InstallmentPlan.findOne({ planCode: req.params.id, ...buildTenantFilter(req.user!) });
-        if (!plan) {
-            return res.status(404).json({ message: 'Installment plan not found' });
-        }
+        let updatedPlan: any;
+        await session.withTransaction(async () => {
+            const plan = await InstallmentPlan.findOne({ planCode: req.params.id, ...buildTenantFilter(req.user!) }).session(session);
+            if (!plan) throw new Error('Installment plan not found');
 
-        const installmentNumber = Number(req.body.installmentNumber);
-        const paidVia = req.body.paidVia as 'cash' | 'card';
-        const notes = String(req.body.notes || '');
+            const installmentNumber = Number(req.body.installmentNumber);
+            const paidVia = req.body.paidVia as 'cash' | 'card';
+            const notes = String(req.body.notes || '');
+            const scheduleItem = plan.schedule.find((item) => item.installmentNumber === installmentNumber);
+            if (!scheduleItem) throw new Error('Installment entry not found');
+            if (scheduleItem.status === 'paid') throw new Error('This installment is already marked paid');
 
-        const scheduleItem = plan.schedule.find((item) => item.installmentNumber === installmentNumber);
-        if (!scheduleItem) {
-            return res.status(404).json({ message: 'Installment entry not found' });
-        }
+            const activeShift = await POSShift.findOneAndUpdate(
+                { ...buildTenantFilter(req.user!), status: 'open' },
+                { $inc: { activityVersion: 1 } },
+                { new: true, session },
+            );
+            scheduleItem.status = 'paid';
+            scheduleItem.paidAt = new Date();
+            scheduleItem.paidVia = paidVia;
+            scheduleItem.notes = notes;
+            scheduleItem.shiftId = activeShift?._id;
 
-        if (scheduleItem.status === 'paid') {
-            return res.status(400).json({ message: 'This installment is already marked paid' });
-        }
+            refreshInstallmentStatus(plan);
+            await plan.save({ session });
+            updatedPlan = plan;
+        });
 
-        scheduleItem.status = 'paid';
-        scheduleItem.paidAt = new Date();
-        scheduleItem.paidVia = paidVia;
-        scheduleItem.notes = notes;
-
-        refreshInstallmentStatus(plan);
-        await plan.save();
-
-        res.json(plan);
+        res.json(updatedPlan);
     } catch (error: any) {
         res.status(400).json({ message: error.message || 'Failed to update installment payment' });
+    } finally {
+        await session.endSession();
     }
 };

@@ -28,6 +28,9 @@ export interface Transaction {
     unitPrice?: number;
     grossProfit?: number;
     installmentPlanId?: string;
+    source?: 'pos' | 'order_desk' | 'inventory';
+    orderId?: string;
+    shiftId?: string;
 }
 
 interface TransactionState {

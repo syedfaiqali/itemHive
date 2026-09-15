@@ -8,6 +8,7 @@ export interface IInstallmentScheduleItem {
     paidAt?: Date;
     paidVia?: 'cash' | 'card';
     notes?: string;
+    shiftId?: mongoose.Types.ObjectId;
 }
 
 export interface IInstallmentWitness {
@@ -38,6 +39,9 @@ export interface IInstallmentPlan extends Document {
     createdBy: string;
     schedule: IInstallmentScheduleItem[];
     businessId?: mongoose.Types.ObjectId;
+    shiftId?: mongoose.Types.ObjectId;
+    orderId?: string;
+    advancePaidVia?: 'cash' | 'card';
 }
 
 const InstallmentWitnessSchema = new Schema<IInstallmentWitness>({
@@ -54,6 +58,7 @@ const InstallmentScheduleSchema = new Schema<IInstallmentScheduleItem>({
     paidAt: { type: Date, default: undefined },
     paidVia: { type: String, enum: ['cash', 'card'], default: undefined },
     notes: { type: String, default: '' },
+    shiftId: { type: Schema.Types.ObjectId, ref: 'POSShift', default: null, index: true },
 }, { _id: false });
 
 const InstallmentPlanSchema: Schema<IInstallmentPlan> = new Schema({
@@ -78,6 +83,9 @@ const InstallmentPlanSchema: Schema<IInstallmentPlan> = new Schema({
     createdBy: { type: String, required: true },
     schedule: { type: [InstallmentScheduleSchema], required: true },
     businessId: { type: Schema.Types.ObjectId, ref: 'Business', default: null, index: true },
+    shiftId: { type: Schema.Types.ObjectId, ref: 'POSShift', default: null, index: true },
+    orderId: { type: String, default: '', index: true },
+    advancePaidVia: { type: String, enum: ['cash', 'card'], default: 'cash' },
 }, { timestamps: true });
 
 InstallmentPlanSchema.index({ businessId: 1, planCode: 1 }, { unique: true });

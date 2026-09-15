@@ -9,6 +9,7 @@ export interface ICreditPayment extends Document {
     notes?: string;
     timestamp: Date;
     businessId?: mongoose.Types.ObjectId;
+    shiftId?: mongoose.Types.ObjectId;
 }
 
 const CreditPaymentSchema: Schema<ICreditPayment> = new Schema({
@@ -20,6 +21,7 @@ const CreditPaymentSchema: Schema<ICreditPayment> = new Schema({
     notes: { type: String, default: '' },
     timestamp: { type: Date, default: Date.now, index: true },
     businessId: { type: Schema.Types.ObjectId, ref: 'Business', default: null, index: true },
+    shiftId: { type: Schema.Types.ObjectId, ref: 'POSShift', default: null, index: true },
 }, { timestamps: true });
 
 export default mongoose.model<ICreditPayment>('CreditPayment', CreditPaymentSchema);

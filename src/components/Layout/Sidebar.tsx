@@ -21,6 +21,8 @@ import {
     BarChart3,
     Monitor as TerminalIcon,
     ClipboardList,
+    FileClock,
+    ChartNoAxesCombined,
     WalletCards,
     CalendarClock,
     Users,
@@ -62,6 +64,8 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onDrawerToggle }) => {
     const menuItems: Array<{ text: string; icon: React.ReactNode; path: string; roles: string[]; permission?: ScreenPermission; requiresInstallmentAccess?: boolean; requiresSignupApproval?: boolean }> = [
         { text: 'Dashboard', icon: <LayoutDashboard size={20} />, path: '/', roles: ['super_admin', 'admin', 'user'], permission: 'dashboard' },
         { text: 'POS Terminal', icon: <TerminalIcon size={20} />, path: '/pos', roles: ['super_admin', 'admin', 'user'], permission: 'pos' },
+        { text: 'Shift Management', icon: <ChartNoAxesCombined size={20} />, path: '/pos-reports', roles: ['super_admin', 'admin', 'user'], permission: 'pos' },
+        { text: 'Order Drafts', icon: <FileClock size={20} />, path: '/order-drafts', roles: ['super_admin', 'admin', 'user'], permission: 'pos' },
         { text: 'Inventory', icon: <Package size={20} />, path: '/inventory', roles: ['super_admin', 'admin', 'user'], permission: 'inventory' },
         { text: 'Categories', icon: <Package size={20} />, path: '/inventory/categories', roles: ['super_admin', 'admin'], permission: 'inventory_categories' },
         { text: 'Product Units', icon: <Scale size={20} />, path: '/inventory/units', roles: ['super_admin', 'admin', 'user'], permission: 'inventory_units' },

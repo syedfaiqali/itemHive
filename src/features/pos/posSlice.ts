@@ -50,11 +50,15 @@ const posSlice = createSlice({
             state.cart = [];
             state.discountPercent = 0;
         },
+        replaceCart: (state, action: PayloadAction<{ cart: CartItem[]; discountPercent?: number }>) => {
+            state.cart = action.payload.cart;
+            state.discountPercent = Math.min(100, Math.max(0, action.payload.discountPercent || 0));
+        },
         setCartDiscountPercent: (state, action: PayloadAction<number>) => {
             state.discountPercent = Math.min(100, Math.max(0, action.payload || 0));
         },
     },
 });
 
-export const { addToCart, updateCartItemPrice, removeFromCart, updateQuantity, clearCart, setCartDiscountPercent } = posSlice.actions;
+export const { addToCart, updateCartItemPrice, removeFromCart, updateQuantity, clearCart, replaceCart, setCartDiscountPercent } = posSlice.actions;
 export default posSlice.reducer;

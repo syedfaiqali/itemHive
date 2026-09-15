@@ -17,7 +17,7 @@ const waitForReceiptImages = async (document: Document) => {
  * makes Chromium lay out every product card and evaluate its print selectors,
  * which becomes noticeably slow for large inventories.
  */
-export const printReceipt = async (receipt: HTMLElement, selector = '#pos-receipt') => {
+export const printReceipt = async (receipt: HTMLElement, selector = '#pos-receipt', rollWidthMm = 58) => {
     const frame = document.createElement('iframe');
     frame.setAttribute('aria-hidden', 'true');
     // Keep the frame off-screen instead of using visibility:hidden; some
@@ -45,7 +45,7 @@ export const printReceipt = async (receipt: HTMLElement, selector = '#pos-receip
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 ${inheritedStyles}
-<style>${thermalInvoicePrintCss(selector, 58)}</style>
+<style>${thermalInvoicePrintCss(selector, rollWidthMm)}</style>
 </head>
 <body>${receipt.outerHTML}</body>
 </html>`);

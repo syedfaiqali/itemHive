@@ -3,6 +3,8 @@ import Transaction from '../models/Transaction';
 import CreditPayment from '../models/CreditPayment';
 import type { AuthRequest } from '../middleware/auth';
 import { buildTenantFilter, getTenantObjectId, type TenantContext } from '../utils/tenancy';
+import mongoose from 'mongoose';
+import POSShift from '../models/POSShift';
 
 const buildCustomerKey = (customerName: string, customerCnic: string) =>
     `${customerName.trim().toLowerCase()}::${customerCnic.trim().toLowerCase()}`;
@@ -102,6 +104,7 @@ export const getCreditPayments = async (req: AuthRequest, res: Response) => {
 };
 
 export const createCreditPayment = async (req: AuthRequest, res: Response) => {
+    const session = await mongoose.startSession();
     try {
         const customerName = String(req.body.customerName || '').trim();
         const customerCnic = String(req.body.customerCnic || '').trim();
@@ -128,18 +131,29 @@ export const createCreditPayment = async (req: AuthRequest, res: Response) => {
             });
         }
 
-        const payment = await CreditPayment.create({
-            customerName,
-            customerCnic,
-            amount,
-            paidVia,
-            receivedBy: req.user?.id || 'unknown',
-            notes,
-            businessId: getTenantObjectId(req.user!),
+        let payment: any;
+        await session.withTransaction(async () => {
+            const activeShift = await POSShift.findOneAndUpdate(
+                { ...buildTenantFilter(req.user!), status: 'open' },
+                { $inc: { activityVersion: 1 } },
+                { new: true, session },
+            );
+            [payment] = await CreditPayment.create([{
+                customerName,
+                customerCnic,
+                amount,
+                paidVia,
+                receivedBy: req.user?.id || 'unknown',
+                notes,
+                shiftId: activeShift?._id,
+                businessId: getTenantObjectId(req.user!),
+            }], { session });
         });
 
         res.status(201).json(payment);
     } catch (error: any) {
         res.status(400).json({ message: error.message || 'Failed to record payment' });
+    } finally {
+        await session.endSession();
     }
 };

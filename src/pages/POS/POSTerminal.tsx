@@ -39,12 +39,14 @@ import {
     Printer,
     Share2,
     Download,
+    Save,
     X
 } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
-import { addToCart, updateCartItemPrice, updateQuantity, clearCart, setCartDiscountPercent } from '../../features/pos/posSlice';
-import { reduceStockApi, resolveProductImage, fetchProducts, placeholderFallback } from '../../features/inventory/inventorySlice';
+import { addToCart, updateCartItemPrice, updateQuantity, clearCart, replaceCart, setCartDiscountPercent } from '../../features/pos/posSlice';
+import { resolveProductImage, fetchProducts, placeholderFallback } from '../../features/inventory/inventorySlice';
 import { fetchTransactions } from '../../features/transactions/transactionSlice';
 import type { Product } from '../../features/inventory/inventorySlice';
 import type { AppDispatch } from '../../store';
@@ -60,10 +62,18 @@ import { amountToWords } from '../../lib/numberToWords';
 import { buildInvoicePdfBlob, shareOrDownloadPdf } from '../../lib/invoicePdf';
 import { thermalInvoicePrintCss } from '../../lib/thermalPrintCss';
 import { printReceipt } from '../../lib/printReceipt';
+import type { OrderDraft } from '../../types/orderDraft';
+import type { POSShift } from '../../types/posShift';
 
 
 type CheckoutMethod = 'cash' | 'card' | 'credit' | 'installment';
 type OrderType = 'dine_in' | 'takeaway' | 'foodpanda' | 'other';
+const showCreditKot = false;
+
+const getRequestErrorMessage = (error: unknown, fallback: string) =>
+    (error as { response?: { data?: { message?: string } }; message?: string }).response?.data?.message
+    || (error as { message?: string }).message
+    || fallback;
 
 const getOrderTypeLabel = (type: OrderType | '', customType: string) => {
     if (type === 'dine_in') return 'Dine In';
@@ -75,16 +85,19 @@ const getOrderTypeLabel = (type: OrderType | '', customType: string) => {
 
 const POSTerminal: React.FC = () => {
     const { categories: productCategories } = useProductCategories();
-    const categories = ['All', ...productCategories];
+    const categories = useMemo(() => ['All', ...productCategories], [productCategories]);
     const dispatch = useDispatch<AppDispatch>();
     const theme = useTheme();
+    const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const requestedDraftId = searchParams.get('draft');
 
     React.useEffect(() => {
         dispatch(fetchProducts());
     }, [dispatch]);
 
     const { user } = useSelector((state: RootState) => state.auth);
-    const { products, error: productsError } = useSelector((state: RootState) => state.inventory);
+    const { products, loaded: productsLoaded, error: productsError } = useSelector((state: RootState) => state.inventory);
     const { cart, discountPercent } = useSelector((state: RootState) => state.pos);
     const { app, country } = useSelector((state: RootState) => state.settings);
     const appSettings = app || DEFAULT_APP_SETTINGS;
@@ -117,6 +130,10 @@ const POSTerminal: React.FC = () => {
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [pendingMethod, setPendingMethod] = useState<CheckoutMethod | null>(null);
     const [confirmingPayment, setConfirmingPayment] = useState(false);
+    const [savingDraft, setSavingDraft] = useState(false);
+    const [activeDraftId, setActiveDraftId] = useState<string | null>(null);
+    const [activeDraftCode, setActiveDraftCode] = useState('');
+    const loadedDraftRef = React.useRef<string | null>(null);
     // State updates apply on the next render; this ref blocks a rapid double
     // click immediately, before the button visually becomes disabled.
     const checkoutInFlightRef = React.useRef(false);
@@ -142,6 +159,32 @@ const POSTerminal: React.FC = () => {
     const [installmentSaleDate, setInstallmentSaleDate] = useState(new Date().toISOString().split('T')[0]);
     const [installmentUnitPriceInput, setInstallmentUnitPriceInput] = useState('');
     const [installmentAdvanceInput, setInstallmentAdvanceInput] = useState('0');
+    const [installmentAdvancePaidVia, setInstallmentAdvancePaidVia] = useState<'cash' | 'card'>('cash');
+    const [openShift, setOpenShift] = useState<POSShift | null>(null);
+    const [shiftLoading, setShiftLoading] = useState(true);
+
+    React.useEffect(() => {
+        let cancelled = false;
+        const loadOpenShift = async () => {
+            setShiftLoading(true);
+            try {
+                const response = await api.get<{ shift: POSShift | null }>('/pos-shifts/current');
+                if (!cancelled) setOpenShift(response.data.shift);
+            } catch {
+                if (!cancelled) setOpenShift(null);
+            } finally {
+                if (!cancelled) setShiftLoading(false);
+            }
+        };
+        void loadOpenShift();
+        window.addEventListener('itemhive-pos-shift-changed', loadOpenShift);
+        window.addEventListener('itemhive-workspace-changed', loadOpenShift);
+        return () => {
+            cancelled = true;
+            window.removeEventListener('itemhive-pos-shift-changed', loadOpenShift);
+            window.removeEventListener('itemhive-workspace-changed', loadOpenShift);
+        };
+    }, []);
 
     const filteredProducts = useMemo(() => {
         return products.filter(p => {
@@ -150,7 +193,7 @@ const POSTerminal: React.FC = () => {
             const matchesCategory = activeTab === 0 || p.category === categories[activeTab];
             return matchesSearch && matchesCategory;
         });
-    }, [products, searchTerm, activeTab]);
+    }, [products, searchTerm, activeTab, categories]);
 
     const subtotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
     const projectedProfit = cart.reduce((acc, item) => acc + ((item.price - item.purchasePrice) * item.quantity), 0);
@@ -176,7 +219,7 @@ const POSTerminal: React.FC = () => {
         ? (draftInstallmentUnitPrice - installmentItem.purchasePrice) * installmentQuantity
         : 0;
     const isOrderTypeComplete = !isRestaurant || Boolean(orderType && (orderType !== 'other' || otherOrderType.trim()));
-    const canChoosePayment = cart.length > 0 && isOrderTypeComplete;
+    const canChoosePayment = cart.length > 0 && isOrderTypeComplete && Boolean(openShift) && !shiftLoading;
     const orderTypeLabel = isRestaurant ? getOrderTypeLabel(orderType, otherOrderType) : '';
 
     React.useEffect(() => {
@@ -186,6 +229,58 @@ const POSTerminal: React.FC = () => {
             setDeliveryNumber('');
         }
     }, [isRestaurant]);
+
+    React.useEffect(() => {
+        if (!requestedDraftId) {
+            loadedDraftRef.current = null;
+            setActiveDraftId(null);
+            setActiveDraftCode('');
+            return;
+        }
+        if (!productsLoaded || loadedDraftRef.current === requestedDraftId) return;
+
+        loadedDraftRef.current = requestedDraftId;
+        let cancelled = false;
+        const loadDraft = async () => {
+            try {
+                const response = await api.get<OrderDraft>(`/order-drafts/${requestedDraftId}`);
+                if (cancelled) return;
+                const unavailableNames: string[] = [];
+                const restoredCart = response.data.items.flatMap((draftItem) => {
+                    const product = products.find((candidate) => candidate.id === draftItem.productId);
+                    if (!product) {
+                        unavailableNames.push(draftItem.productName);
+                        return [];
+                    }
+                    return [{ ...product, price: draftItem.unitPrice, quantity: draftItem.quantity }];
+                });
+
+                if (restoredCart.length === 0) {
+                    throw new Error('None of the products in this draft are available anymore.');
+                }
+
+                dispatch(replaceCart({ cart: restoredCart, discountPercent: response.data.discountPercent }));
+                setOrderType(response.data.orderType || '');
+                setOtherOrderType(response.data.otherOrderType || '');
+                setDeliveryNumber(response.data.deliveryNumber || '');
+                setPendingMethod(null);
+                setActiveDraftId(response.data._id);
+                setActiveDraftCode(response.data.draftCode);
+                if (unavailableNames.length > 0) {
+                    setStockToast({ open: true, message: `${unavailableNames.join(', ')} could not be restored because they no longer exist.` });
+                }
+            } catch (requestError: unknown) {
+                if (cancelled) return;
+                setStockToast({ open: true, message: getRequestErrorMessage(requestError, 'Order draft could not be opened.') });
+                navigate('/order-drafts', { replace: true });
+            }
+        };
+
+        void loadDraft();
+        return () => {
+            cancelled = true;
+        };
+    }, [dispatch, navigate, products, productsLoaded, requestedDraftId]);
 
     /** POS invoice PDF: uses the same document structure as Order Desk. */
     const buildReceiptPdf = (id: string, method: CheckoutMethod, receiptTimeIso: string) => {
@@ -314,6 +409,54 @@ const POSTerminal: React.FC = () => {
         dispatch(addToCart(product));
     };
 
+    const handleSaveDraft = async () => {
+        if (cart.length === 0 || savingDraft || confirmingPayment) return;
+        setSavingDraft(true);
+        try {
+            const payload = {
+                items: cart.map((item) => ({
+                    productId: item.id,
+                    quantity: item.quantity,
+                    unitPrice: item.price,
+                })),
+                discountPercent: appliedDiscountPercent,
+                orderType: isRestaurant && orderType ? orderType : undefined,
+                otherOrderType: isRestaurant && orderType === 'other' ? otherOrderType.trim() : undefined,
+                deliveryNumber: isRestaurant ? deliveryNumber.trim() : undefined,
+            };
+
+            if (activeDraftId) {
+                await api.put(`/order-drafts/${activeDraftId}`, payload);
+            } else {
+                await api.post('/order-drafts', payload);
+            }
+
+            dispatch(clearCart());
+            setPendingMethod(null);
+            setOrderType('');
+            setOtherOrderType('');
+            setDeliveryNumber('');
+            navigate('/order-drafts');
+        } catch (requestError: unknown) {
+            setStockToast({ open: true, message: getRequestErrorMessage(requestError, 'Order draft could not be saved.') });
+        } finally {
+            setSavingDraft(false);
+        }
+    };
+
+    const removePaidDraft = async () => {
+        if (!activeDraftId) return;
+        try {
+            await api.delete(`/order-drafts/${activeDraftId}`);
+            setActiveDraftId(null);
+            setActiveDraftCode('');
+            loadedDraftRef.current = null;
+            navigate('/pos', { replace: true });
+        } catch {
+            setStockToast({ open: true, message: 'Payment succeeded, but the paid draft could not be removed. Please delete it from Order Drafts.' });
+        }
+    };
+
     const handleCheckout = (method: 'cash' | 'card') => {
         setPendingMethod(method);
     };
@@ -351,6 +494,7 @@ const POSTerminal: React.FC = () => {
         setInstallmentSaleDate(new Date().toISOString().split('T')[0]);
         setInstallmentUnitPriceInput(String(cart[0]?.price || 0));
         setInstallmentAdvanceInput('0');
+        setInstallmentAdvancePaidVia('cash');
         setInstallmentOpen(true);
     };
 
@@ -393,6 +537,10 @@ const POSTerminal: React.FC = () => {
 
     const handleConfirmCheckout = async () => {
         if (!pendingMethod || confirmingPayment || checkoutInFlightRef.current) return;
+        if (!openShift) {
+            setStockToast({ open: true, message: 'Open a POS shift before taking payment.' });
+            return;
+        }
         if (isRestaurant && !isOrderTypeComplete) {
             setStockToast({ open: true, message: 'Select an order type before taking payment.' });
             return;
@@ -419,6 +567,7 @@ const POSTerminal: React.FC = () => {
                     totalAmount: draftInstallmentTotal,
                     unitPrice: draftInstallmentUnitPrice,
                     advancePayment: draftInstallmentAdvance,
+                    advancePaidVia: installmentAdvancePaidVia,
                     customerName: installmentCustomerName.trim(),
                     customerCnic: installmentCustomerCnic.trim(),
                     customerPhone: installmentCustomerPhone.trim(),
@@ -428,6 +577,8 @@ const POSTerminal: React.FC = () => {
                     userName: user?.name || 'Staff',
                     orderType: isRestaurant ? orderType : undefined,
                     otherOrderType: isRestaurant && orderType === 'other' ? otherOrderType.trim() : undefined,
+                    shiftId: openShift._id,
+                    orderId: id,
                     witnesses: [
                         { name: witnessOneName.trim(), cnic: witnessOneCnic.trim(), address: witnessOneAddress.trim() },
                         { name: witnessTwoName.trim(), cnic: witnessTwoCnic.trim(), address: witnessTwoAddress.trim() },
@@ -439,6 +590,8 @@ const POSTerminal: React.FC = () => {
                     dispatch(fetchTransactions()),
                 ]);
 
+                await removePaidDraft();
+
                 window.dispatchEvent(new Event('itemhive-installments-updated'));
                 setReceiptId(id);
                 setReceiptTime(receiptTimeIso);
@@ -447,47 +600,31 @@ const POSTerminal: React.FC = () => {
                 setConfirmOpen(false);
                 setPendingMethod(null);
                 return;
-            } catch (error: any) {
+            } catch (error: unknown) {
                 setStockToast({
                     open: true,
-                    message: error.response?.data?.message || 'Installment plan could not be created.',
+                    message: getRequestErrorMessage(error, 'Installment plan could not be created.'),
                 });
                 return;
             }
         }
 
-        const results = await Promise.all(cart.map((item, index) => {
-            const tx = {
-                // Each product line is a separate database transaction, so it
-                // needs its own ID even when product IDs share a prefix.
-                id: `${id}-L${index + 1}`,
-                productId: item.id,
-                productName: item.name,
-                type: 'reduction' as const,
-                amount: item.quantity,
-                userName: user?.name || 'Staff',
-                timestamp: receiptTimeIso,
-                totalPrice: item.price * item.quantity,
+        try {
+            await api.post('/transactions/checkout', {
+                orderId: id,
+                shiftId: openShift._id,
+                items: cart.map((item) => ({ productId: item.id, quantity: item.quantity, unitPrice: item.price })),
                 discountPercent: appliedDiscountPercent,
                 paymentMethod: pendingMethod,
-                paidVia: pendingMethod === 'credit' ? creditPaidVia : undefined,
+                paidVia: pendingMethod === 'credit' ? creditPaidVia : pendingMethod,
                 paidNow: pendingMethod === 'credit' ? creditPaidNow : total,
-                dueAmount: pendingMethod === 'credit' ? creditDue : 0,
                 customerName: pendingMethod === 'credit' ? creditCustomerName.trim() : undefined,
                 customerCnic: pendingMethod === 'credit' ? creditCustomerCnic.trim() : undefined,
                 orderType: isRestaurant ? orderType : undefined,
                 otherOrderType: isRestaurant && orderType === 'other' ? otherOrderType.trim() : undefined,
-                unitPrice: item.price,
-            };
-            return dispatch(reduceStockApi({ id: item.id, amount: item.quantity, transaction: tx }));
-        }));
-
-        const failedResult = results.find((result) => reduceStockApi.rejected.match(result));
-        if (failedResult && reduceStockApi.rejected.match(failedResult)) {
-            setStockToast({
-                open: true,
-                message: typeof failedResult.payload === 'string' ? failedResult.payload : 'Credit sale could not be saved.',
             });
+        } catch (error: unknown) {
+            setStockToast({ open: true, message: getRequestErrorMessage(error, 'Sale could not be completed.') });
             return;
         }
 
@@ -495,6 +632,8 @@ const POSTerminal: React.FC = () => {
             dispatch(fetchProducts({ force: true })),
             dispatch(fetchTransactions()),
         ]);
+
+        await removePaidDraft();
 
         setReceiptId(id);
         setReceiptTime(receiptTimeIso);
@@ -552,6 +691,7 @@ const POSTerminal: React.FC = () => {
         setInstallmentMonths(3);
         setInstallmentUnitPriceInput('');
         setInstallmentAdvanceInput('0');
+        setInstallmentAdvancePaidVia('cash');
     };
 
     const handlePrint = async () => {
@@ -929,7 +1069,10 @@ const POSTerminal: React.FC = () => {
                 <Box sx={{ p: 2.5, bgcolor: 'primary.main', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                         <ShoppingCart size={22} />
-                        <Typography variant="h6" fontWeight={800}>Current Order</Typography>
+                        <Box>
+                            <Typography variant="h6" fontWeight={800} lineHeight={1.15}>Current Order</Typography>
+                            {activeDraftCode && <Typography variant="caption" sx={{ opacity: 0.85 }}>Editing {activeDraftCode}</Typography>}
+                        </Box>
                     </Box>
                 </Box>
 
@@ -1115,6 +1258,25 @@ const POSTerminal: React.FC = () => {
                         />}
                     </Stack>
 
+                    {!shiftLoading && !openShift && (
+                        <Alert
+                            severity="warning"
+                            action={<Button color="inherit" size="small" onClick={() => navigate('/pos-reports')} sx={{ fontWeight: 900 }}>Open Shift</Button>}
+                            sx={{ mb: 1.25, alignItems: 'center' }}
+                        >
+                            Payment is locked until a POS shift is opened. You can still save this order as a draft.
+                        </Alert>
+                    )}
+                    {openShift && (
+                        <Chip
+                            size="small"
+                            color="success"
+                            variant="outlined"
+                            label={`${openShift.shiftCode} · ${openShift.registerName}`}
+                            sx={{ alignSelf: 'flex-start', mb: 1.25, fontWeight: 800 }}
+                        />
+                    )}
+
                     <Grid container spacing={1}>
                         <Grid size={{ xs: canAccessInstallments ? 3 : 4 }}>
                             <Button
@@ -1164,7 +1326,7 @@ const POSTerminal: React.FC = () => {
                                 EMI
                             </Button>
                         </Grid>}
-                        <Grid size={{ xs: 6 }}>
+                        <Grid size={{ xs: 12 }}>
                             <Button
                                 fullWidth
                                 variant="outlined"
@@ -1179,6 +1341,25 @@ const POSTerminal: React.FC = () => {
                                 }}
                             >
                                 Clear
+                            </Button>
+                        </Grid>
+                        <Grid size={{ xs: 6 }}>
+                            <Button
+                                fullWidth
+                                variant="outlined"
+                                size="large"
+                                startIcon={savingDraft ? <CircularProgress size={19} color="inherit" /> : <Save size={21} />}
+                                disabled={cart.length === 0 || savingDraft || confirmingPayment}
+                                onClick={handleSaveDraft}
+                                sx={{
+                                    py: 1.3,
+                                    mt: 0.5,
+                                    borderRadius: 3,
+                                    fontWeight: 900,
+                                    fontSize: '0.95rem',
+                                }}
+                            >
+                                {savingDraft ? 'Saving...' : activeDraftId ? 'Update Draft' : 'Save as Draft'}
                             </Button>
                         </Grid>
                         <Grid size={{ xs: 6 }}>
@@ -1270,7 +1451,7 @@ const POSTerminal: React.FC = () => {
                         </Typography>
                     </Box>
 
-                    {false && isRestaurant && (
+                    {showCreditKot && isRestaurant && (
                         <Box
                             id="pos-kot"
                             sx={{
@@ -1380,6 +1561,12 @@ const POSTerminal: React.FC = () => {
                                 inputProps={{ min: 0, step: '0.01' }}
                                 helperText="Advance is deducted before EMI is created."
                             />
+                        </Grid>
+                        <Grid size={{ xs: 12, md: 6 }}>
+                            <TextField select fullWidth label="Advance Paid Via" value={installmentAdvancePaidVia} onChange={(e) => setInstallmentAdvancePaidVia(e.target.value as 'cash' | 'card')}>
+                                <MenuItem value="cash">Cash</MenuItem>
+                                <MenuItem value="card">Card</MenuItem>
+                            </TextField>
                         </Grid>
                         <Grid size={{ xs: 12, md: 6 }}>
                             <TextField

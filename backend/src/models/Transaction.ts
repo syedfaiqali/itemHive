@@ -25,6 +25,9 @@ export interface ITransaction extends Document {
     unitPrice?: number;
     grossProfit?: number;
     installmentPlanId?: string;
+    source?: 'pos' | 'order_desk' | 'inventory';
+    orderId?: string;
+    shiftId?: mongoose.Types.ObjectId;
     businessId?: mongoose.Types.ObjectId;
 }
 
@@ -53,6 +56,9 @@ const TransactionSchema: Schema = new Schema({
     unitPrice: { type: Number, default: 0 },
     grossProfit: { type: Number, default: 0 },
     installmentPlanId: { type: String, default: '', index: true },
+    source: { type: String, enum: ['pos', 'order_desk', 'inventory'], default: undefined, index: true },
+    orderId: { type: String, default: '', index: true },
+    shiftId: { type: Schema.Types.ObjectId, ref: 'POSShift', default: null, index: true },
     businessId: { type: Schema.Types.ObjectId, ref: 'Business', default: null, index: true }
 }, { timestamps: true });
 
