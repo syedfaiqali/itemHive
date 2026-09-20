@@ -96,6 +96,12 @@ export const createPOSCheckout = async (req: AuthRequest, res: Response) => {
             if (isRestaurantOrder && !allowedOrderTypes.includes(requestedOrderType)) {
                 throw new Error('Select a valid order type before taking payment');
             }
+            const isFoodpandaOrder = requestedOrderType.toLowerCase() === 'foodpanda';
+            const foodpandaOrderNumber = isFoodpandaOrder ? String(req.body.foodpandaOrderNumber || '').trim() : '';
+            const foodpandaRiderName = isFoodpandaOrder ? String(req.body.foodpandaRiderName || '').trim() : '';
+            if (isFoodpandaOrder && (!foodpandaOrderNumber || !foodpandaRiderName)) {
+                throw new Error('Foodpanda order number and rider name are required');
+            }
 
             const transactionDocuments = lineInputs.map((line: any, index: number) => ({
                 id: `${orderId}-L${index + 1}`,
@@ -120,6 +126,8 @@ export const createPOSCheckout = async (req: AuthRequest, res: Response) => {
                 customerCnic: paymentMethod === 'credit' ? String(req.body.customerCnic || '').trim() : '',
                 orderType: isRestaurantOrder ? requestedOrderType : undefined,
                 otherOrderType: isRestaurantOrder && requestedOrderType === 'other' ? String(req.body.otherOrderType || '').trim() : '',
+                foodpandaOrderNumber,
+                foodpandaRiderName,
                 unitCost: Number(line.product.purchasePrice || 0),
                 unitPrice: line.unitPrice,
                 grossProfit: (line.subtotal - line.discountAmount) - (Number(line.product.purchasePrice || 0) * line.quantity),

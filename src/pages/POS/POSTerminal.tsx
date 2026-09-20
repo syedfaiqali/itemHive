@@ -121,6 +121,7 @@ const POSTerminal: React.FC = () => {
     const [activeTab, setActiveTab] = useState(0);
     const [paymentMethod, setPaymentMethod] = useState<CheckoutMethod | null>(null);
     const [orderType, setOrderType] = useState<OrderType | ''>('');
+    const isFoodpandaOrder = orderType.trim().toLowerCase() === 'foodpanda';
     const [otherOrderType, setOtherOrderType] = useState('');
     const [deliveryNumber, setDeliveryNumber] = useState('');
     const [orderDone, setOrderDone] = useState(false);
@@ -147,6 +148,9 @@ const POSTerminal: React.FC = () => {
     const [creditDue, setCreditDue] = useState(0);
     const [creditCustomerName, setCreditCustomerName] = useState('');
     const [creditCustomerCnic, setCreditCustomerCnic] = useState('');
+    const [foodpandaOpen, setFoodpandaOpen] = useState(false);
+    const [foodpandaOrderNumber, setFoodpandaOrderNumber] = useState('');
+    const [foodpandaRiderName, setFoodpandaRiderName] = useState('');
     const [installmentOpen, setInstallmentOpen] = useState(false);
     const [installmentCustomerName, setInstallmentCustomerName] = useState('');
     const [installmentCustomerCnic, setInstallmentCustomerCnic] = useState('');
@@ -479,7 +483,20 @@ const POSTerminal: React.FC = () => {
     };
 
     const handleCheckout = (method: 'cash' | 'card') => {
+        if (method === 'card' && isFoodpandaOrder) {
+            setFoodpandaOpen(true);
+            return;
+        }
         setPendingMethod(method);
+    };
+
+    const handleContinueFoodpanda = () => {
+        if (!foodpandaOrderNumber.trim() || !foodpandaRiderName.trim()) {
+            setStockToast({ open: true, message: 'Foodpanda order number and rider name are required.' });
+            return;
+        }
+        setPendingMethod('card');
+        setFoodpandaOpen(false);
     };
 
     const handleOpenCredit = () => {
@@ -643,6 +660,8 @@ const POSTerminal: React.FC = () => {
                 customerCnic: pendingMethod === 'credit' ? creditCustomerCnic.trim() : undefined,
                 orderType: isRestaurant ? orderType : undefined,
                 otherOrderType: isRestaurant && orderType === 'other' ? otherOrderType.trim() : undefined,
+                foodpandaOrderNumber: isFoodpandaOrder ? foodpandaOrderNumber.trim() : undefined,
+                foodpandaRiderName: isFoodpandaOrder ? foodpandaRiderName.trim() : undefined,
             });
         } catch (error: unknown) {
             setStockToast({ open: true, message: getRequestErrorMessage(error, 'Sale could not be completed.') });
@@ -678,6 +697,10 @@ const POSTerminal: React.FC = () => {
         setOrderType(value);
         setOtherOrderType('');
         setPendingMethod(null);
+        if (value.trim().toLowerCase() !== 'foodpanda') {
+            setFoodpandaOrderNumber('');
+            setFoodpandaRiderName('');
+        }
     };
 
     const handlePayNow = () => {
@@ -699,6 +722,8 @@ const POSTerminal: React.FC = () => {
         setCreditDue(0);
         setCreditCustomerName('');
         setCreditCustomerCnic('');
+        setFoodpandaOrderNumber('');
+        setFoodpandaRiderName('');
         setInstallmentCustomerName('');
         setInstallmentCustomerCnic('');
         setInstallmentCustomerPhone('');
@@ -1084,10 +1109,11 @@ const POSTerminal: React.FC = () => {
                     border: '1px solid',
                     borderColor: 'divider',
                     minHeight: { xs: 360, sm: 420, lg: 0 },
-                    height: { lg: '100%' }
+                    height: { lg: '100%' },
+                    maxHeight: { xs: 'calc(100dvh - 12px)', lg: '100%' }
                 }}
             >
-                <Box sx={{ p: 2.5, bgcolor: 'primary.main', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Box sx={{ p: { xs: 1.5, sm: 2.5 }, bgcolor: 'primary.main', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                         <ShoppingCart size={22} />
                         <Box>
@@ -1100,87 +1126,99 @@ const POSTerminal: React.FC = () => {
                 <Box
                     sx={{
                         p: 0,
-                        flexGrow: 1,
+                        flex: 1,
                         minHeight: 0,
-                        overflowY: cart.length === 0 ? 'hidden' : 'auto',
+                        overflowY: 'auto',
+                        overflowX: 'hidden',
                         display: 'flex',
                         flexDirection: 'column',
-                        justifyContent: cart.length === 0 ? 'center' : 'flex-start'
+                        scrollbarWidth: 'thin',
+                        scrollbarColor: (theme) => `${theme.palette.primary.main} transparent`,
+                        '&::-webkit-scrollbar': { width: 8 },
+                        '&::-webkit-scrollbar-thumb': {
+                            bgcolor: 'primary.main',
+                            borderRadius: 99,
+                            border: '2px solid',
+                            borderColor: 'background.paper'
+                        },
+                        '&::-webkit-scrollbar-track': { bgcolor: 'transparent' },
+                        overscrollBehavior: 'contain'
                     }}
                 >
-                    {cart.length === 0 ? (
-                        <Box sx={{
-                            textAlign: 'center',
-                            opacity: 0.4,
-                            width: '100%',
-                            px: 3,
-                            py: 2
-                        }}>
-                            <ShoppingCart size={56} strokeWidth={1} style={{ marginBottom: 12 }} />
-                            <Typography variant="h6" fontWeight={800}>Cart is empty</Typography>
-                            <Typography variant="body2" fontWeight={600}>Select products to start</Typography>
-                        </Box>
-                    ) : (
-                        <Box sx={{ p: 2, pb: 1 }}>
-                            <AnimatePresence>
-                                {cart.map((item) => (
-                                    <motion.div
-                                        key={item.id}
-                                        initial={{ opacity: 0, y: 10 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        exit={{ opacity: 0, scale: 0.95 }}
-                                    >
-                                        <Box sx={{ mb: 1.25, display: 'flex', alignItems: { xs: 'flex-start', sm: 'center' }, gap: { xs: 1, sm: 2 }, flexWrap: 'wrap' }}>
-                                            <Box sx={{ flexGrow: 1, minWidth: { xs: '100%', sm: 160 } }}>
-                                                <Typography variant="body2" fontWeight={700} noWrap={false} sx={{ wordBreak: 'break-word' }}>{item.name}</Typography>
-                                                <Typography variant="caption" color="text.secondary" display="block">
-                                                    Cost: {formatCurrency(item.purchasePrice)} | Default sell: {formatCurrency(item.salePrice)}
+                    <Box sx={{ minHeight: cart.length === 0 ? 180 : 'auto', display: 'flex', flexDirection: 'column', justifyContent: cart.length === 0 ? 'center' : 'flex-start' }}>
+                        {cart.length === 0 ? (
+                            <Box sx={{
+                                textAlign: 'center',
+                                opacity: 0.4,
+                                width: '100%',
+                                px: 3,
+                                py: 2
+                            }}>
+                                <ShoppingCart size={56} strokeWidth={1} style={{ marginBottom: 12 }} />
+                                <Typography variant="h6" fontWeight={800}>Cart is empty</Typography>
+                                <Typography variant="body2" fontWeight={600}>Select products to start</Typography>
+                            </Box>
+                        ) : (
+                            <Box sx={{ p: 2, pb: 1 }}>
+                                <AnimatePresence>
+                                    {cart.map((item) => (
+                                        <motion.div
+                                            key={item.id}
+                                            initial={{ opacity: 0, y: 10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0, scale: 0.95 }}
+                                        >
+                                            <Box sx={{ mb: 1.25, display: 'flex', alignItems: { xs: 'flex-start', sm: 'center' }, gap: { xs: 1, sm: 2 }, flexWrap: 'wrap' }}>
+                                                <Box sx={{ flexGrow: 1, minWidth: { xs: '100%', sm: 160 } }}>
+                                                    <Typography variant="body2" fontWeight={700} noWrap={false} sx={{ wordBreak: 'break-word' }}>{item.name}</Typography>
+                                                    <Typography variant="caption" color="text.secondary" display="block">
+                                                        Cost: {formatCurrency(item.purchasePrice)} | Default sell: {formatCurrency(item.salePrice)}
+                                                    </Typography>
+                                                    <TextField
+                                                        size="small"
+                                                        type="number"
+                                                        label="Sell Price"
+                                                        value={item.price}
+                                                        onChange={(e) => dispatch(updateCartItemPrice({ id: item.id, price: Number(e.target.value || 0) }))}
+                                                        disabled={!canOverridePrice}
+                                                        sx={{ mt: 1, maxWidth: 150 }}
+                                                        InputProps={{
+                                                            startAdornment: (
+                                                                <InputAdornment position="start">{currencySymbol}</InputAdornment>
+                                                            ),
+                                                        }}
+                                                    />
+                                                </Box>
+                                                <Stack direction="row" alignItems="center" spacing={1} sx={{ bgcolor: 'action.hover', borderRadius: 2, p: 0.5 }}>
+                                                    <IconButton size="small" onClick={() => dispatch(updateQuantity({ id: item.id, quantity: item.quantity - 1 }))}>
+                                                        <Minus size={14} />
+                                                    </IconButton>
+                                                    <Typography variant="body2" sx={{ fontWeight: 800, minWidth: 20, textAlign: 'center' }}>
+                                                        {item.quantity}
+                                                    </Typography>
+                                                    <IconButton
+                                                        size="small"
+                                                        onClick={() => {
+                                                            const product = products.find(p => p.id === item.id);
+                                                            if (product && item.quantity < product.stock) {
+                                                                dispatch(updateQuantity({ id: item.id, quantity: item.quantity + 1 }));
+                                                            }
+                                                        }}
+                                                    >
+                                                        <Plus size={14} />
+                                                    </IconButton>
+                                                </Stack>
+                                                <Typography variant="body2" fontWeight={800} sx={{ minWidth: { xs: '100%', sm: 70 }, textAlign: { xs: 'left', sm: 'right' } }}>
+                                                    {formatCurrency(item.price * item.quantity)}
                                                 </Typography>
-                                                <TextField
-                                                    size="small"
-                                                    type="number"
-                                                    label="Sell Price"
-                                                    value={item.price}
-                                                    onChange={(e) => dispatch(updateCartItemPrice({ id: item.id, price: Number(e.target.value || 0) }))}
-                                                    disabled={!canOverridePrice}
-                                                    sx={{ mt: 1, maxWidth: 150 }}
-                                                    InputProps={{
-                                                        startAdornment: (
-                                                            <InputAdornment position="start">{currencySymbol}</InputAdornment>
-                                                        ),
-                                                    }}
-                                                />
                                             </Box>
-                                            <Stack direction="row" alignItems="center" spacing={1} sx={{ bgcolor: 'action.hover', borderRadius: 2, p: 0.5 }}>
-                                                <IconButton size="small" onClick={() => dispatch(updateQuantity({ id: item.id, quantity: item.quantity - 1 }))}>
-                                                    <Minus size={14} />
-                                                </IconButton>
-                                                <Typography variant="body2" sx={{ fontWeight: 800, minWidth: 20, textAlign: 'center' }}>
-                                                    {item.quantity}
-                                                </Typography>
-                                                <IconButton
-                                                    size="small"
-                                                    onClick={() => {
-                                                        const product = products.find(p => p.id === item.id);
-                                                        if (product && item.quantity < product.stock) {
-                                                            dispatch(updateQuantity({ id: item.id, quantity: item.quantity + 1 }));
-                                                        }
-                                                    }}
-                                                >
-                                                    <Plus size={14} />
-                                                </IconButton>
-                                            </Stack>
-                                            <Typography variant="body2" fontWeight={800} sx={{ minWidth: { xs: '100%', sm: 70 }, textAlign: { xs: 'left', sm: 'right' } }}>
-                                                {formatCurrency(item.price * item.quantity)}
-                                            </Typography>
-                                        </Box>
-                                        <Divider sx={{ mb: 1.25, borderStyle: 'dashed' }} />
-                                    </motion.div>
-                                ))}
-                            </AnimatePresence>
-                        </Box>
-                    )}
-                </Box>
+                                            <Divider sx={{ mb: 1.25, borderStyle: 'dashed' }} />
+                                        </motion.div>
+                                    ))}
+                                </AnimatePresence>
+                            </Box>
+                        )}
+                    </Box>
 
                 <Box
                     sx={{
@@ -1239,7 +1277,7 @@ const POSTerminal: React.FC = () => {
                     </Stack>
 
                     <Stack spacing={1} sx={{ mb: 1.25 }}>
-                        {isRestaurant && <TextField
+                        {isRestaurant && !isFoodpandaOrder && <TextField
                             select
                             fullWidth
                             size="small"
@@ -1317,7 +1355,7 @@ const POSTerminal: React.FC = () => {
                                 onClick={() => handleCheckout('card')}
                                 sx={{ py: 1, borderRadius: 2, fontWeight: 700 }}
                             >
-                                Card
+                                {isFoodpandaOrder ? 'Foodpanda' : 'Online / Card'}
                             </Button>
                         </Grid>
                         <Grid size={{ xs: canAccessInstallments ? 3 : 4 }}>
@@ -1397,12 +1435,52 @@ const POSTerminal: React.FC = () => {
                                     boxShadow: (theme) => `0 8px 16px -4px ${alpha(theme.palette.primary.main, 0.4)}`
                                 }}
                             >
-                                {pendingMethod ? `Pay with ${pendingMethod === 'installment' ? 'EMI' : pendingMethod}` : 'Pay Now'}
+                                {pendingMethod ? (isFoodpandaOrder && pendingMethod === 'card' ? 'Continue Foodpanda Order' : `Pay with ${pendingMethod === 'installment' ? 'EMI' : pendingMethod}`) : 'Pay Now'}
                             </Button>
                         </Grid>
                     </Grid>
                 </Box>
+                </Box>
             </Paper>
+
+            <Dialog
+                open={foodpandaOpen}
+                onClose={() => setFoodpandaOpen(false)}
+                maxWidth="xs"
+                fullWidth
+                PaperProps={{ sx: { borderRadius: 3 } }}
+            >
+                <DialogTitle sx={{ fontWeight: 800 }}>Foodpanda Order Details</DialogTitle>
+                <DialogContent>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        Record the Foodpanda order number and rider details before continuing.
+                    </Typography>
+                    <TextField
+                        fullWidth
+                        autoFocus
+                        required
+                        label="Foodpanda Order No."
+                        placeholder="e.g. FP-123456"
+                        value={foodpandaOrderNumber}
+                        onChange={(event) => setFoodpandaOrderNumber(event.target.value)}
+                        inputProps={{ maxLength: 80 }}
+                        sx={{ mb: 2 }}
+                    />
+                    <TextField
+                        fullWidth
+                        required
+                        label="Rider Name"
+                        placeholder="Enter rider name"
+                        value={foodpandaRiderName}
+                        onChange={(event) => setFoodpandaRiderName(event.target.value)}
+                        inputProps={{ maxLength: 120 }}
+                    />
+                </DialogContent>
+                <DialogActions sx={{ p: 2 }}>
+                    <Button variant="outlined" onClick={() => setFoodpandaOpen(false)}>Cancel</Button>
+                    <Button variant="contained" onClick={handleContinueFoodpanda}>Continue</Button>
+                </DialogActions>
+            </Dialog>
 
             <Dialog
                 open={creditOpen}
@@ -1620,17 +1698,17 @@ const POSTerminal: React.FC = () => {
                 fullWidth
                 PaperProps={{ sx: { borderRadius: 3 } }}
             >
-                <DialogTitle sx={{ fontWeight: 800 }}>Confirm Payment</DialogTitle>
+                <DialogTitle sx={{ fontWeight: 800 }}>{isFoodpandaOrder ? 'Confirm Foodpanda Order' : 'Confirm Payment'}</DialogTitle>
                 <DialogContent>
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                        Confirm this payment to finalize sale and update stock.
+                        {isFoodpandaOrder ? 'Confirm this Foodpanda order to finalize sale and update stock.' : 'Confirm this payment to finalize sale and update stock.'}
                     </Typography>
                     <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'action.hover', border: '1px solid', borderColor: 'divider' }}>
                         <Typography variant="body2" sx={{ opacity: 0.9 }}>
                             Cashier: <strong>{user?.name || 'Staff'}</strong>
                         </Typography>
                         <Typography variant="body2" fontWeight={700}>
-                            Method: {(pendingMethod || '').toUpperCase()}
+                            Method: {isFoodpandaOrder && pendingMethod === 'card' ? 'FOODPANDA' : (pendingMethod || '').toUpperCase()}
                         </Typography>
                         {pendingMethod === 'credit' && (
                             <Box sx={{ mt: 1 }}>
@@ -1671,7 +1749,7 @@ const POSTerminal: React.FC = () => {
                         disabled={confirmingPayment}
                         startIcon={confirmingPayment ? <CircularProgress size={18} color="inherit" /> : undefined}
                     >
-                        {confirmingPayment ? 'Processing...' : 'Confirm Payment'}
+                        {confirmingPayment ? 'Processing...' : isFoodpandaOrder ? 'Confirm Foodpanda Order' : 'Confirm Payment'}
                     </Button>
                 </DialogActions>
             </Dialog>

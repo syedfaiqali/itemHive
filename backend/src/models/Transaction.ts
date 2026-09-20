@@ -21,6 +21,8 @@ export interface ITransaction extends Document {
     customerCnic?: string;
     orderType?: string;
     otherOrderType?: string;
+    foodpandaOrderNumber?: string;
+    foodpandaRiderName?: string;
     unitCost?: number;
     unitPrice?: number;
     grossProfit?: number;
@@ -52,6 +54,8 @@ const TransactionSchema: Schema = new Schema({
     customerCnic: { type: String, default: '' },
     orderType: { type: String, trim: true, maxlength: 80, default: undefined },
     otherOrderType: { type: String, default: '' },
+    foodpandaOrderNumber: { type: String, default: '', trim: true, maxlength: 80 },
+    foodpandaRiderName: { type: String, default: '', trim: true, maxlength: 120 },
     unitCost: { type: Number, default: 0 },
     unitPrice: { type: Number, default: 0 },
     grossProfit: { type: Number, default: 0 },

@@ -24,6 +24,8 @@ export interface Transaction {
     customerCnic?: string;
     orderType?: string;
     otherOrderType?: string;
+    foodpandaOrderNumber?: string;
+    foodpandaRiderName?: string;
     unitCost?: number;
     unitPrice?: number;
     grossProfit?: number;
