@@ -640,10 +640,25 @@ const SettingsPage: React.FC = () => {
                                             <Button size="small" onClick={() => setAppDraft({ ...appDraft, orderTypeOptions: [...appDraft.orderTypeOptions, ''] })}>Add row</Button>
                                         </Box>
                                         <Table size="small">
-                                            <TableHead><TableRow><TableCell>Order type name</TableCell><TableCell align="right">Action</TableCell></TableRow></TableHead>
+                                            <TableHead><TableRow><TableCell sx={{ width: 110 }}>Sequence</TableCell><TableCell>Order type name</TableCell><TableCell align="right">Action</TableCell></TableRow></TableHead>
                                             <TableBody>
                                                 {appDraft.orderTypeOptions.map((option, index) => (
-                                                    <TableRow key={`${option}-${index}`}>
+                                                    <TableRow key={index}>
+                                                        <TableCell>
+                                                            <TextField
+                                                                size="small"
+                                                                type="number"
+                                                                value={index + 1}
+                                                                inputProps={{ min: 1, max: appDraft.orderTypeOptions.length, step: 1 }}
+                                                                onChange={(event) => {
+                                                                    const requestedSequence = Math.min(Math.max(Number(event.target.value || index + 1), 1), appDraft.orderTypeOptions.length);
+                                                                    const orderTypeOptions = [...appDraft.orderTypeOptions];
+                                                                    const [movedOption] = orderTypeOptions.splice(index, 1);
+                                                                    orderTypeOptions.splice(requestedSequence - 1, 0, movedOption);
+                                                                    setAppDraft({ ...appDraft, orderTypeOptions });
+                                                                }}
+                                                            />
+                                                        </TableCell>
                                                         <TableCell>
                                                             <TextField
                                                                 size="small"
