@@ -291,7 +291,11 @@ const POSTerminal: React.FC = () => {
 
     /** POS invoice PDF: uses the same document structure as Order Desk. */
     const buildReceiptPdf = (id: string, method: CheckoutMethod, receiptTimeIso: string) => {
-        const paymentLabel = method === 'credit'
+        // Foodpanda uses the card checkout path internally, but it is not a
+        // customer card payment. Keep the customer-facing receipt unambiguous.
+        const paymentLabel = isFoodpandaOrder
+            ? 'FOODPANDA'
+            : method === 'credit'
             ? `CREDIT (${creditPaidVia.toUpperCase()} + DUE)`
             : method === 'installment'
                 ? `INSTALLMENT (${installmentMonths} MONTHS)`
@@ -315,6 +319,10 @@ const POSTerminal: React.FC = () => {
                 { label: 'Invoice date', value: new Date(receiptTimeIso).toLocaleDateString() },
                 { label: 'Invoice time', value: new Date(receiptTimeIso).toLocaleTimeString() },
                 { label: 'Invoice number', value: `#${id}` },
+                ...(isFoodpandaOrder ? [
+                    { label: 'Foodpanda order no.', value: foodpandaOrderNumber.trim() },
+                    { label: 'Rider name', value: foodpandaRiderName.trim() },
+                ] : []),
             ],
             columns: [
                 { label: '#', width: 0.6 },
@@ -1806,8 +1814,10 @@ const POSTerminal: React.FC = () => {
                                 <Box className="receipt-meta-row"><Typography component="span">Order ID:</Typography><Typography component="span" fontWeight={900}>#{receiptId.replace(/^R-/, '').slice(-8).toUpperCase()}</Typography></Box>
                                 <Box className="receipt-meta-row"><Typography component="span">Date/Time:</Typography><Typography component="span" fontWeight={900}>{receiptTime ? new Date(receiptTime).toLocaleString() : '-'}</Typography></Box>
                                 <Box className="receipt-meta-row"><Typography component="span">Cashier:</Typography><Typography component="span" fontWeight={900}>{user?.name || 'Staff'}</Typography></Box>
-                                <Box className="receipt-meta-row"><Typography component="span">Method:</Typography><Typography component="span" fontWeight={900} sx={{ textTransform: 'capitalize' }}>{paymentMethod || '-'}</Typography></Box>
+                                <Box className="receipt-meta-row"><Typography component="span">Method:</Typography><Typography component="span" fontWeight={900} sx={{ textTransform: 'capitalize' }}>{isFoodpandaOrder ? 'Foodpanda' : (paymentMethod || '-')}</Typography></Box>
                                 {isRestaurant && <Box className="receipt-meta-row"><Typography component="span">Order Type:</Typography><Typography component="span" fontWeight={900}>{orderTypeLabel}</Typography></Box>}
+                                {isFoodpandaOrder && <Box className="receipt-meta-row"><Typography component="span">Foodpanda Order No:</Typography><Typography component="span" fontWeight={900}>{foodpandaOrderNumber.trim()}</Typography></Box>}
+                                {isFoodpandaOrder && <Box className="receipt-meta-row"><Typography component="span">Rider Name:</Typography><Typography component="span" fontWeight={900}>{foodpandaRiderName.trim()}</Typography></Box>}
                                 {isRestaurant && deliveryNumber.trim() && <Box className="receipt-meta-row"><Typography component="span">Delivery No:</Typography><Typography component="span" fontWeight={900}>{deliveryNumber.trim()}</Typography></Box>}
                             </Box>
 
