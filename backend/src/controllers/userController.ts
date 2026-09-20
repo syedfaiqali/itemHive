@@ -7,6 +7,15 @@ import { normalizeRole, serializeUser } from '../utils/accessControl';
 import { isAdminScreenPermission } from '../utils/screenPermissions';
 import { getAppSettingsForTenant, invalidateAppSettingsCache } from '../utils/tenancy';
 
+const isMonthlyPaymentOverdue = (settings: any, now = new Date()) => {
+    if (!settings?.monthlyPaymentTrackingEnabled) return false;
+    const referenceDate = settings.monthlyPaymentPaidAt || settings.monthlyPaymentTrackingStartedAt;
+    if (!referenceDate) return false;
+    const dueDate = new Date(referenceDate);
+    dueDate.setMonth(dueDate.getMonth() + 1);
+    return dueDate <= now;
+};
+
 const ensureManageableTarget = (role: string) => {
     const normalizedRole = normalizeRole(role);
 
@@ -45,10 +54,11 @@ const serializeUsersWithBusinessNames = async (users: any[]) => {
                 { businessId: { $in: businessIds } },
                 { key: { $in: businessIds.map((businessId) => `business:${businessId}`) } },
             ],
-        }).select('key businessId restaurantEnabled'),
+        }).select('key businessId restaurantEnabled monthlyPaymentTrackingEnabled monthlyPaymentPaidAt monthlyPaymentTrackingStartedAt'),
     ]);
     const businessNameById = new Map(businesses.map((business) => [String(business._id), business.name]));
     const restaurantEnabledByBusinessId = new Map<string, boolean>();
+    const monthlyPaymentByBusinessId = new Map<string, { enabled: boolean; paidAt?: string; trackingStartedAt?: string; overdue: boolean }>();
 
     // Old legacy data may contain both a global settings record and the newer
     // business:<id> record. Read the global/legacy value first, then always
@@ -59,6 +69,12 @@ const serializeUsersWithBusinessNames = async (users: any[]) => {
             : String(setting.businessId || '');
         if (settingBusinessId) {
             restaurantEnabledByBusinessId.set(settingBusinessId, Boolean(setting.restaurantEnabled));
+            monthlyPaymentByBusinessId.set(settingBusinessId, {
+                enabled: Boolean(setting.monthlyPaymentTrackingEnabled),
+                paidAt: setting.monthlyPaymentPaidAt ? new Date(setting.monthlyPaymentPaidAt).toISOString() : undefined,
+                trackingStartedAt: setting.monthlyPaymentTrackingStartedAt ? new Date(setting.monthlyPaymentTrackingStartedAt).toISOString() : undefined,
+                overdue: isMonthlyPaymentOverdue(setting),
+            });
         }
     };
     businessSettings.filter((setting) => !String(setting.key || '').startsWith('business:')).forEach(applyRestaurantSetting);
@@ -68,6 +84,7 @@ const serializeUsersWithBusinessNames = async (users: any[]) => {
         ...serializeUser(user),
         businessName: businessNameById.get(String(user.businessId || '')) || '',
         restaurantEnabled: restaurantEnabledByBusinessId.get(String(user.businessId || '')) || false,
+        monthlyPayment: monthlyPaymentByBusinessId.get(String(user.businessId || '')) || { enabled: false, overdue: false },
     }));
 };
 
@@ -195,6 +212,51 @@ export const updateUserStatus = async (req: AuthRequest, res: Response) => {
         });
     } catch (error: any) {
         return res.status(400).json({ message: error.message || 'Failed to update user status' });
+    }
+};
+
+export const updateMonthlyPayment = async (req: AuthRequest, res: Response) => {
+    try {
+        const user = await User.findById(req.params.id);
+        if (!user || !user.businessId || !['admin', 'super_admin'].includes(normalizeRole(user.role))) {
+            return res.status(400).json({ message: 'Monthly payment can only be managed for an admin workspace' });
+        }
+        const business = await Business.findById(user.businessId).select('isLegacy');
+        if (!business) return res.status(400).json({ message: 'The account workspace could not be found' });
+
+        const tenant = { businessId: String(user.businessId), businessIsLegacy: Boolean(business.isLegacy) };
+        const settings = await getAppSettingsForTenant(tenant);
+        const enabled = Boolean(req.body.enabled);
+        const paid = enabled && Boolean(req.body.paid);
+        settings.monthlyPaymentTrackingEnabled = enabled;
+        settings.monthlyPaymentTrackingStartedAt = enabled
+            ? (settings.monthlyPaymentTrackingStartedAt || new Date())
+            : undefined;
+        settings.monthlyPaymentPaidAt = paid
+            ? new Date(req.body.paidAt || new Date())
+            : undefined;
+        await settings.save();
+        invalidateAppSettingsCache(tenant);
+        return res.json({ message: 'Monthly payment updated successfully' });
+    } catch (error: any) {
+        return res.status(400).json({ message: error.message || 'Failed to update monthly payment' });
+    }
+};
+
+export const getMonthlyPaymentAlerts = async (_req: AuthRequest, res: Response) => {
+    try {
+        const settings = await AppSetting.find({ monthlyPaymentTrackingEnabled: true })
+            .select('businessId key monthlyPaymentPaidAt monthlyPaymentTrackingStartedAt');
+        const businessIds = settings.flatMap((setting) => setting.businessId ? [setting.businessId] : []);
+        const businesses = await Business.find({ _id: { $in: businessIds } }).select('name');
+        const businessNames = new Map(businesses.map((business) => [String(business._id), business.name]));
+        return res.json(settings.filter((setting) => isMonthlyPaymentOverdue(setting)).map((setting) => ({
+            businessId: String(setting.businessId || ''),
+            businessName: businessNames.get(String(setting.businessId || '')) || 'Workspace',
+            paidAt: setting.monthlyPaymentPaidAt || null,
+        })));
+    } catch (error: any) {
+        return res.status(500).json({ message: error.message || 'Failed to load monthly payment alerts' });
     }
 };
 

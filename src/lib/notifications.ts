@@ -23,7 +23,7 @@ export interface NotificationItem {
     detail: string;
     time: string;
     path?: string;
-    category: 'installment' | 'order' | 'stock' | 'transaction';
+    category: 'installment' | 'order' | 'stock' | 'transaction' | 'billing';
     severity: 'warning' | 'success' | 'info';
     sortTime: number;
 }

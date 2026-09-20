@@ -204,6 +204,12 @@ export const updateUserStatusSchema = Joi.object({
     restaurantEnabled: Joi.boolean().optional(),
 }).or('isActive', 'isVisible', 'installmentAccess', 'discountAccess', 'restaurantEnabled');
 
+export const updateMonthlyPaymentSchema = Joi.object({
+    enabled: Joi.boolean().required(),
+    paid: Joi.boolean().required(),
+    paidAt: Joi.date().iso().optional(),
+});
+
 export const updateAdminLimitSchema = Joi.object({
     userCreationLimit: Joi.number().integer().min(0).required(),
 });

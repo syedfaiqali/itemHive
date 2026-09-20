@@ -75,6 +75,7 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
     const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
     const [notifAnchorEl, setNotifAnchorEl] = React.useState<null | HTMLElement>(null);
     const [installmentPlans, setInstallmentPlans] = React.useState<InstallmentNotificationPlan[]>([]);
+    const [monthlyPaymentAlerts, setMonthlyPaymentAlerts] = React.useState<Array<{ businessId: string; businessName: string }>>([]);
     const [workspaceOptions, setWorkspaceOptions] = React.useState<WorkspaceOption[]>([]);
     const [selectedWorkspaceId, setSelectedWorkspaceId] = React.useState(() => localStorage.getItem('itemhive-workspace-id') || '');
     const roleLabel = formatRoleLabel(user?.role);
@@ -119,6 +120,20 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
     }, [canAccessInstallments, location.pathname]);
 
     React.useEffect(() => {
+        const loadMonthlyPaymentAlerts = async () => {
+            try {
+                const response = await api.get('/users/monthly-payment-alerts');
+                setMonthlyPaymentAlerts(response.data || []);
+            } catch {
+                setMonthlyPaymentAlerts([]);
+            }
+        };
+        loadMonthlyPaymentAlerts();
+        window.addEventListener('itemhive-team-updated', loadMonthlyPaymentAlerts);
+        return () => window.removeEventListener('itemhive-team-updated', loadMonthlyPaymentAlerts);
+    }, [location.pathname]);
+
+    React.useEffect(() => {
         const loadWorkspaceOptions = async () => {
             if (user?.role !== 'super_admin') {
                 setWorkspaceOptions([]);
@@ -161,15 +176,27 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
 
     const allNotifications = React.useMemo(
         () =>
-            buildNotifications({
+            [
+                ...monthlyPaymentAlerts.map((alert) => ({
+                    id: `monthly-payment-${alert.businessId}`,
+                    title: 'Monthly Payment Overdue',
+                    detail: `${alert.businessName} has not completed its monthly payment.`,
+                    time: 'Payment overdue',
+                    path: '/team',
+                    category: 'billing' as const,
+                    severity: 'warning' as const,
+                    sortTime: Date.now(),
+                })),
+                ...buildNotifications({
                 installmentPlans,
                 orders,
                 transactions,
                 products,
                 orderUpdatesEnabled: notifications.orderUpdates,
                 lowStockAlertsEnabled: notifications.lowStockAlerts,
-            }),
-        [installmentPlans, notifications.lowStockAlerts, notifications.orderUpdates, orders, products, transactions]
+                }),
+            ],
+        [installmentPlans, monthlyPaymentAlerts, notifications.lowStockAlerts, notifications.orderUpdates, orders, products, transactions]
     );
 
     const recentNotifications = React.useMemo(() => allNotifications.slice(0, 6), [allNotifications]);

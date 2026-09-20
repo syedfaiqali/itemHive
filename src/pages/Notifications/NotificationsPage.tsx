@@ -12,7 +12,7 @@ import {
     Typography,
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
-import { Bell, CalendarClock, ClipboardList, History, Package2, RefreshCw } from 'lucide-react';
+import { Bell, CalendarClock, CircleDollarSign, ClipboardList, History, Package2, RefreshCw } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import api from '../../api/axios';
@@ -24,6 +24,7 @@ const iconByCategory = {
     order: ClipboardList,
     stock: Package2,
     transaction: History,
+    billing: CircleDollarSign,
 };
 
 const colorBySeverity = {

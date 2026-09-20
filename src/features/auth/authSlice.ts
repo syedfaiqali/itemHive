@@ -19,6 +19,7 @@ export interface User {
     screenPermissions?: ScreenPermission[] | null;
     /** Workspace-level flag provided to client-admin rows in Team Management. */
     restaurantEnabled?: boolean;
+    monthlyPayment?: { enabled: boolean; paidAt?: string; trackingStartedAt?: string; overdue: boolean };
     userCreationLimit?: number;
     businessId?: string;
     businessName?: string;

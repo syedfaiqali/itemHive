@@ -10,6 +10,7 @@ import {
     DialogActions,
     DialogContent,
     DialogTitle,
+    FormControlLabel,
     IconButton,
     InputAdornment,
     MenuItem,
@@ -27,7 +28,7 @@ import {
     Tooltip,
     Typography,
 } from '@mui/material';
-import { Edit3, Eye, EyeOff, Info, Search, ShieldCheck, Trash2, UserPlus, Users } from 'lucide-react';
+import { CircleDollarSign, Edit3, Eye, EyeOff, Info, Search, ShieldCheck, Trash2, UserPlus, Users } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../../store';
 import type { User, UserRole } from '../../features/auth/authSlice';
@@ -99,6 +100,10 @@ const TeamManagementPage: React.FC = () => {
     const [total, setTotal] = React.useState(0);
     const [editingUser, setEditingUser] = React.useState<User | null>(null);
     const [deletingUser, setDeletingUser] = React.useState<User | null>(null);
+    const [monthlyPaymentUser, setMonthlyPaymentUser] = React.useState<User | null>(null);
+    const [monthlyPaymentEnabled, setMonthlyPaymentEnabled] = React.useState(false);
+    const [monthlyPaymentPaid, setMonthlyPaymentPaid] = React.useState(false);
+    const [monthlyPaymentDate, setMonthlyPaymentDate] = React.useState(new Date().toISOString().slice(0, 10));
     const [draft, setDraft] = React.useState<AccountDraft>({ name: '', email: '', password: '', role: 'user', businessId: '', userCreationLimit: '0' });
     const [showPassword, setShowPassword] = React.useState(false);
     const [createDialogOpen, setCreateDialogOpen] = React.useState(false);
@@ -269,6 +274,33 @@ const TeamManagementPage: React.FC = () => {
         }
     };
 
+    const openMonthlyPayment = (target: User) => {
+        setMonthlyPaymentUser(target);
+        setMonthlyPaymentEnabled(Boolean(target.monthlyPayment?.enabled));
+        setMonthlyPaymentPaid(Boolean(target.monthlyPayment?.paidAt) && !Boolean(target.monthlyPayment?.overdue));
+        setMonthlyPaymentDate(target.monthlyPayment?.paidAt?.slice(0, 10) || new Date().toISOString().slice(0, 10));
+    };
+
+    const saveMonthlyPayment = async () => {
+        if (!monthlyPaymentUser) return;
+        setSavingId(monthlyPaymentUser.id);
+        try {
+            await api.patch(`/users/${monthlyPaymentUser.id}/monthly-payment`, {
+                enabled: monthlyPaymentEnabled,
+                paid: monthlyPaymentPaid,
+                paidAt: new Date(`${monthlyPaymentDate}T12:00:00`).toISOString(),
+            });
+            setMonthlyPaymentUser(null);
+            await loadUsers();
+            window.dispatchEvent(new Event('itemhive-team-updated'));
+            setSnack('Monthly payment updated successfully.');
+        } catch (requestError: unknown) {
+            setError(getApiErrorMessage(requestError, 'Unable to update monthly payment.'));
+        } finally {
+            setSavingId('');
+        }
+    };
+
     return (
         <Box>
             <Snackbar open={Boolean(snack)} autoHideDuration={2600} onClose={() => setSnack('')} anchorOrigin={{ vertical: 'top', horizontal: 'right' }}>
@@ -319,6 +351,7 @@ const TeamManagementPage: React.FC = () => {
                             <TableCell align="center">Installments</TableCell>
                             <TableCell align="center">Discount Access</TableCell>
                             <TableCell align="center">Restaurant / KOT</TableCell>
+                            <TableCell align="center">Monthly</TableCell>
                             <TableCell align="center">User Limit</TableCell>
                             <TableCell align="right">Actions</TableCell>
                         </TableRow>
@@ -326,7 +359,7 @@ const TeamManagementPage: React.FC = () => {
                     <TableBody>
                         {loading && (
                             <TableRow>
-                                <TableCell colSpan={10} align="center" sx={{ py: 8 }}><CircularProgress size={30} /></TableCell>
+                                <TableCell colSpan={11} align="center" sx={{ py: 8 }}><CircularProgress size={30} /></TableCell>
                             </TableRow>
                         )}
                         {!loading && users.map((teamUser) => {
@@ -381,6 +414,13 @@ const TeamManagementPage: React.FC = () => {
                                             />
                                         ) : '-'}
                                     </TableCell>
+                                    <TableCell align="center">
+                                        {(teamUser.role === 'admin' || teamUser.role === 'super_admin') ? (
+                                            <Tooltip title={!teamUser.monthlyPayment?.enabled ? 'Monthly payment tracking is off' : teamUser.monthlyPayment.overdue ? 'Monthly payment is overdue' : teamUser.monthlyPayment.paidAt ? `Paid: ${new Date(teamUser.monthlyPayment.paidAt).toLocaleDateString()}` : 'Payment pending'}>
+                                                <span><IconButton size="small" color={teamUser.monthlyPayment?.overdue ? 'error' : teamUser.monthlyPayment?.paidAt ? 'success' : 'default'} onClick={() => openMonthlyPayment(teamUser)} disabled={!isSuperAdmin || isBusy} aria-label={`Monthly payment for ${teamUser.businessName || teamUser.name}`}><CircleDollarSign size={19} /></IconButton></span>
+                                            </Tooltip>
+                                        ) : '-'}
+                                    </TableCell>
                                     <TableCell align="center">{teamUser.role === 'admin' ? teamUser.userCreationLimit ?? 0 : '-'}</TableCell>
                                     <TableCell align="right">
                                         <Stack direction="row" spacing={1} justifyContent="flex-end">
@@ -429,6 +469,19 @@ const TeamManagementPage: React.FC = () => {
                     rowsPerPageOptions={[10, 20, 50, 100]}
                 />
             </TableContainer>
+
+            <Dialog open={Boolean(monthlyPaymentUser)} onClose={() => !savingId && setMonthlyPaymentUser(null)} fullWidth maxWidth="xs">
+                <DialogTitle>Monthly Payment — {monthlyPaymentUser?.businessName || monthlyPaymentUser?.name}</DialogTitle>
+                <DialogContent>
+                    <Stack spacing={1.5} sx={{ pt: 1 }}>
+                        <FormControlLabel control={<Switch checked={monthlyPaymentEnabled} onChange={(event) => setMonthlyPaymentEnabled(event.target.checked)} />} label="Track monthly payment" />
+                        <FormControlLabel control={<Switch checked={monthlyPaymentPaid} disabled={!monthlyPaymentEnabled} onChange={(event) => setMonthlyPaymentPaid(event.target.checked)} />} label="Payment received" />
+                        <TextField label="Payment date" type="date" value={monthlyPaymentDate} disabled={!monthlyPaymentEnabled || !monthlyPaymentPaid} onChange={(event) => setMonthlyPaymentDate(event.target.value)} InputLabelProps={{ shrink: true }} />
+                        <Typography variant="caption" color="text.secondary">If tracking is enabled and a payment remains unpaid for one full month, an overdue notification will be shown.</Typography>
+                    </Stack>
+                </DialogContent>
+                <DialogActions><Button onClick={() => setMonthlyPaymentUser(null)} disabled={Boolean(savingId)}>Cancel</Button><Button variant="contained" onClick={saveMonthlyPayment} disabled={Boolean(savingId)}>Save</Button></DialogActions>
+            </Dialog>
 
             <Dialog open={createDialogOpen} onClose={() => !createSaving && setCreateDialogOpen(false)} fullWidth maxWidth="sm">
                 <DialogTitle>{isSuperAdmin ? 'Create Account' : 'Add User'}</DialogTitle>
