@@ -164,7 +164,7 @@ const run = async () => {
                 { productId: productBId, quantity: 1, unitPrice: 50 },
             ],
             discountPercent: 5,
-            orderType: 'dine_in',
+            orderType: 'Dine In',
         },
     });
     assert.equal(await Product.findOne({ id: productAId, businessId: businessA._id }).then((p) => p?.stock), 20, 'saving a draft must not reduce stock');
@@ -181,10 +181,10 @@ const run = async () => {
     const updatedDraft = await api(`/order-drafts/${draft._id}`, {
         ...authA,
         method: 'PUT',
-        body: { items: [{ productId: productAId, quantity: 2, unitPrice: 100 }], discountPercent: 5, orderType: 'takeaway' },
+        body: { items: [{ productId: productAId, quantity: 2, unitPrice: 100 }], discountPercent: 5, orderType: 'Takeaway' },
     });
     assert.equal(updatedDraft.items[0].quantity, 2, 'draft update should preserve edited quantity');
-    assert.equal((await api(`/order-drafts/${draft._id}`, { ...authA })).orderType, 'takeaway', 'draft detail should return edited order type');
+    assert.equal((await api(`/order-drafts/${draft._id}`, { ...authA })).orderType, 'Takeaway', 'draft detail should return edited order type');
 
     const cashOrderId = `R-CASH-${suffix}`;
     const cashCheckout = await api('/transactions/checkout', {
@@ -200,7 +200,7 @@ const run = async () => {
             ],
             discountPercent: 5,
             paymentMethod: 'cash',
-            orderType: 'dine_in',
+            orderType: 'Dine In',
         },
     });
     assert.equal(cashCheckout.transactions.length, 2, 'multi-line checkout should create two transaction lines');
@@ -243,7 +243,7 @@ const run = async () => {
             paidVia: 'cash',
             customerName: 'Test Customer',
             customerCnic: '42101-1234567-1',
-            orderType: 'takeaway',
+            orderType: 'Takeaway',
         },
     });
     xReport = (await api('/pos-shifts/x-report', { ...authA })).report.totals;

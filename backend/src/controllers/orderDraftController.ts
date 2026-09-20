@@ -57,8 +57,11 @@ const buildDraftPayload = async (req: AuthRequest) => {
         && allowedDiscountOptions.includes(requestedDiscount)
         ? Math.min(100, Math.max(0, requestedDiscount))
         : 0;
-    const orderType = ['dine_in', 'takeaway', 'foodpanda', 'other'].includes(req.body.orderType)
-        ? req.body.orderType
+    const requestedOrderType = String(req.body.orderType || '').trim();
+    const orderType = (appSettings.orderTypeOptions || [])
+        .map((option) => String(option || '').trim())
+        .includes(requestedOrderType)
+        ? requestedOrderType
         : undefined;
 
     return {

@@ -22,7 +22,7 @@ export interface Transaction {
     dueAmount?: number;
     customerName?: string;
     customerCnic?: string;
-    orderType?: 'dine_in' | 'takeaway' | 'foodpanda' | 'other';
+    orderType?: string;
     otherOrderType?: string;
     unitCost?: number;
     unitPrice?: number;

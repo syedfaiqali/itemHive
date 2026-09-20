@@ -11,7 +11,7 @@ export interface IOrderDraft extends Document {
     draftCode: string;
     items: IOrderDraftItem[];
     discountPercent: number;
-    orderType?: 'dine_in' | 'takeaway' | 'foodpanda' | 'other';
+    orderType?: string;
     otherOrderType?: string;
     deliveryNumber?: string;
     createdBy: mongoose.Types.ObjectId;
@@ -31,7 +31,7 @@ const OrderDraftSchema = new Schema<IOrderDraft>({
         _id: false,
     }],
     discountPercent: { type: Number, default: 0, min: 0, max: 100 },
-    orderType: { type: String, enum: ['dine_in', 'takeaway', 'foodpanda', 'other'], default: undefined },
+    orderType: { type: String, trim: true, maxlength: 80, default: undefined },
     otherOrderType: { type: String, default: '', trim: true, maxlength: 80 },
     deliveryNumber: { type: String, default: '', trim: true, maxlength: 40 },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },

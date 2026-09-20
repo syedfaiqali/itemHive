@@ -101,7 +101,7 @@ const SettingsPage: React.FC = () => {
     const dispatch = useDispatch<AppDispatch>();
     const { mode } = useSelector((state: RootState) => state.theme);
     const { user } = useSelector((state: RootState) => state.auth);
-    const { notifications, country, currency, app, canManageDiscounts, loading, error } = useSelector((state: RootState) => state.settings);
+    const { notifications, country, currency, app, canManageDiscounts, canManageOrderTypes, loading, error } = useSelector((state: RootState) => state.settings);
     const activeAppSettings = app || DEFAULT_APP_SETTINGS;
     const [appDraft, setAppDraft] = React.useState<AppSettings>(activeAppSettings);
     const [bannerError, setBannerError] = React.useState<string | null>(null);
@@ -119,6 +119,7 @@ const SettingsPage: React.FC = () => {
     // Admins own their workspace branding; the rest of the POS config stays super-admin only.
     const canEditBranding = user?.role === 'super_admin' || user?.role === 'admin';
     const canEditDiscounts = user?.role === 'super_admin' || canManageDiscounts;
+    const canEditOrderTypes = user?.role === 'super_admin' || canManageOrderTypes;
 
     React.useEffect(() => {
         dispatch(fetchSettings());
@@ -594,6 +595,56 @@ const SettingsPage: React.FC = () => {
                                     >
                                         Save Discount Settings
                                     </Button>
+                                </Stack>
+                            </AccordionDetails>
+                        </Accordion>
+                    </Grid>
+                )}
+
+                {canEditOrderTypes && appDraft.restaurantEnabled && (
+                    <Grid size={{ xs: 12, md: 6 }}>
+                        <Accordion disableGutters elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: '12px !important' }}>
+                            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                                <Box><Typography fontWeight={700}>Restaurant / KOT Order Types</Typography><Typography variant="caption" color="text.secondary">Manage the choices shown in your POS order-type dropdown</Typography></Box>
+                            </AccordionSummary>
+                            <AccordionDetails>
+                                <Divider sx={{ mb: 2 }} />
+                                <Stack spacing={2}>
+                                    <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden' }}>
+                                        <Box sx={{ px: 1.5, py: 1, bgcolor: 'action.hover', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <Box>
+                                                <Typography variant="subtitle2" fontWeight={800}>Order type options</Typography>
+                                                <Typography variant="caption" color="text.secondary">Add the names cashiers may select in POS.</Typography>
+                                            </Box>
+                                            <Button size="small" onClick={() => setAppDraft({ ...appDraft, orderTypeOptions: [...appDraft.orderTypeOptions, ''] })}>Add row</Button>
+                                        </Box>
+                                        <Table size="small">
+                                            <TableHead><TableRow><TableCell>Order type name</TableCell><TableCell align="right">Action</TableCell></TableRow></TableHead>
+                                            <TableBody>
+                                                {appDraft.orderTypeOptions.map((option, index) => (
+                                                    <TableRow key={`${option}-${index}`}>
+                                                        <TableCell>
+                                                            <TextField
+                                                                size="small"
+                                                                fullWidth
+                                                                value={option}
+                                                                placeholder="e.g. Delivery"
+                                                                inputProps={{ maxLength: 80 }}
+                                                                onChange={(event) => {
+                                                                    const orderTypeOptions = [...appDraft.orderTypeOptions];
+                                                                    orderTypeOptions[index] = event.target.value;
+                                                                    setAppDraft({ ...appDraft, orderTypeOptions });
+                                                                }}
+                                                            />
+                                                        </TableCell>
+                                                        <TableCell align="right"><Button color="error" size="small" onClick={() => setAppDraft({ ...appDraft, orderTypeOptions: appDraft.orderTypeOptions.filter((_, itemIndex) => itemIndex !== index) })}>Remove</Button></TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    </Box>
+                                    <Typography variant="caption" color="text.secondary">These options apply to every POS user in this workspace.</Typography>
+                                    <Button variant="contained" onClick={() => persistSettings(country, currency, notifications, appDraft)} disabled={loading}>Save Order Types</Button>
                                 </Stack>
                             </AccordionDetails>
                         </Accordion>

@@ -67,7 +67,7 @@ import type { POSShift } from '../../types/posShift';
 
 
 type CheckoutMethod = 'cash' | 'card' | 'credit' | 'installment';
-type OrderType = 'dine_in' | 'takeaway' | 'foodpanda' | 'other';
+type OrderType = string;
 const showCreditKot = false;
 
 const getRequestErrorMessage = (error: unknown, fallback: string) =>
@@ -80,7 +80,7 @@ const getOrderTypeLabel = (type: OrderType | '', customType: string) => {
     if (type === 'takeaway') return 'Takeaway';
     if (type === 'foodpanda') return 'Foodpanda';
     if (type === 'other') return customType.trim() || 'Other';
-    return 'Not specified';
+    return type || 'Not specified';
 };
 
 const POSTerminal: React.FC = () => {
@@ -113,6 +113,9 @@ const POSTerminal: React.FC = () => {
         .map(Number)
         .filter((option) => Number.isFinite(option) && option > 0 && option <= 100)))
         .sort((first, second) => first - second);
+    const orderTypeOptions = Array.from(new Set((appSettings.orderTypeOptions || [])
+        .map((option) => String(option || '').trim())
+        .filter(Boolean)));
 
     const [searchTerm, setSearchTerm] = useState('');
     const [activeTab, setActiveTab] = useState(0);
@@ -1245,10 +1248,7 @@ const POSTerminal: React.FC = () => {
                             onChange={(event) => handleOrderTypeChange(event.target.value as OrderType)}
                             helperText="Select an order type to enable payment options."
                         >
-                            <MenuItem value="dine_in">Dine In</MenuItem>
-                            <MenuItem value="takeaway">Takeaway</MenuItem>
-                            <MenuItem value="foodpanda">Foodpanda</MenuItem>
-                            <MenuItem value="other">Other</MenuItem>
+                            {orderTypeOptions.map((option) => <MenuItem key={option} value={option}>{option}</MenuItem>)}
                         </TextField>}
                         {isRestaurant && orderType === 'other' && (
                             <TextField

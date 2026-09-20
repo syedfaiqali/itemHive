@@ -20,6 +20,8 @@ export interface AppSettings {
     discountsEnabled: boolean;
     /** Super-admin configured discount percentages shown to cashiers. */
     discountOptions: number[];
+    /** Restaurant POS choices configured for this workspace. */
+    orderTypeOptions: string[];
     /** Turns on restaurant-only POS functionality for this workspace. */
     restaurantEnabled: boolean;
     autoRegistrationEnabled: boolean;
@@ -35,6 +37,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     installmentsEnabled: false,
     discountsEnabled: false,
     discountOptions: [],
+    orderTypeOptions: ['Dine In', 'Takeaway', 'Foodpanda', 'Other'],
     restaurantEnabled: false,
     autoRegistrationEnabled: true,
 };
@@ -60,6 +63,7 @@ interface SettingsState {
     currency: CurrencyCode;
     app: AppSettings;
     canManageDiscounts: boolean;
+    canManageOrderTypes: boolean;
     loading: boolean;
     error: string | null;
 }
@@ -73,6 +77,7 @@ const initialState: SettingsState = {
     currency: 'PKR',
     app: DEFAULT_APP_SETTINGS,
     canManageDiscounts: false,
+    canManageOrderTypes: false,
     loading: false,
     error: null,
 };
@@ -88,6 +93,7 @@ export const fetchSettings = createAsyncThunk(
                 notifications: NotificationSettings;
                 app: AppSettings;
                 canManageDiscounts: boolean;
+                canManageOrderTypes: boolean;
             };
         } catch (error: any) {
             return rejectWithValue(error.response?.data?.message || 'Failed to fetch settings');
@@ -114,6 +120,7 @@ export const saveSettings = createAsyncThunk(
                 notifications: NotificationSettings;
                 app: AppSettings;
                 canManageDiscounts: boolean;
+                canManageOrderTypes: boolean;
             };
         } catch (error: any) {
             if (error.response?.status === 413) {
@@ -160,6 +167,7 @@ const settingsSlice = createSlice({
                 state.notifications = action.payload.notifications;
                 state.app = { ...DEFAULT_APP_SETTINGS, ...action.payload.app };
                 state.canManageDiscounts = Boolean(action.payload.canManageDiscounts);
+                state.canManageOrderTypes = Boolean(action.payload.canManageOrderTypes);
             })
             .addCase(fetchSettings.rejected, (state, action: PayloadAction<any>) => {
                 state.loading = false;
@@ -176,6 +184,7 @@ const settingsSlice = createSlice({
                 state.notifications = action.payload.notifications;
                 state.app = { ...DEFAULT_APP_SETTINGS, ...action.payload.app };
                 state.canManageDiscounts = Boolean(action.payload.canManageDiscounts);
+                state.canManageOrderTypes = Boolean(action.payload.canManageOrderTypes);
             })
             .addCase(saveSettings.rejected, (state, action: PayloadAction<any>) => {
                 state.loading = false;

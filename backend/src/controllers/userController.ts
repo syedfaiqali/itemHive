@@ -5,6 +5,7 @@ import AppSetting from '../models/AppSetting';
 import type { AuthRequest } from '../middleware/auth';
 import { normalizeRole, serializeUser } from '../utils/accessControl';
 import { isAdminScreenPermission } from '../utils/screenPermissions';
+import { getAppSettingsForTenant, invalidateAppSettingsCache } from '../utils/tenancy';
 
 const ensureManageableTarget = (role: string) => {
     const normalizedRole = normalizeRole(role);
@@ -39,10 +40,29 @@ const serializeUsersWithBusinessNames = async (users: any[]) => {
     const businessIds = [...new Set(users.map((user) => String(user.businessId || '')).filter(Boolean))];
     const [businesses, businessSettings] = await Promise.all([
         Business.find({ _id: { $in: businessIds } }).select('name'),
-        AppSetting.find({ businessId: { $in: businessIds } }).select('businessId restaurantEnabled'),
+        AppSetting.find({
+            $or: [
+                { businessId: { $in: businessIds } },
+                { key: { $in: businessIds.map((businessId) => `business:${businessId}`) } },
+            ],
+        }).select('key businessId restaurantEnabled'),
     ]);
     const businessNameById = new Map(businesses.map((business) => [String(business._id), business.name]));
-    const restaurantEnabledByBusinessId = new Map(businessSettings.map((setting) => [String(setting.businessId), Boolean(setting.restaurantEnabled)]));
+    const restaurantEnabledByBusinessId = new Map<string, boolean>();
+
+    // Old legacy data may contain both a global settings record and the newer
+    // business:<id> record. Read the global/legacy value first, then always
+    // let the tenant-specific record win—the same precedence POS uses.
+    const applyRestaurantSetting = (setting: any) => {
+        const settingBusinessId = String(setting.key || '').startsWith('business:')
+            ? String(setting.key).slice('business:'.length)
+            : String(setting.businessId || '');
+        if (settingBusinessId) {
+            restaurantEnabledByBusinessId.set(settingBusinessId, Boolean(setting.restaurantEnabled));
+        }
+    };
+    businessSettings.filter((setting) => !String(setting.key || '').startsWith('business:')).forEach(applyRestaurantSetting);
+    businessSettings.filter((setting) => String(setting.key || '').startsWith('business:')).forEach(applyRestaurantSetting);
 
     return users.map((user) => ({
         ...serializeUser(user),
@@ -143,14 +163,28 @@ export const updateUserStatus = async (req: AuthRequest, res: Response) => {
                 return res.status(400).json({ message: 'Restaurant mode can only be assigned to client admin accounts' });
             }
 
-            await AppSetting.findOneAndUpdate(
-                { key: `business:${user.businessId}` },
-                {
-                    $set: { restaurantEnabled: req.body.restaurantEnabled },
-                    $setOnInsert: { businessId: user.businessId },
-                },
-                { new: true, upsert: true, setDefaultsOnInsert: true }
-            );
+            // Use the same tenant-settings lookup that POS uses. In particular,
+            // this migrates a legacy workspace's old global settings document to
+            // its business key before updating it, so the Team grid and POS read
+            // back the same value immediately.
+            const business = await Business.findById(user.businessId).select('isLegacy');
+            if (!business) {
+                return res.status(400).json({ message: 'The account workspace could not be found' });
+            }
+
+            const tenant = {
+                businessId: String(user.businessId),
+                businessIsLegacy: Boolean(business.isLegacy),
+            };
+            const appSettings = await getAppSettingsForTenant(tenant);
+            // Some older tenant records have the business key but no businessId.
+            // Backfill it so Team Management reads the same setting that POS uses.
+            if (!appSettings.businessId || String(appSettings.businessId) !== tenant.businessId) {
+                appSettings.businessId = user.businessId;
+            }
+            appSettings.restaurantEnabled = req.body.restaurantEnabled;
+            await appSettings.save();
+            invalidateAppSettingsCache(tenant);
         }
 
         await user.save();

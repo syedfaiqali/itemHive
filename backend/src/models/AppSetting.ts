@@ -12,6 +12,7 @@ export interface IAppSetting extends Document {
     installmentsEnabled: boolean;
     discountsEnabled: boolean;
     discountOptions: number[];
+    orderTypeOptions: string[];
     /** Enables restaurant-only POS features such as Kitchen Order Tickets. */
     restaurantEnabled: boolean;
     autoRegistrationEnabled: boolean;
@@ -29,6 +30,7 @@ const AppSettingSchema: Schema<IAppSetting> = new Schema({
     installmentsEnabled: { type: Boolean, default: false },
     discountsEnabled: { type: Boolean, default: false },
     discountOptions: { type: [Number], default: [] },
+    orderTypeOptions: { type: [String], default: ['Dine In', 'Takeaway', 'Foodpanda', 'Other'] },
     restaurantEnabled: { type: Boolean, default: false },
     autoRegistrationEnabled: { type: Boolean, default: true },
 }, { timestamps: true });

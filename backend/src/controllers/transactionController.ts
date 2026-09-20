@@ -91,6 +91,11 @@ export const createPOSCheckout = async (req: AuthRequest, res: Response) => {
                 ? (req.body.paidVia === 'card' ? 'card' : 'cash')
                 : paymentMethod;
             const isRestaurantOrder = Boolean(appSettings?.restaurantEnabled);
+            const requestedOrderType = String(req.body.orderType || '').trim();
+            const allowedOrderTypes = (appSettings?.orderTypeOptions || []).map((option) => String(option || '').trim());
+            if (isRestaurantOrder && !allowedOrderTypes.includes(requestedOrderType)) {
+                throw new Error('Select a valid order type before taking payment');
+            }
 
             const transactionDocuments = lineInputs.map((line: any, index: number) => ({
                 id: `${orderId}-L${index + 1}`,
@@ -113,8 +118,8 @@ export const createPOSCheckout = async (req: AuthRequest, res: Response) => {
                 dueAmount: index === 0 ? dueAmount : 0,
                 customerName: paymentMethod === 'credit' ? String(req.body.customerName || '').trim() : '',
                 customerCnic: paymentMethod === 'credit' ? String(req.body.customerCnic || '').trim() : '',
-                orderType: isRestaurantOrder ? req.body.orderType : undefined,
-                otherOrderType: isRestaurantOrder && req.body.orderType === 'other' ? String(req.body.otherOrderType || '').trim() : '',
+                orderType: isRestaurantOrder ? requestedOrderType : undefined,
+                otherOrderType: isRestaurantOrder && requestedOrderType === 'other' ? String(req.body.otherOrderType || '').trim() : '',
                 unitCost: Number(line.product.purchasePrice || 0),
                 unitPrice: line.unitPrice,
                 grossProfit: (line.subtotal - line.discountAmount) - (Number(line.product.purchasePrice || 0) * line.quantity),
@@ -230,6 +235,11 @@ export const createTransaction = async (req: AuthRequest, res: Response) => {
             ? (resolvedSubtotal - resolvedDiscountAmount) - (resolvedUnitCost * amount)
             : 0;
         const isRestaurantOrder = Boolean(appSettings?.restaurantEnabled);
+        const requestedOrderType = String(orderType || '').trim();
+        const allowedOrderTypes = (appSettings?.orderTypeOptions || []).map((option) => String(option || '').trim());
+        if (isRestaurantOrder && requestedOrderType && !allowedOrderTypes.includes(requestedOrderType)) {
+            throw new Error('Select a valid order type');
+        }
 
         // 1. Record the transaction
         const transaction = new Transaction({
@@ -250,8 +260,8 @@ export const createTransaction = async (req: AuthRequest, res: Response) => {
             dueAmount: dueAmount || 0,
             customerName,
             customerCnic,
-            orderType: isRestaurantOrder ? orderType : undefined,
-            otherOrderType: isRestaurantOrder && orderType === 'other' ? otherOrderType : undefined,
+            orderType: isRestaurantOrder ? requestedOrderType || undefined : undefined,
+            otherOrderType: isRestaurantOrder && requestedOrderType === 'other' ? otherOrderType : undefined,
             unitCost: resolvedUnitCost,
             unitPrice: resolvedUnitPrice,
             grossProfit: resolvedGrossProfit,

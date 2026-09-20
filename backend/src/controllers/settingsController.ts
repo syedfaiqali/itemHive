@@ -6,6 +6,8 @@ import type { IUser } from '../models/User';
 import { getAppSettingsForTenant, getGlobalAppSettings, invalidateAppSettingsCache } from '../utils/tenancy';
 import type { IAppSetting } from '../models/AppSetting';
 
+const DEFAULT_ORDER_TYPE_OPTIONS = ['Dine In', 'Takeaway', 'Foodpanda', 'Other'];
+
 const serializeAppSettings = (appSettings: IAppSetting, globalAppSettings: IAppSetting) => ({
     salesTaxRate: appSettings.salesTaxRate,
     shopName: appSettings.shopName,
@@ -16,6 +18,7 @@ const serializeAppSettings = (appSettings: IAppSetting, globalAppSettings: IAppS
     installmentsEnabled: appSettings.installmentsEnabled,
     discountsEnabled: appSettings.discountsEnabled,
     discountOptions: appSettings.discountOptions || [],
+    orderTypeOptions: appSettings.orderTypeOptions?.length ? appSettings.orderTypeOptions : DEFAULT_ORDER_TYPE_OPTIONS,
     restaurantEnabled: appSettings.restaurantEnabled,
     autoRegistrationEnabled: globalAppSettings.autoRegistrationEnabled,
 });
@@ -44,6 +47,7 @@ export const getSettings = async (req: AuthRequest, res: Response) => {
             ...serializePreferences(user.preferences),
             app: serializeAppSettings(appSettings, globalAppSettings),
             canManageDiscounts: req.user?.role === 'super_admin' || Boolean(req.user?.discountAccess),
+            canManageOrderTypes: req.user?.role === 'super_admin' || req.user?.role === 'admin',
         });
     } catch (error: any) {
         return res.status(500).json({ message: error.message || 'Failed to fetch settings' });
@@ -98,6 +102,12 @@ export const updateSettings = async (req: AuthRequest, res: Response) => {
                 appSettings.discountsEnabled = req.body.app.discountsEnabled;
                 appSettings.discountOptions = req.body.app.discountOptions;
             }
+            if ((isSuperAdmin || role === 'admin') && appSettings.restaurantEnabled && Array.isArray(req.body.app.orderTypeOptions)) {
+                const options = (req.body.app.orderTypeOptions as unknown[])
+                    .map((option) => String(option || '').trim())
+                    .filter(Boolean);
+                appSettings.orderTypeOptions = [...new Map(options.map((option: string) => [option.toLowerCase(), option])).values()];
+            }
             if (appSettings.isModified()) {
                 await appSettings.save();
                 invalidateAppSettingsCache(req.user!);
@@ -112,6 +122,7 @@ export const updateSettings = async (req: AuthRequest, res: Response) => {
             ...serializePreferences(user.preferences),
             app: serializeAppSettings(appSettings, globalAppSettings),
             canManageDiscounts: req.user?.role === 'super_admin' || Boolean(req.user?.discountAccess),
+            canManageOrderTypes: req.user?.role === 'super_admin' || req.user?.role === 'admin',
         });
     } catch (error: any) {
         return res.status(400).json({ message: error.message || 'Failed to update settings' });

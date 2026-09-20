@@ -10,7 +10,7 @@ export interface OrderDraft {
     draftCode: string;
     items: OrderDraftItem[];
     discountPercent: number;
-    orderType?: 'dine_in' | 'takeaway' | 'foodpanda' | 'other';
+    orderType?: string;
     otherOrderType?: string;
     deliveryNumber?: string;
     createdByName: string;

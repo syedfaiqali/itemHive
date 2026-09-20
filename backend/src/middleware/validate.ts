@@ -137,7 +137,7 @@ export const installmentPlanSchema = Joi.object({
     shiftId: Joi.string().hex().length(24).optional(),
     orderId: Joi.string().min(1).max(120).optional(),
     advancePaidVia: Joi.string().valid('cash', 'card').optional(),
-    orderType: Joi.string().valid('dine_in', 'takeaway', 'foodpanda', 'other').optional(),
+    orderType: Joi.string().trim().max(80).optional(),
     otherOrderType: Joi.string().allow('').max(80).optional(),
     witnesses: Joi.array().length(2).items(
         Joi.object({
@@ -190,6 +190,7 @@ export const settingsSchema = Joi.object({
         installmentsEnabled: Joi.boolean().required(),
         discountsEnabled: Joi.boolean().required(),
         discountOptions: Joi.array().items(Joi.number().greater(0).max(100)).max(20).unique().required(),
+        orderTypeOptions: Joi.array().items(Joi.string().trim().min(1).max(80)).min(1).max(20).unique().optional(),
         restaurantEnabled: Joi.boolean().optional(),
         autoRegistrationEnabled: Joi.boolean().optional(),
     }).optional(),

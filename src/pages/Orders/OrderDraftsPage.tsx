@@ -36,7 +36,7 @@ const orderTypeLabel = (draft: OrderDraft) => {
     if (draft.orderType === 'takeaway') return 'Takeaway';
     if (draft.orderType === 'foodpanda') return 'Foodpanda';
     if (draft.orderType === 'other') return draft.otherOrderType || 'Other';
-    return 'Order type pending';
+    return draft.orderType || 'Order type pending';
 };
 
 const OrderDraftsPage: React.FC = () => {
