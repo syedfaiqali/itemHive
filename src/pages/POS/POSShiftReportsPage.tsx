@@ -27,7 +27,8 @@ import api from '../../api/axios';
 import type { RootState } from '../../store';
 import useAppCurrency from '../../hooks/useAppCurrency';
 import { DEFAULT_APP_SETTINGS } from '../../features/settings/settingsSlice';
-import { printReceipt } from '../../lib/printReceipt';
+import { printElement } from '../../lib/printReceipt';
+import { shiftReportPrintCss } from '../../lib/shiftReportPrintCss';
 import { downloadShiftReportPdf } from '../../lib/shiftReportPdf';
 import type { POSShift, ShiftReport, ShiftReportTotals } from '../../types/posShift';
 
@@ -198,9 +199,9 @@ const POSShiftReportsPage: React.FC = () => {
         if (!receipt || printing) return;
         setPrinting(true);
         try {
-            await printReceipt(receipt, '#shift-report-receipt', 80);
+            await printElement(receipt, shiftReportPrintCss());
         } catch {
-            setError('The 80mm report could not be prepared for printing.');
+            setError('The Shift Closing Report could not be prepared for printing.');
         } finally {
             setPrinting(false);
         }
@@ -393,13 +394,13 @@ const POSShiftReportsPage: React.FC = () => {
                 <DialogTitle fontWeight={900}>{displayReport?.status === 'closed' ? 'Shift Closing Report' : 'Live Shift Summary'} Preview</DialogTitle>
                 <DialogContent>
                     {displayReport && <Box id="shift-report-receipt" sx={{ bgcolor: '#fff', color: '#000', px: 2, py: 2.5, fontFamily: 'monospace', border: '1px dashed #999' }}>
-                        <Typography align="center" fontWeight={900} fontSize={18}>{appSettings.shopName || 'ItemHive'}</Typography>
-                        {appSettings.shopAddress && <Typography align="center" fontSize={10}>{appSettings.shopAddress}</Typography>}
-                        {appSettings.shopPhone && <Typography align="center" fontSize={10}>{appSettings.shopPhone}</Typography>}
-                        <Typography align="center" fontWeight={900} fontSize={13} sx={{ mt: 1.2 }}>{displayReport.status === 'closed' ? 'SHIFT CLOSING REPORT' : 'LIVE SHIFT SUMMARY'}</Typography>
-                        <Typography align="center" fontSize={10} fontWeight={800}>{displayReport.status === 'closed' ? 'FINALIZED' : 'SHIFT OPEN'}</Typography>
+                        <Typography className="shift-report-brand" align="center" fontWeight={900} fontSize={18}>{appSettings.shopName || 'ItemHive'}</Typography>
+                        {appSettings.shopAddress && <Typography className="shift-report-contact" align="center" fontSize={10}>{appSettings.shopAddress}</Typography>}
+                        {appSettings.shopPhone && <Typography className="shift-report-contact" align="center" fontSize={10}>{appSettings.shopPhone}</Typography>}
+                        <Typography className="shift-report-title" align="center" fontWeight={900} fontSize={13} sx={{ mt: 1.2 }}>{displayReport.status === 'closed' ? 'SHIFT CLOSING REPORT' : 'LIVE SHIFT SUMMARY'}</Typography>
+                        <Typography className="shift-report-status" align="center" fontSize={10} fontWeight={800}>{displayReport.status === 'closed' ? 'FINALIZED' : 'SHIFT OPEN'}</Typography>
 
-                        <Box sx={{ borderTop: '1px dashed #000', borderBottom: '1px dashed #000', py: 0.8, mt: 1.2 }}>
+                        <Box className="shift-report-meta" sx={{ borderTop: '1px dashed #000', borderBottom: '1px dashed #000', py: 0.8, mt: 1.2 }}>
                             {[
                                 ['Report Date', new Date(displayReport.reportTime).toLocaleString()],
                                 ['Register', displayReport.registerName],
@@ -410,8 +411,8 @@ const POSShiftReportsPage: React.FC = () => {
                             ].map(([label, value]) => <Stack key={String(label)} direction="row" justifyContent="space-between" spacing={1}><Typography fontSize={10} fontWeight={700}>{label}</Typography><Typography fontSize={10} textAlign="right">{value}</Typography></Stack>)}
                         </Box>
 
-                        <Typography fontSize={12} fontWeight={900} sx={{ mt: 1.2, pb: 0.35, borderBottom: '1px dashed #000' }}>SALES DETAILS</Typography>
-                        <Stack spacing={0.35} sx={{ py: 0.75 }}>
+                        <Typography className="shift-report-section" fontSize={12} fontWeight={900} sx={{ mt: 1.2, pb: 0.35, borderBottom: '1px dashed #000' }}>SALES DETAILS</Typography>
+                        <Stack className="shift-report-list" spacing={0.35} sx={{ py: 0.75 }}>
                             {[
                                 ['Opening Cash', formatCurrency(displayReport.openingCash)],
                                 ['Gross Sales', formatCurrency(displayReport.totals.grossSales)],
@@ -422,14 +423,14 @@ const POSShiftReportsPage: React.FC = () => {
                             ].map(([label, value]) => <Stack key={String(label)} direction="row" justifyContent="space-between"><Typography fontSize={10.5} fontWeight={label === 'Net Sales' || label === 'Total Collected' ? 900 : 500}>{label}</Typography><Typography fontSize={10.5} fontWeight={700}>{value}</Typography></Stack>)}
                         </Stack>
 
-                        <Typography fontSize={12} fontWeight={900} sx={{ mt: 0.4, pb: 0.35, borderBottom: '1px dashed #000' }}>INSIGHTS</Typography>
-                        <Stack spacing={0.35} sx={{ py: 0.75 }}>
+                        <Typography className="shift-report-section" fontSize={12} fontWeight={900} sx={{ mt: 0.4, pb: 0.35, borderBottom: '1px dashed #000' }}>INSIGHTS</Typography>
+                        <Stack className="shift-report-list" spacing={0.35} sx={{ py: 0.75 }}>
                             <Stack direction="row" justifyContent="space-between"><Typography fontSize={10.5}>Completed Orders</Typography><Typography fontSize={10.5} fontWeight={700}>{displayReport.totals.completedOrders}</Typography></Stack>
                             <Stack direction="row" justifyContent="space-between"><Typography fontSize={10.5}>Items Sold</Typography><Typography fontSize={10.5} fontWeight={700}>{displayReport.totals.itemsSold}</Typography></Stack>
                         </Stack>
 
-                        <Typography fontSize={12} fontWeight={900} sx={{ mt: 0.4, pb: 0.35, borderBottom: '1px dashed #000' }}>PAYMENT-WISE SALES</Typography>
-                        <Stack direction="row" sx={{ py: 0.45, borderBottom: '1px dotted #777' }}>
+                        <Typography className="shift-report-section" fontSize={12} fontWeight={900} sx={{ mt: 0.4, pb: 0.35, borderBottom: '1px dashed #000' }}>PAYMENT-WISE SALES</Typography>
+                        <Stack className="shift-report-table-row shift-report-table-head" direction="row" sx={{ py: 0.45, borderBottom: '1px dotted #777' }}>
                             <Typography fontSize={9.5} fontWeight={900} sx={{ flex: 1 }}>Method</Typography><Typography fontSize={9.5} fontWeight={900} sx={{ width: 44, textAlign: 'center' }}>Orders</Typography><Typography fontSize={9.5} fontWeight={900} sx={{ width: 90, textAlign: 'right' }}>Amount</Typography>
                         </Stack>
                         {(displayReport.paymentSummary?.length ? displayReport.paymentSummary : [
@@ -438,38 +439,38 @@ const POSShiftReportsPage: React.FC = () => {
                             { method: 'credit' as const, orderCount: 0, amount: displayReport.totals.creditSales },
                             ...(canAccessInstallments ? [{ method: 'installment' as const, orderCount: 0, amount: displayReport.totals.installmentSales }] : []),
                         ]).filter((entry) => canAccessInstallments || entry.method !== 'installment').map((entry) => (
-                            <Stack key={entry.method} direction="row" sx={{ py: 0.25 }}>
+                            <Stack className="shift-report-table-row" key={entry.method} direction="row" sx={{ py: 0.25 }}>
                                 <Typography fontSize={10} sx={{ flex: 1 }}>{paymentMethodLabel(entry.method)}</Typography><Typography fontSize={10} sx={{ width: 44, textAlign: 'center' }}>{displayReport.paymentSummary?.length ? entry.orderCount : '-'}</Typography><Typography fontSize={10} fontWeight={700} sx={{ width: 90, textAlign: 'right' }}>{formatCurrency(entry.amount)}</Typography>
                             </Stack>
                         ))}
-                        <Stack direction="row" justifyContent="space-between" sx={{ borderTop: '1px dotted #777', pt: 0.35 }}><Typography fontSize={10.5} fontWeight={900}>Total Sales</Typography><Typography fontSize={10.5} fontWeight={900}>{formatCurrency(displayReport.totals.netSales)}</Typography></Stack>
+                        <Stack className="shift-report-total-row" direction="row" justifyContent="space-between" sx={{ borderTop: '1px dotted #777', pt: 0.35 }}><Typography fontSize={10.5} fontWeight={900}>Total Sales</Typography><Typography fontSize={10.5} fontWeight={900}>{formatCurrency(displayReport.totals.netSales)}</Typography></Stack>
 
                         {!!displayReport.orderTypeSummary?.length && <>
-                            <Typography fontSize={12} fontWeight={900} sx={{ mt: 1.2, pb: 0.35, borderBottom: '1px dashed #000' }}>ORDER-TYPE SALES</Typography>
-                            <Stack direction="row" sx={{ py: 0.45, borderBottom: '1px dotted #777' }}>
+                            <Typography className="shift-report-section" fontSize={12} fontWeight={900} sx={{ mt: 1.2, pb: 0.35, borderBottom: '1px dashed #000' }}>ORDER-TYPE SALES</Typography>
+                            <Stack className="shift-report-table-row shift-report-table-head" direction="row" sx={{ py: 0.45, borderBottom: '1px dotted #777' }}>
                                 <Typography fontSize={9.5} fontWeight={900} sx={{ flex: 1 }}>Order Type</Typography><Typography fontSize={9.5} fontWeight={900} sx={{ width: 44, textAlign: 'center' }}>Orders</Typography><Typography fontSize={9.5} fontWeight={900} sx={{ width: 90, textAlign: 'right' }}>Amount</Typography>
                             </Stack>
-                            {displayReport.orderTypeSummary.map((entry) => <Stack key={entry.orderType} direction="row" sx={{ py: 0.25 }}><Typography fontSize={10} sx={{ flex: 1 }}>{orderTypeLabel(entry.orderType)}</Typography><Typography fontSize={10} sx={{ width: 44, textAlign: 'center' }}>{entry.orderCount}</Typography><Typography fontSize={10} fontWeight={700} sx={{ width: 90, textAlign: 'right' }}>{formatCurrency(entry.amount)}</Typography></Stack>)}
+                            {displayReport.orderTypeSummary.map((entry) => <Stack className="shift-report-table-row" key={entry.orderType} direction="row" sx={{ py: 0.25 }}><Typography fontSize={10} sx={{ flex: 1 }}>{orderTypeLabel(entry.orderType)}</Typography><Typography fontSize={10} sx={{ width: 44, textAlign: 'center' }}>{entry.orderCount}</Typography><Typography fontSize={10} fontWeight={700} sx={{ width: 90, textAlign: 'right' }}>{formatCurrency(entry.amount)}</Typography></Stack>)}
                         </>}
 
                         {!!displayReport.soldItems?.length && <>
-                            <Typography fontSize={12} fontWeight={900} sx={{ mt: 1.2, pb: 0.35, borderBottom: '1px dashed #000' }}>SOLD ITEM DETAILS</Typography>
-                            <Stack direction="row" sx={{ py: 0.45, borderBottom: '1px dotted #777' }}>
+                            <Typography className="shift-report-section" fontSize={12} fontWeight={900} sx={{ mt: 1.2, pb: 0.35, borderBottom: '1px dashed #000' }}>SOLD ITEM DETAILS</Typography>
+                            <Stack className="shift-report-table-row shift-report-item-row shift-report-table-head" direction="row" sx={{ py: 0.45, borderBottom: '1px dotted #777' }}>
                                 <Typography fontSize={9.5} fontWeight={900} sx={{ flex: 1 }}>Item</Typography><Typography fontSize={9.5} fontWeight={900} sx={{ width: 34, textAlign: 'center' }}>Qty</Typography><Typography fontSize={9.5} fontWeight={900} sx={{ width: 78, textAlign: 'right' }}>Amount</Typography>
                             </Stack>
-                            {displayReport.soldItems.map((item) => <Stack key={`${item.productId}-${item.productName}`} direction="row" alignItems="flex-start" sx={{ py: 0.25 }}><Typography fontSize={9.5} sx={{ flex: 1, pr: 0.5, overflowWrap: 'anywhere' }}>{item.productName}</Typography><Typography fontSize={9.5} sx={{ width: 34, textAlign: 'center' }}>{item.quantity}</Typography><Typography fontSize={9.5} fontWeight={700} sx={{ width: 78, textAlign: 'right' }}>{formatCurrency(item.amount)}</Typography></Stack>)}
-                            <Stack direction="row" sx={{ borderTop: '1px dotted #777', pt: 0.35 }}><Typography fontSize={10} fontWeight={900} sx={{ flex: 1 }}>Total</Typography><Typography fontSize={10} fontWeight={900} sx={{ width: 34, textAlign: 'center' }}>{displayReport.totals.itemsSold}</Typography><Typography fontSize={10} fontWeight={900} sx={{ width: 78, textAlign: 'right' }}>{formatCurrency(displayReport.totals.netSales)}</Typography></Stack>
+                            {displayReport.soldItems.map((item) => <Stack className="shift-report-table-row shift-report-item-row" key={`${item.productId}-${item.productName}`} direction="row" alignItems="flex-start" sx={{ py: 0.25 }}><Typography fontSize={9.5} sx={{ flex: 1, pr: 0.5, overflowWrap: 'anywhere' }}>{item.productName}</Typography><Typography fontSize={9.5} sx={{ width: 34, textAlign: 'center' }}>{item.quantity}</Typography><Typography fontSize={9.5} fontWeight={700} sx={{ width: 78, textAlign: 'right' }}>{formatCurrency(item.amount)}</Typography></Stack>)}
+                            <Stack className="shift-report-table-row shift-report-item-row shift-report-total-row" direction="row" sx={{ borderTop: '1px dotted #777', pt: 0.35 }}><Typography fontSize={10} fontWeight={900} sx={{ flex: 1 }}>Total</Typography><Typography fontSize={10} fontWeight={900} sx={{ width: 34, textAlign: 'center' }}>{displayReport.totals.itemsSold}</Typography><Typography fontSize={10} fontWeight={900} sx={{ width: 78, textAlign: 'right' }}>{formatCurrency(displayReport.totals.netSales)}</Typography></Stack>
                         </>}
 
-                        <Typography fontSize={12} fontWeight={900} sx={{ mt: 1.2, pb: 0.35, borderBottom: '1px dashed #000' }}>CASH RECONCILIATION</Typography>
-                        <Stack spacing={0.35} sx={{ py: 0.75 }}>
+                        <Typography className="shift-report-section" fontSize={12} fontWeight={900} sx={{ mt: 1.2, pb: 0.35, borderBottom: '1px dashed #000' }}>CASH RECONCILIATION</Typography>
+                        <Stack className="shift-report-list" spacing={0.35} sx={{ py: 0.75 }}>
                             <Stack direction="row" justifyContent="space-between"><Typography fontSize={10.5}>Opening Cash</Typography><Typography fontSize={10.5} fontWeight={700}>{formatCurrency(displayReport.openingCash)}</Typography></Stack>
                             <Stack direction="row" justifyContent="space-between"><Typography fontSize={10.5} fontWeight={900}>Expected Cash</Typography><Typography fontSize={10.5} fontWeight={900}>{formatCurrency(displayReport.totals.expectedDrawerCash)}</Typography></Stack>
                             {displayReport.totals.countedCash != null && <Stack direction="row" justifyContent="space-between"><Typography fontSize={10.5}>Counted Cash</Typography><Typography fontSize={10.5} fontWeight={700}>{formatCurrency(displayReport.totals.countedCash)}</Typography></Stack>}
                             {displayReport.totals.cashDifference != null && <Stack direction="row" justifyContent="space-between"><Typography fontSize={10.5} fontWeight={900}>Variance</Typography><Typography fontSize={10.5} fontWeight={900}>{differenceLabel(displayReport.totals)}</Typography></Stack>}
                         </Stack>
 
-                        <Typography align="center" fontSize={10} fontWeight={900} sx={{ borderTop: '1px dashed #000', pt: 1 }}>{displayReport.status === 'open' ? 'LIVE SUMMARY - SHIFT REMAINS OPEN' : 'FINAL REPORT - SHIFT CLOSED'}</Typography>
+                        <Typography className="shift-report-print-footer" align="center" fontSize={10} fontWeight={900} sx={{ borderTop: '1px dashed #000', pt: 1 }}>{displayReport.status === 'open' ? 'LIVE SUMMARY - SHIFT REMAINS OPEN' : 'FINAL REPORT - SHIFT CLOSED'}</Typography>
                         <Typography align="center" fontSize={9}>Printed {new Date().toLocaleString()}</Typography>
                     </Box>}
                 </DialogContent>

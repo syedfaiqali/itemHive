@@ -18,6 +18,15 @@ const waitForReceiptImages = async (document: Document) => {
  * which becomes noticeably slow for large inventories.
  */
 export const printReceipt = async (receipt: HTMLElement, selector = '#pos-receipt', rollWidthMm = 58) => {
+    await printElement(receipt, thermalInvoicePrintCss(selector, rollWidthMm));
+};
+
+/**
+ * Prints a self-contained element using caller-supplied document styles.
+ * Use this for full-page reports; thermal receipts should keep using
+ * printReceipt so their roll dimensions remain unchanged.
+ */
+export const printElement = async (element: HTMLElement, printCss: string) => {
     const frame = document.createElement('iframe');
     frame.setAttribute('aria-hidden', 'true');
     // Keep the frame off-screen instead of using visibility:hidden; some
@@ -45,9 +54,9 @@ export const printReceipt = async (receipt: HTMLElement, selector = '#pos-receip
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 ${inheritedStyles}
-<style>${thermalInvoicePrintCss(selector, rollWidthMm)}</style>
+<style>${printCss}</style>
 </head>
-<body>${receipt.outerHTML}</body>
+<body>${element.outerHTML}</body>
 </html>`);
     printDocument.close();
 
