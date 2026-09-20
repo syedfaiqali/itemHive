@@ -2,8 +2,6 @@ import React from 'react';
 import axios from 'axios';
 import {
     Box,
-    Card,
-    CardContent,
     Typography,
     Grid,
     Divider,
@@ -120,6 +118,27 @@ const SettingsPage: React.FC = () => {
     const canEditBranding = user?.role === 'super_admin' || user?.role === 'admin';
     const canEditDiscounts = user?.role === 'super_admin' || canManageDiscounts;
     const canEditOrderTypes = user?.role === 'super_admin' || canManageOrderTypes;
+    const premiumAccordionSx = {
+        border: '1px solid',
+        borderColor: alpha(theme.palette.primary.main, mode === 'dark' ? 0.26 : 0.18),
+        borderRadius: '16px !important',
+        overflow: 'hidden',
+        bgcolor: alpha(theme.palette.background.paper, mode === 'dark' ? 0.72 : 0.9),
+        boxShadow: mode === 'dark' ? '0 16px 38px rgba(0, 0, 0, 0.18)' : '0 14px 30px rgba(15, 23, 42, 0.06)',
+        '&::before': { display: 'none' },
+        '&.Mui-expanded': { my: 0, borderColor: alpha(theme.palette.primary.main, mode === 'dark' ? 0.48 : 0.32) },
+    };
+    const premiumSummarySx = {
+        px: { xs: 2, sm: 2.5 },
+        minHeight: 76,
+        '& .MuiAccordionSummary-content': { my: 1.25 },
+        '& .MuiAccordionSummary-expandIconWrapper': {
+            p: 0.65,
+            borderRadius: 1.5,
+            bgcolor: alpha(theme.palette.primary.main, 0.1),
+            color: 'primary.main',
+        },
+    };
 
     React.useEffect(() => {
         dispatch(fetchSettings());
@@ -244,11 +263,13 @@ const SettingsPage: React.FC = () => {
                 </Typography>
             </Box>
 
-            <Grid container spacing={3}>
-                <Grid size={{ xs: 12, md: 7 }}>
-                    <Card>
-                        <CardContent>
-                            <Typography variant="h6" fontWeight={700} gutterBottom>Regional</Typography>
+            <Grid container spacing={2.25}>
+                <Grid size={{ xs: 12 }}>
+                    <Accordion defaultExpanded disableGutters elevation={0} sx={premiumAccordionSx}>
+                        <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={premiumSummarySx}>
+                            <Box><Typography variant="h6" fontWeight={800}>Regional</Typography><Typography variant="body2" color="text.secondary">Country, currency and personal preferences</Typography></Box>
+                        </AccordionSummary>
+                        <AccordionDetails sx={{ px: { xs: 2, sm: 2.5 }, pb: 2.5 }}>
                             <Divider sx={{ mb: 2 }} />
                             <FormControl fullWidth size="small" sx={{ mb: 2 }}>
                                 <InputLabel
@@ -411,14 +432,14 @@ const SettingsPage: React.FC = () => {
                                     label="Low stock alerts"
                                 />
                             </Stack>
-                        </CardContent>
-                    </Card>
+                        </AccordionDetails>
+                    </Accordion>
                 </Grid>
 
                 {user?.role === 'super_admin' && (
                     <Grid size={{ xs: 12 }}>
-                        <Accordion disableGutters elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: '12px !important', overflow: 'hidden' }}>
-                            <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ px: 2.5 }}>
+                        <Accordion disableGutters elevation={0} sx={premiumAccordionSx}>
+                            <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={premiumSummarySx}>
                                 <Box>
                                     <Typography variant="h6" fontWeight={700}>Business Management</Typography>
                                     <Typography variant="body2" color="text.secondary">{businesses.length} business workspace{businesses.length === 1 ? '' : 'es'}</Typography>
@@ -463,9 +484,9 @@ const SettingsPage: React.FC = () => {
                     </Grid>
                 )}
                 {user?.role === 'super_admin' && (
-                    <Grid size={{ xs: 12, md: 6 }}>
-                        <Accordion disableGutters elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: '12px !important' }}>
-                            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                    <Grid size={{ xs: 12 }}>
+                        <Accordion disableGutters elevation={0} sx={premiumAccordionSx}>
+                            <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={premiumSummarySx}>
                                 <Box><Typography fontWeight={700}>Registration</Typography><Typography variant="caption" color="text.secondary">Public signup access</Typography></Box>
                             </AccordionSummary>
                             <AccordionDetails>
@@ -499,9 +520,9 @@ const SettingsPage: React.FC = () => {
                 )}
 
                 {canEditDiscounts && (
-                    <Grid size={{ xs: 12, md: 6 }}>
-                        <Accordion disableGutters elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: '12px !important' }}>
-                            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                    <Grid size={{ xs: 12 }}>
+                        <Accordion disableGutters elevation={0} sx={premiumAccordionSx}>
+                            <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={premiumSummarySx}>
                                 <Box><Typography fontWeight={700}>Discount Controls</Typography><Typography variant="caption" color="text.secondary">Manage the discounts available in your POS</Typography></Box>
                             </AccordionSummary>
                             <AccordionDetails>
@@ -602,9 +623,9 @@ const SettingsPage: React.FC = () => {
                 )}
 
                 {canEditOrderTypes && appDraft.restaurantEnabled && (
-                    <Grid size={{ xs: 12, md: 6 }}>
-                        <Accordion disableGutters elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: '12px !important' }}>
-                            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                    <Grid size={{ xs: 12 }}>
+                        <Accordion disableGutters elevation={0} sx={premiumAccordionSx}>
+                            <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={premiumSummarySx}>
                                 <Box><Typography fontWeight={700}>Restaurant / KOT Order Types</Typography><Typography variant="caption" color="text.secondary">Manage the choices shown in your POS order-type dropdown</Typography></Box>
                             </AccordionSummary>
                             <AccordionDetails>
@@ -652,10 +673,12 @@ const SettingsPage: React.FC = () => {
                 )}
 
                 {canEditBranding && (
-                    <Grid size={{ xs: 12, md: 6 }}>
-                        <Card>
-                            <CardContent>
-                                <Typography variant="h6" fontWeight={700} gutterBottom>Invoice & Receipt Branding</Typography>
+                    <Grid size={{ xs: 12 }}>
+                        <Accordion disableGutters elevation={0} sx={premiumAccordionSx}>
+                            <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={premiumSummarySx}>
+                                <Box><Typography variant="h6" fontWeight={800}>Invoice & Receipt Branding</Typography><Typography variant="body2" color="text.secondary">Shop identity, receipt banner and invoice logo</Typography></Box>
+                            </AccordionSummary>
+                            <AccordionDetails sx={{ px: { xs: 2, sm: 2.5 }, pb: 2.5 }}>
                                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                                     The banner prints at the top of receipts, order invoices, transaction invoices and stock slips.
                                     PNG, JPEG, WEBP or SVG; wide images work best.
@@ -819,8 +842,8 @@ const SettingsPage: React.FC = () => {
                                     style={{ display: 'none' }}
                                     onChange={handleInvoiceLogoFileChange}
                                 />
-                            </CardContent>
-                        </Card>
+                            </AccordionDetails>
+                        </Accordion>
                     </Grid>
                 )}
 
