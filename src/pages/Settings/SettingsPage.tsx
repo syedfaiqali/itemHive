@@ -506,12 +506,25 @@ const SettingsPage: React.FC = () => {
                                             ? 'New users get their workspace immediately.'
                                             : 'New signups are sent to Signup Requests for super admin approval.'}
                                     </Typography>
+                                    <Divider />
+                                    <FormControlLabel
+                                        control={
+                                            <Switch
+                                                checked={appDraft.basicCustomizationOfferEnabled}
+                                                onChange={(event) => setAppDraft({ ...appDraft, basicCustomizationOfferEnabled: event.target.checked })}
+                                            />
+                                        }
+                                        label="Show Basic customization offer on pricing"
+                                    />
+                                    <Typography variant="caption" color="text.secondary">
+                                        When enabled, visitors see a corner offer that Basic-plan clients can request customization.
+                                    </Typography>
                                     <Button
                                         variant="contained"
                                         onClick={() => persistSettings(country, currency, notifications, appDraft)}
                                         disabled={loading}
                                     >
-                                        Save Registration Setting
+                                        Save Registration & Offer Settings
                                     </Button>
                                 </Stack>
                             </AccordionDetails>

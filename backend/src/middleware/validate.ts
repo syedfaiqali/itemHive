@@ -193,6 +193,7 @@ export const settingsSchema = Joi.object({
         orderTypeOptions: Joi.array().items(Joi.string().trim().min(1).max(80)).min(1).max(20).unique().optional(),
         restaurantEnabled: Joi.boolean().optional(),
         autoRegistrationEnabled: Joi.boolean().optional(),
+        basicCustomizationOfferEnabled: Joi.boolean().optional(),
     }).optional(),
 });
 

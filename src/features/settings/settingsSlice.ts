@@ -25,6 +25,8 @@ export interface AppSettings {
     /** Turns on restaurant-only POS functionality for this workspace. */
     restaurantEnabled: boolean;
     autoRegistrationEnabled: boolean;
+    /** Super-admin toggle for the public Basic-plan customization offer. */
+    basicCustomizationOfferEnabled: boolean;
 }
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
@@ -40,6 +42,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     orderTypeOptions: ['Dine In', 'Takeaway', 'Foodpanda', 'Other'],
     restaurantEnabled: false,
     autoRegistrationEnabled: true,
+    basicCustomizationOfferEnabled: false,
 };
 
 export type CurrencyCode = 'USD' | 'EUR' | 'GBP' | 'CHF' | 'CDF' | 'XAF' | 'PKR' | 'INR' | 'AED';

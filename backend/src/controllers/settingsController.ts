@@ -21,6 +21,7 @@ const serializeAppSettings = (appSettings: IAppSetting, globalAppSettings: IAppS
     orderTypeOptions: appSettings.orderTypeOptions?.length ? appSettings.orderTypeOptions : DEFAULT_ORDER_TYPE_OPTIONS,
     restaurantEnabled: appSettings.restaurantEnabled,
     autoRegistrationEnabled: globalAppSettings.autoRegistrationEnabled,
+    basicCustomizationOfferEnabled: globalAppSettings.basicCustomizationOfferEnabled,
 });
 
 const serializePreferences = (preferences: IUser['preferences']) => ({
@@ -51,6 +52,18 @@ export const getSettings = async (req: AuthRequest, res: Response) => {
         });
     } catch (error: any) {
         return res.status(500).json({ message: error.message || 'Failed to fetch settings' });
+    }
+};
+
+/** Public, deliberately minimal pricing configuration. No authentication required. */
+export const getPublicPricingSettings = async (_req: AuthRequest, res: Response) => {
+    try {
+        const globalAppSettings = await getGlobalAppSettings();
+        return res.json({
+            basicCustomizationOfferEnabled: Boolean(globalAppSettings.basicCustomizationOfferEnabled),
+        });
+    } catch (error: any) {
+        return res.status(500).json({ message: error.message || 'Failed to fetch pricing settings' });
     }
 };
 
@@ -114,6 +127,11 @@ export const updateSettings = async (req: AuthRequest, res: Response) => {
             }
             if (isSuperAdmin && typeof req.body.app.autoRegistrationEnabled === 'boolean') {
                 globalAppSettings.autoRegistrationEnabled = req.body.app.autoRegistrationEnabled;
+            }
+            if (isSuperAdmin && typeof req.body.app.basicCustomizationOfferEnabled === 'boolean') {
+                globalAppSettings.basicCustomizationOfferEnabled = req.body.app.basicCustomizationOfferEnabled;
+            }
+            if (isSuperAdmin && globalAppSettings.isModified()) {
                 await globalAppSettings.save();
             }
         }

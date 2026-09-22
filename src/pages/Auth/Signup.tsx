@@ -35,9 +35,10 @@ const countryOptions: Array<{ value: CountryCode; label: string }> = [
 ];
 
 const packageOptions = [
-    { id: 'free_trial', name: 'Free Trial', detail: '2 months free access' },
-    { id: 'starter', name: 'Starter Monthly', detail: 'Inventory, POS, reports' },
-    { id: 'pro', name: 'Pro Monthly', detail: 'Everything plus credits, installments, team controls' },
+    { id: 'basic', name: 'Basic', detail: '1 user, all existing features — PKR 2,000/month' },
+    { id: 'pro', name: 'Pro', detail: '1 admin + 3 users, all existing features — PKR 3,000/month' },
+    { id: 'premium', name: 'Premium', detail: '1 admin + 10 users, minor changes — PKR 4,000/month' },
+    { id: 'customization', name: 'Customization', detail: 'Flexible users and product updates — custom price' },
 ];
 
 const Signup: React.FC = () => {
@@ -54,7 +55,7 @@ const Signup: React.FC = () => {
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [businessName, setBusinessName] = useState('');
-    const [packageId, setPackageId] = useState('free_trial');
+    const [packageId, setPackageId] = useState('basic');
     const [country, setCountry] = useState<CountryCode>('PK');
     const [businessType, setBusinessType] = useState('');
     const [phone, setPhone] = useState('');
@@ -107,7 +108,7 @@ const Signup: React.FC = () => {
                     businessName,
                     role: 'admin',
                     packageId,
-                    packageName: packageOptions.find((plan) => plan.id === packageId)?.name || 'Free Trial',
+                    packageName: packageOptions.find((plan) => plan.id === packageId)?.name || 'Basic',
                     country,
                     currency: countryCurrencyMap[country],
                     businessType,

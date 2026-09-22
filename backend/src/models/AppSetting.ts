@@ -19,6 +19,8 @@ export interface IAppSetting extends Document {
     /** Enables restaurant-only POS features such as Kitchen Order Tickets. */
     restaurantEnabled: boolean;
     autoRegistrationEnabled: boolean;
+    /** Shows the Basic-plan customization offer on the public pricing screen. */
+    basicCustomizationOfferEnabled: boolean;
 }
 
 const AppSettingSchema: Schema<IAppSetting> = new Schema({
@@ -39,6 +41,7 @@ const AppSettingSchema: Schema<IAppSetting> = new Schema({
     monthlyPaymentTrackingStartedAt: { type: Date, default: null },
     restaurantEnabled: { type: Boolean, default: false },
     autoRegistrationEnabled: { type: Boolean, default: true },
+    basicCustomizationOfferEnabled: { type: Boolean, default: false },
 }, { timestamps: true });
 
 export default mongoose.model<IAppSetting>('AppSetting', AppSettingSchema);

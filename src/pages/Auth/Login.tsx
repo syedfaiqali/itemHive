@@ -20,6 +20,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { alpha, useTheme } from '@mui/material/styles';
 import type { AppDispatch, RootState } from '../../store';
+import api from '../../api/axios';
 
 const Login: React.FC = () => {
     const theme = useTheme();
@@ -30,6 +31,7 @@ const Login: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'signin' | 'pricing'>('signin');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [basicCustomizationOfferEnabled, setBasicCustomizationOfferEnabled] = useState(false);
 
     const floatingWidgets = [
         { icon: <Smartphone size={16} />, left: '6%', top: '10%', rotate: -11 },
@@ -67,6 +69,12 @@ const Login: React.FC = () => {
         };
     }, [isAuthenticated, navigate, dispatch]);
 
+    useEffect(() => {
+        api.get<{ basicCustomizationOfferEnabled: boolean }>('/settings/public-pricing')
+            .then((response) => setBasicCustomizationOfferEnabled(Boolean(response.data.basicCustomizationOfferEnabled)))
+            .catch(() => setBasicCustomizationOfferEnabled(false));
+    }, []);
+
     const handleLogin = (e: React.FormEvent) => {
         e.preventDefault();
         dispatch(loginUser({ email, password }));
@@ -74,25 +82,32 @@ const Login: React.FC = () => {
 
     const plans = [
         {
-            id: 'free_trial',
-            name: 'Free Trial',
-            price: 'Free',
-            tag: '2 months',
-            features: ['Inventory + POS basics', 'Product and stock tracking', 'Starter reports', 'Expires after 2 months'],
-        },
-        {
-            id: 'starter',
-            name: 'Starter',
-            price: 'Monthly',
-            tag: 'Core',
-            features: ['Unlimited daily sales', 'Inventory requests', 'Transactions + reports', 'Team access controls'],
+            id: 'basic',
+            name: 'Basic',
+            price: 'PKR 2,000 / month',
+            tag: '1 user',
+            features: ['1 user account', 'All existing ItemHive features'],
         },
         {
             id: 'pro',
             name: 'Pro',
-            price: 'Monthly',
-            tag: 'Best',
-            features: ['Everything in Starter', 'Credit customers', 'Installments workflow', 'Workspace switching'],
+            price: 'PKR 3,000 / month',
+            tag: '4 users',
+            features: ['1 admin + 3 user accounts', 'All existing ItemHive features'],
+        },
+        {
+            id: 'premium',
+            name: 'Premium',
+            price: 'PKR 4,000 / month',
+            tag: '11 users',
+            features: ['1 admin + 10 user accounts', 'All existing features', 'Small changes as per client requirements'],
+        },
+        {
+            id: 'customization',
+            name: 'Customization',
+            price: 'Custom price',
+            tag: 'Flexible team',
+            features: ['Admin and user accounts as needed', 'All existing ItemHive features', 'Product updates where feasible for your requirements'],
         },
     ];
 
@@ -150,7 +165,7 @@ const Login: React.FC = () => {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5 }}
-                    style={{ width: '100%', maxWidth: '980px' }}
+                    style={{ width: '100%', maxWidth: activeTab === 'pricing' ? '1180px' : '980px' }}
                 >
                     <Paper
                         elevation={24}
@@ -161,7 +176,7 @@ const Login: React.FC = () => {
                             flexDirection: { xs: 'column', md: 'row' },
                             border: '1px solid',
                             borderColor: 'divider',
-                            minHeight: { xs: 'auto', md: 500 },
+                            minHeight: { xs: 'auto', md: activeTab === 'pricing' ? 620 : 500 },
                             maxWidth: '100%',
                             m: 'auto'
                         }}
@@ -221,21 +236,47 @@ const Login: React.FC = () => {
                         </Box>
                         <Box
                             sx={{
-                                flex: 1,
-                                p: { xs: 1.5, sm: 2.25, md: 2.75 },
+                                flex: activeTab === 'pricing' ? 1.9 : 1,
+                                p: { xs: 1.5, sm: 2.25, md: activeTab === 'pricing' ? 3 : 2.75 },
                                 bgcolor: 'background.paper',
                                 display: 'flex',
                                 flexDirection: 'column',
                                 justifyContent: 'center'
                             }}
                         >
-                            <Box sx={{ mb: 1.5, textAlign: { xs: 'center', md: 'left' } }}>
-                                <Typography variant="h4" fontWeight={800} color="primary.main" gutterBottom>
-                                    ItemHive
-                                </Typography>
-                                <Typography variant="body2" color="text.secondary">
-                                    {activeTab === 'signin' ? 'Welcome back. Sign in to continue.' : 'Simple plans for growing retail teams.'}
-                                </Typography>
+                            <Box sx={{ mb: 1.5, display: 'flex', alignItems: 'stretch', justifyContent: 'space-between', gap: 2, textAlign: { xs: 'center', md: 'left' } }}>
+                                <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                                    <Typography variant="h4" fontWeight={800} color="primary.main" gutterBottom>
+                                        ItemHive
+                                    </Typography>
+                                    <Typography variant="body2" color="text.secondary">
+                                        {activeTab === 'signin' ? 'Welcome back. Sign in to continue.' : 'Simple plans for growing retail teams.'}
+                                    </Typography>
+                                </Box>
+                                {activeTab === 'pricing' && basicCustomizationOfferEnabled && (
+                                    <Box
+                                        sx={{
+                                            display: { xs: 'none', md: 'flex' },
+                                            flexDirection: 'column',
+                                            justifyContent: 'center',
+                                            minWidth: 340,
+                                            minHeight: 112,
+                                            px: 3,
+                                            py: 2,
+                                            borderRadius: '0 20px 0 20px',
+                                            background: `linear-gradient(135deg, ${theme.palette.primary.dark}, ${theme.palette.primary.main})`,
+                                            color: 'primary.contrastText',
+                                            boxShadow: `0 16px 30px -18px ${alpha(theme.palette.primary.dark, 0.9)}`,
+                                        }}
+                                    >
+                                        <Typography variant="h6" fontWeight={900} sx={{ lineHeight: 1.1, mb: 0.8 }}>
+                                            Limited-time offer
+                                        </Typography>
+                                        <Typography variant="body2" sx={{ lineHeight: 1.45, opacity: 0.96 }}>
+                                            Basic plan clients can request customization for their business needs.
+                                        </Typography>
+                                    </Box>
+                                )}
                             </Box>
 
                             <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0.75, mb: 1.5, p: 0.4, bgcolor: 'action.hover', borderRadius: 2 }}>
@@ -356,7 +397,7 @@ const Login: React.FC = () => {
                                     </Box>
                                 </>
                             ) : (
-                                <Stack spacing={1.2}>
+                                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' }, gap: 1.2 }}>
                                     {plans.map((plan) => (
                                         <Box
                                             key={plan.id}
@@ -364,8 +405,10 @@ const Login: React.FC = () => {
                                                 p: 1.35,
                                                 borderRadius: 3,
                                                 border: '1px solid',
-                                                borderColor: plan.id === 'pro' ? 'primary.main' : 'divider',
-                                                bgcolor: plan.id === 'pro' ? alpha(theme.palette.primary.main, 0.08) : 'background.paper',
+                                                borderColor: plan.id === 'premium' ? 'primary.main' : 'divider',
+                                                bgcolor: plan.id === 'premium' ? alpha(theme.palette.primary.main, 0.08) : 'background.paper',
+                                                display: 'flex',
+                                                flexDirection: 'column',
                                             }}
                                         >
                                             <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
@@ -373,7 +416,7 @@ const Login: React.FC = () => {
                                                     <Typography variant="subtitle1" fontWeight={900}>{plan.name}</Typography>
                                                     <Typography variant="caption" color="text.secondary">{plan.price}</Typography>
                                                 </Box>
-                                                <Chip label={plan.tag} color={plan.id === 'pro' ? 'primary' : 'default'} size="small" sx={{ fontWeight: 900 }} />
+                                                <Chip label={plan.tag} color={plan.id === 'premium' ? 'primary' : 'default'} size="small" sx={{ fontWeight: 900 }} />
                                             </Stack>
                                             <Box sx={{ display: 'grid', gap: 0.35, mt: 0.9 }}>
                                                 {plan.features.map((feature) => (
@@ -384,16 +427,16 @@ const Login: React.FC = () => {
                                             </Box>
                                             <Button
                                                 fullWidth
-                                                variant={plan.id === 'pro' ? 'contained' : 'outlined'}
+                                                variant={plan.id === 'premium' ? 'contained' : 'outlined'}
                                                 size="small"
                                                 onClick={() => navigate(`/signup?plan=${plan.id}`)}
-                                                sx={{ mt: 1, borderRadius: 2, fontWeight: 900, textTransform: 'none' }}
+                                                sx={{ mt: 'auto', pt: 1, borderRadius: 2, fontWeight: 900, textTransform: 'none' }}
                                             >
                                                 Choose {plan.name}
                                             </Button>
                                         </Box>
                                     ))}
-                                </Stack>
+                                </Box>
                             )}
                         </Box>
                     </Paper>
