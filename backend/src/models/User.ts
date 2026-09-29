@@ -10,6 +10,7 @@ export interface IUser extends Document {
     visiblePassword?: string;
     role: UserRole;
     avatar?: string;
+    appearance?: { themeColor: string; backgroundColor?: string; sidebarColor?: string; navbarColor?: string; sidebarFontColor?: string; navbarFontColor?: string; borderColor?: string; headingColor?: string; secondaryTextColor?: string; secondaryColor?: string; successColor?: string; warningColor?: string; errorColor?: string; fontColor: string; logo: string };
     isActive: boolean;
     isVisible: boolean;
     installmentAccess: boolean;
@@ -36,6 +37,23 @@ const UserSchema: Schema = new Schema({
     visiblePassword: { type: String, select: false },
     role: { type: String, enum: USER_ROLES, default: 'user' },
     avatar: { type: String },
+    appearance: {
+        themeColor: { type: String, default: '#0ea5a5' },
+        backgroundColor: { type: String, default: '' },
+        sidebarColor: { type: String, default: '' },
+        navbarColor: { type: String, default: '' },
+        sidebarFontColor: { type: String, default: '' },
+        navbarFontColor: { type: String, default: '' },
+        borderColor: { type: String, default: '' },
+        headingColor: { type: String, default: '' },
+        secondaryTextColor: { type: String, default: '' },
+        secondaryColor: { type: String, default: '' },
+        successColor: { type: String, default: '' },
+        warningColor: { type: String, default: '' },
+        errorColor: { type: String, default: '' },
+        fontColor: { type: String, default: '' },
+        logo: { type: String, default: '' },
+    },
     isActive: { type: Boolean, default: true, index: true },
     isVisible: { type: Boolean, default: true, index: true },
     installmentAccess: { type: Boolean, default: false },

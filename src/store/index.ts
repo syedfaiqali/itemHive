@@ -14,6 +14,7 @@ import authReducer from '../features/auth/authSlice';
 import inventoryReducer from '../features/inventory/inventorySlice';
 import transactionReducer from '../features/transactions/transactionSlice';
 import reportsReducer from '../features/reports/reportSlice';
+import themePreviewReducer from '../features/theme/themePreviewSlice';
 import themeReducer from '../features/theme/themeSlice';
 import posReducer from '../features/pos/posSlice';
 import ordersReducer from '../features/orders/ordersSlice';
@@ -25,6 +26,7 @@ const rootReducer = combineReducers({
     transactions: transactionReducer,
     reports: reportsReducer,
     theme: themeReducer,
+    themePreview: themePreviewReducer,
     pos: posReducer,
     orders: ordersReducer,
     settings: settingsReducer,

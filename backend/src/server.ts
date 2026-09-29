@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
+import dns from 'dns';
 import path from 'path';
 import connectDB from './config/db';
 import authRoutes from './routes/authRoutes';
@@ -25,6 +26,10 @@ import { ensureTenantIndexes } from './utils/tenantIndexes';
 
 // Environmental variables I LOVE YOU 2
 dotenv.config();
+dotenv.config({ path: path.resolve(__dirname, '../.env.local'), override: true });
+
+// Some networks have a broken IPv6 route to Google APIs, where TLS handshakes reset after ~10s.
+dns.setDefaultResultOrder('ipv4first');
 
 const app = express();
 const PORT = process.env.PORT || 5000;

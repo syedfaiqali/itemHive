@@ -250,3 +250,16 @@ export const getCurrentUser = async (req: AuthRequest, res: Response) => {
         return res.status(500).json({ message: error.message || 'Failed to load the current account' });
     }
 };
+
+export const updateAppearance = async (req: AuthRequest, res: Response) => {
+    try {
+        const { themeColor, backgroundColor, sidebarColor, navbarColor, sidebarFontColor, navbarFontColor, borderColor, headingColor, secondaryTextColor, secondaryColor, successColor, warningColor, errorColor, fontColor, logo } = req.body;
+        const user = await User.findByIdAndUpdate(req.user?.id,
+            { $set: { appearance: { themeColor, backgroundColor, sidebarColor, navbarColor, sidebarFontColor, navbarFontColor, borderColor, headingColor, secondaryTextColor, secondaryColor, successColor, warningColor, errorColor, fontColor, logo } } },
+            { new: true, runValidators: true });
+        if (!user) return res.status(404).json({ message: 'User not found' });
+        return res.json({ appearance: user.appearance });
+    } catch {
+        return res.status(500).json({ message: 'Unable to save theme settings' });
+    }
+};

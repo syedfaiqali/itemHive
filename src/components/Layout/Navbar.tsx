@@ -22,6 +22,7 @@ import {
     Moon,
     UserCircle2,
     Settings,
+    Palette,
     LogOut,
     Sparkles,
     ChevronRight,
@@ -39,6 +40,7 @@ import api from '../../api/axios';
 import { buildNotifications, type InstallmentNotificationPlan, type NotificationItem } from '../../lib/notifications';
 import type { AppDispatch } from '../../store';
 import { hasScreenAccess } from '../../lib/screenPermissions';
+import { useLogoPlate } from '../../lib/logoVisibility';
 
 interface NavbarProps {
     onMenuClick: () => void;
@@ -62,6 +64,25 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
     const location = useLocation();
     const theme = useTheme();
     const { user } = useSelector((state: RootState) => state.auth);
+    const navbarFontColor = useSelector((state: RootState) => {
+        const preview = state.themePreview.value;
+        return (preview && preview.userId === state.auth.user?.id
+            ? preview.appearance.navbarFontColor
+            : state.auth.user?.appearance?.navbarFontColor) || '';
+    });
+    const navbarColor = useSelector((state: RootState) => {
+        const preview = state.themePreview.value;
+        return (preview && preview.userId === state.auth.user?.id
+            ? preview.appearance.navbarColor
+            : state.auth.user?.appearance?.navbarColor) || '';
+    });
+    const logo = useSelector((state: RootState) => {
+        const preview = state.themePreview.value;
+        return (preview && preview.userId === state.auth.user?.id
+            ? preview.appearance.logo
+            : state.auth.user?.appearance?.logo) || '/favicon.png';
+    });
+    const logoPlate = useLogoPlate(logo, navbarColor || theme.palette.background.paper, [theme.palette.background.default]);
     const { mode, isSidebarCollapsed } = useSelector((state: RootState) => state.theme);
     const { transactions } = useSelector((state: RootState) => state.transactions);
     const { orders } = useSelector((state: RootState) => state.orders);
@@ -269,7 +290,7 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
             sx={{
                 width: { sm: `calc(100% - ${currentWidth}px)` },
                 ml: { sm: `${currentWidth}px` },
-                backgroundColor: (theme) => alpha(theme.palette.background.paper, 0.8),
+                backgroundColor: (theme) => navbarColor || alpha(theme.palette.background.paper, 0.8),
                 backdropFilter: 'blur(12px)',
                 transition: (theme) => theme.transitions.create(['width', 'margin'], {
                     easing: theme.transitions.easing.sharp,
@@ -277,8 +298,9 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
                 }),
                 borderBottom: '1px solid',
                 borderColor: 'divider',
-                color: 'text.primary',
+                color: navbarFontColor || 'text.primary',
                 boxShadow: 'none',
+                borderRadius: 0,
             }}
         >
             <Toolbar>
@@ -302,14 +324,16 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
                     >
                         <Box
                             component="img"
-                            src="/favicon.png"
+                            src={logo}
                             alt="Logo"
-                            sx={{ width: 28, height: 28 }}
+                            sx={{ width: logo !== '/favicon.png' ? 140 : 28, height: logo !== '/favicon.png' ? 48 : 28, objectFit: 'contain', ...(logoPlate && { bgcolor: logoPlate, borderRadius: 1.5, p: 0.5 }) }}
                         />
+                        {logo === '/favicon.png' && (
                         <Typography
                             variant="h6"
-                            className="gradient-text"
+                            className={navbarFontColor ? undefined : 'gradient-text'}
                             sx={{
+                                color: navbarFontColor || undefined,
                                 fontWeight: 800,
                                 letterSpacing: -1,
                                 fontSize: '1.2rem'
@@ -317,6 +341,7 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
                         >
                             ItemHive
                         </Typography>
+                        )}
                     </Box>
                 </Box>
 
@@ -352,7 +377,7 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
                                         const option = workspaceOptions.find((entry) => entry.businessId === value);
                                         return (
                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0 }}>
-                                                <Typography variant="caption" sx={{ fontWeight: 900, color: 'text.secondary' }}>
+                                                <Typography variant="caption" sx={{ fontWeight: 900, color: navbarFontColor || 'text.secondary' }}>
                                                     Viewing
                                                 </Typography>
                                                 <Typography
@@ -373,6 +398,7 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
                                 }}
                                 sx={{
                                     minWidth: 230,
+                                    '& .MuiInputBase-root, & .MuiSelect-icon': { color: navbarFontColor || 'text.primary' },
                                     '& .MuiInputBase-root': {
                                         fontWeight: 800,
                                         fontSize: 14,
@@ -582,6 +608,11 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
                             <UserCircle2 size={18} className="menu-action-icon" />
                             <Box sx={{ flexGrow: 1, ml: 1 }}>Profile</Box>
                             <ChevronRight size={16} className="menu-action-arrow" />
+                        </MenuItem>
+                        <MenuItem onClick={() => handleNavigateTo('/theme-settings')} sx={buildActionItemSx(false, isActivePath('/theme-settings'))}>
+                            <Palette size={18} className="menu-action-icon" />
+                            <Box sx={{ flexGrow: 1, ml: 1 }}>Theme Settings</Box>
+                            <ChevronRight size={16} />
                         </MenuItem>
                         {canAccessSettings && (
                             <MenuItem onClick={() => handleNavigateTo('/settings')} sx={buildActionItemSx(false, isActivePath('/settings'))}>

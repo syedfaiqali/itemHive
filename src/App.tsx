@@ -32,6 +32,7 @@ const OrderDesk = React.lazy(() => import('./pages/Orders/OrderDesk'));
 const OrderDraftsPage = React.lazy(() => import('./pages/Orders/OrderDraftsPage'));
 const POSShiftReportsPage = React.lazy(() => import('./pages/POS/POSShiftReportsPage'));
 const SettingsPage = React.lazy(() => import('./pages/Settings/SettingsPage'));
+const ThemeSettingsPage = React.lazy(() => import('./pages/Settings/ThemeSettingsPage'));
 const ProfilePage = React.lazy(() => import('./pages/Profile/ProfilePage'));
 const CustomersPage = React.lazy(() => import('./pages/Customers/CustomersPage'));
 const CustomerRecordsPage = React.lazy(() => import('./pages/Customers/CustomerRecordsPage'));
@@ -44,12 +45,24 @@ const SignupRequestsPage = React.lazy(() => import('./pages/Admin/SignupRequests
 const InventoryRequestsPage = React.lazy(() => import('./pages/Inventory/InventoryRequestsPage'));
 const PermissionManagementPage = React.lazy(() => import('./pages/Admin/PermissionManagementPage'));
 const AccessDeniedPage = React.lazy(() => import('./pages/Auth/AccessDeniedPage'));
+// Keep route elements stable during color previews. Only theme consumers need updates.
+const AppThemeProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
+  const mode = useSelector((state: RootState) => state.theme.mode);
+  const appearance = useSelector((state: RootState) => {
+    const preview = state.themePreview.value;
+    return preview && preview.userId === state.auth.user?.id
+      ? preview.appearance
+      : state.auth.user?.appearance;
+  });
+  const theme = React.useMemo(() => getAppTheme(mode, appearance), [mode, appearance]);
+  return <ThemeProvider theme={theme}>{children}</ThemeProvider>;
+};
+
 const AppContent: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
-  const { mode } = useSelector((state: RootState) => state.theme);
   const { isAuthenticated } = useSelector((state: RootState) => state.auth);
   const { app } = useSelector((state: RootState) => state.settings);
-  const theme = React.useMemo(() => getAppTheme(mode), [mode]);
+
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -65,7 +78,7 @@ const AppContent: React.FC = () => {
   }, [dispatch]);
 
   return (
-    <ThemeProvider theme={theme}>
+    <AppThemeProvider>
       <BrowserRouter>
         <ScrollToTop />
         <React.Suspense fallback={<div>Loading...</div>}>
@@ -164,6 +177,7 @@ const AppContent: React.FC = () => {
                   <SettingsPage />
                 </ProtectedRoute>
               } />
+              <Route path="theme-settings" element={<ThemeSettingsPage />} />
               <Route path="profile" element={
                 <ProtectedRoute allowedRoles={['super_admin', 'admin', 'user']}>
                   <ProfilePage />
@@ -176,7 +190,7 @@ const AppContent: React.FC = () => {
           </Routes>
         </React.Suspense>
       </BrowserRouter>
-    </ThemeProvider>
+    </AppThemeProvider>
   );
 };
 

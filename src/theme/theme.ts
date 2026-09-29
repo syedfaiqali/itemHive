@@ -1,63 +1,81 @@
-import { createTheme, type PaletteMode, alpha } from '@mui/material';
+import { createTheme, type PaletteMode, alpha, lighten, darken, emphasize, getContrastRatio } from '@mui/material';
 
-export const getAppTheme = (mode: PaletteMode) => createTheme({
+import type { Appearance } from '../features/auth/authSlice';
+
+export const getAppTheme = (mode: PaletteMode, appearance?: Partial<Appearance>) => {
+const primary = appearance?.themeColor || '#0ea5a5';
+const fontColor = appearance?.fontColor;
+const backgroundColor = appearance?.backgroundColor;
+const borderColor = appearance?.borderColor;
+const divider = borderColor || (mode === 'light' ? 'rgba(15, 23, 42, 0.08)' : 'rgba(255, 255, 255, 0.14)');
+return createTheme({
     palette: {
         mode,
         primary: {
-            main: '#0ea5a5',
-            light: '#2dd4bf',
-            dark: '#0f766e',
-            contrastText: '#ffffff',
+            main: primary,
+            light: lighten(primary, 0.25),
+            dark: darken(primary, 0.25),
+            contrastText: getContrastRatio(primary, '#ffffff') >= 4.5 ? '#ffffff' : '#0b1220',
         },
         secondary: {
-            main: '#f59e0b',
-            light: '#fbbf24',
-            dark: '#d97706',
+            main: appearance?.secondaryColor || '#f59e0b',
+            light: appearance?.secondaryColor ? lighten(appearance.secondaryColor, 0.25) : '#fbbf24',
+            dark: appearance?.secondaryColor ? darken(appearance.secondaryColor, 0.25) : '#d97706',
             contrastText: '#0b1220',
         },
         success: {
-            main: '#16a34a',
-            light: '#4ade80',
-            dark: '#15803d',
+            main: appearance?.successColor || '#16a34a',
+            light: appearance?.successColor ? lighten(appearance.successColor, 0.25) : '#4ade80',
+            dark: appearance?.successColor ? darken(appearance.successColor, 0.25) : '#15803d',
         },
         warning: {
-            main: '#f59e0b',
-            light: '#fbbf24',
-            dark: '#d97706',
+            main: appearance?.warningColor || '#f59e0b',
+            light: appearance?.warningColor ? lighten(appearance.warningColor, 0.25) : '#fbbf24',
+            dark: appearance?.warningColor ? darken(appearance.warningColor, 0.25) : '#d97706',
         },
         error: {
-            main: '#dc2626',
-            light: '#f87171',
-            dark: '#b91c1c',
+            main: appearance?.errorColor || '#dc2626',
+            light: appearance?.errorColor ? lighten(appearance.errorColor, 0.25) : '#f87171',
+            dark: appearance?.errorColor ? darken(appearance.errorColor, 0.25) : '#b91c1c',
         },
         background: {
-            default: mode === 'light' ? '#f5f7fb' : '#0a0f1c',
-            paper: mode === 'light' ? '#ffffff' : '#111827',
+            default: backgroundColor || (mode === 'light' ? '#f5f7fb' : '#0a0f1c'),
+            paper: backgroundColor || (mode === 'light' ? '#ffffff' : '#111827'),
         },
         text: {
-            primary: mode === 'light' ? '#0f172a' : '#f1f5f9',
-            secondary: mode === 'light' ? '#5b6475' : '#cbd5f5',
+            primary: fontColor || (mode === 'light' ? '#0f172a' : '#f1f5f9'),
+            secondary: appearance?.secondaryTextColor || (fontColor ? alpha(fontColor, 0.75) : (mode === 'light' ? '#5b6475' : '#cbd5f5')),
         },
-        divider: mode === 'light' ? 'rgba(15, 23, 42, 0.08)' : 'rgba(255, 255, 255, 0.14)',
+        divider,
         action: {
             hover: mode === 'light' ? 'rgba(15, 23, 42, 0.04)' : 'rgba(148, 163, 184, 0.16)',
-            selected: mode === 'light' ? 'rgba(14, 165, 165, 0.12)' : 'rgba(45, 212, 191, 0.18)',
+            selected: alpha(primary, mode === 'light' ? 0.12 : 0.18),
         },
     },
     typography: {
         fontFamily: '"Manrope", "Segoe UI", "Helvetica", "Arial", sans-serif',
-        h1: { fontWeight: 800, fontSize: '2.6rem', letterSpacing: '-0.02em', fontFamily: '"Sora", "Manrope", sans-serif' },
-        h2: { fontWeight: 800, fontSize: '2.2rem', letterSpacing: '-0.02em', fontFamily: '"Sora", "Manrope", sans-serif' },
-        h3: { fontWeight: 700, fontSize: '1.85rem', letterSpacing: '-0.01em', fontFamily: '"Sora", "Manrope", sans-serif' },
-        h4: { fontWeight: 700, fontSize: '1.55rem', letterSpacing: '-0.01em', fontFamily: '"Sora", "Manrope", sans-serif' },
-        h5: { fontWeight: 700, fontSize: '1.25rem', fontFamily: '"Sora", "Manrope", sans-serif' },
-        h6: { fontWeight: 700, fontSize: '1.05rem', fontFamily: '"Sora", "Manrope", sans-serif' },
+        h1: { color: appearance?.headingColor || undefined, fontWeight: 800, fontSize: '2.6rem', letterSpacing: '-0.02em', fontFamily: '"Sora", "Manrope", sans-serif' },
+        h2: { color: appearance?.headingColor || undefined, fontWeight: 800, fontSize: '2.2rem', letterSpacing: '-0.02em', fontFamily: '"Sora", "Manrope", sans-serif' },
+        h3: { color: appearance?.headingColor || undefined, fontWeight: 700, fontSize: '1.85rem', letterSpacing: '-0.01em', fontFamily: '"Sora", "Manrope", sans-serif' },
+        h4: { color: appearance?.headingColor || undefined, fontWeight: 700, fontSize: '1.55rem', letterSpacing: '-0.01em', fontFamily: '"Sora", "Manrope", sans-serif' },
+        h5: { color: appearance?.headingColor || undefined, fontWeight: 700, fontSize: '1.25rem', fontFamily: '"Sora", "Manrope", sans-serif' },
+        h6: { color: appearance?.headingColor || undefined, fontWeight: 700, fontSize: '1.05rem', fontFamily: '"Sora", "Manrope", sans-serif' },
         button: { textTransform: 'none', fontWeight: 700 },
     },
     shape: {
         borderRadius: 6,
     },
     components: {
+        MuiCssBaseline: {
+            styleOverrides: {
+                // The global scrollbar in index.css reads these variables, so it follows the active theme.
+                ':root': {
+                    '--scrollbar-track': backgroundColor ? emphasize(backgroundColor, 0.06) : (mode === 'light' ? '#e2e8f0' : '#1e293b'),
+                    '--scrollbar-thumb': primary,
+                    '--scrollbar-thumb-hover': darken(primary, 0.25),
+                },
+            },
+        },
         MuiButton: {
             styleOverrides: {
                 root: {
@@ -75,12 +93,12 @@ export const getAppTheme = (mode: PaletteMode) => createTheme({
                     borderWidth: 1.5,
                 },
                 outlinedPrimary: {
-                    color: '#0ea5a5',
-                    borderColor: alpha('#0ea5a5', 0.5),
-                    backgroundColor: mode === 'light' ? alpha('#0ea5a5', 0.025) : alpha('#2dd4bf', 0.08),
+                    color: primary,
+                    borderColor: borderColor || alpha(primary, 0.5),
+                    backgroundColor: mode === 'light' ? alpha(primary, 0.025) : alpha(primary, 0.08),
                     '&:hover': {
-                        borderColor: '#0ea5a5',
-                        backgroundColor: mode === 'light' ? alpha('#0ea5a5', 0.09) : alpha('#2dd4bf', 0.16),
+                        borderColor: primary,
+                        backgroundColor: mode === 'light' ? alpha(primary, 0.09) : alpha(primary, 0.16),
                     },
                 },
             },
@@ -92,9 +110,7 @@ export const getAppTheme = (mode: PaletteMode) => createTheme({
                     boxShadow: mode === 'light'
                         ? '0 12px 30px -20px rgba(15, 23, 42, 0.35)'
                         : '0 16px 32px -24px rgba(0, 0, 0, 0.7)',
-                    border: mode === 'light'
-                        ? '1px solid rgba(15, 23, 42, 0.08)'
-                        : '1px solid rgba(148, 163, 184, 0.28)',
+                    border: `1px solid ${borderColor || (mode === 'light' ? 'rgba(15, 23, 42, 0.08)' : 'rgba(148, 163, 184, 0.28)')}`,
                 },
             },
         },
@@ -111,6 +127,7 @@ export const getAppTheme = (mode: PaletteMode) => createTheme({
         },
         MuiOutlinedInput: {
             styleOverrides: {
+                notchedOutline: borderColor ? { borderColor } : {},
                 root: {
                     borderRadius: 6,
                     backgroundColor: mode === 'light' ? '#f8fafc' : alpha('#1e293b', 0.4),
@@ -149,7 +166,7 @@ export const getAppTheme = (mode: PaletteMode) => createTheme({
         MuiTableHead: {
             styleOverrides: {
                 root: {
-                    backgroundColor: mode === 'light' ? 'rgba(14, 165, 165, 0.06)' : 'rgba(14, 165, 165, 0.12)',
+                    backgroundColor: alpha(primary, mode === 'light' ? 0.06 : 0.12),
                 },
             },
         },
@@ -164,9 +181,7 @@ export const getAppTheme = (mode: PaletteMode) => createTheme({
         MuiTableCell: {
             styleOverrides: {
                 root: {
-                    borderBottom: mode === 'light'
-                        ? '1px solid rgba(15, 23, 42, 0.08)'
-                        : '1px solid rgba(148, 163, 184, 0.2)',
+                    borderBottom: `1px solid ${borderColor || (mode === 'light' ? 'rgba(15, 23, 42, 0.08)' : 'rgba(148, 163, 184, 0.2)')}`,
                     '@media (max-width:600px)': {
                         padding: '10px 12px',
                         fontSize: '0.78rem',
@@ -200,6 +215,7 @@ export const getAppTheme = (mode: PaletteMode) => createTheme({
         },
     },
 });
+};
 
 export default getAppTheme;
 

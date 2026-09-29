@@ -5,7 +5,10 @@ import type { ScreenPermission } from '../../lib/screenPermissions';
 
 export type UserRole = 'super_admin' | 'admin' | 'user';
 
+export interface Appearance { themeColor: string; backgroundColor?: string; sidebarColor?: string; navbarColor?: string; sidebarFontColor?: string; navbarFontColor?: string; borderColor?: string; headingColor?: string; secondaryTextColor?: string; secondaryColor?: string; successColor?: string; warningColor?: string; errorColor?: string; fontColor: string; logo: string }
+
 export interface User {
+    appearance?: Appearance;
     id: string;
     name: string;
     email: string;
@@ -131,6 +134,9 @@ const authSlice = createSlice({
             state.isAuthenticated = false;
             localStorage.removeItem('token');
         },
+        setAppearance: (state, action: PayloadAction<Appearance>) => {
+            if (state.user) state.user.appearance = action.payload;
+        },
         clearError: (state) => {
             state.error = null;
         }
@@ -181,5 +187,5 @@ const authSlice = createSlice({
     }
 });
 
-export const { logout, clearError } = authSlice.actions;
+export const { logout, clearError, setAppearance } = authSlice.actions;
 export default authSlice.reducer;

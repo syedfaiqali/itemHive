@@ -40,6 +40,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
 import { toggleSidebar } from '../../features/theme/themeSlice';
 import { hasScreenAccess, type ScreenPermission } from '../../lib/screenPermissions';
+import { useLogoPlate } from '../../lib/logoVisibility';
 
 const drawerWidth = 260;
 const collapsedWidth = 80;
@@ -55,8 +56,28 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onDrawerToggle }) => {
     const location = useLocation();
     const navigate = useNavigate();
     const { user } = useSelector((state: RootState) => state.auth);
+    const sidebarFontColor = useSelector((state: RootState) => {
+        const preview = state.themePreview.value;
+        return (preview && preview.userId === state.auth.user?.id
+            ? preview.appearance.sidebarFontColor
+            : state.auth.user?.appearance?.sidebarFontColor) || '';
+    });
+    const sidebarColor = useSelector((state: RootState) => {
+        const preview = state.themePreview.value;
+        return (preview && preview.userId === state.auth.user?.id
+            ? preview.appearance.sidebarColor
+            : state.auth.user?.appearance?.sidebarColor) || '';
+    });
+    const logo = useSelector((state: RootState) => {
+        const preview = state.themePreview.value;
+        return (preview && preview.userId === state.auth.user?.id
+            ? preview.appearance.logo
+            : state.auth.user?.appearance?.logo) || '/favicon.png';
+    });
     const { isSidebarCollapsed } = useSelector((state: RootState) => state.theme);
     const { app } = useSelector((state: RootState) => state.settings);
+    const hasCustomLogo = logo !== '/favicon.png';
+    const logoPlate = useLogoPlate(logo, sidebarColor || theme.palette.background.paper, [theme.palette.background.default]);
     const currentWidth = isSidebarCollapsed ? collapsedWidth : drawerWidth;
     const currentRole = user?.role || 'user';
     const canAccessInstallments = user?.role === 'super_admin' || Boolean(app?.installmentsEnabled && user?.installmentAccess);
@@ -94,11 +115,11 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onDrawerToggle }) => {
             }}>
                 <Box
                     component="img"
-                    src="/favicon.png"
+                    src={logo}
                     alt="Logo"
-                    sx={{ width: 32, height: 32, flexShrink: 0, filter: 'drop-shadow(0 4px 8px rgba(14, 165, 165, 0.3))' }}
+                    sx={{ width: hasCustomLogo ? (isSidebarCollapsed ? 48 : '100%') : 32, height: hasCustomLogo ? 64 : 32, maxWidth: '100%', objectFit: 'contain', flexShrink: 0, ...(logoPlate && { bgcolor: logoPlate, borderRadius: 1.5, p: 0.75 }) }}
                 />
-                {!isSidebarCollapsed && (
+                {!isSidebarCollapsed && !hasCustomLogo && (
                     <Typography
                         variant="h6"
                         fontWeight={900}
@@ -109,7 +130,7 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onDrawerToggle }) => {
                             letterSpacing: -0.5,
                             background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.primary.light})`,
                             WebkitBackgroundClip: 'text',
-                            WebkitTextFillColor: 'transparent',
+                            WebkitTextFillColor: sidebarFontColor || 'transparent',
                         }}
                     >
                         ItemHive
@@ -129,17 +150,18 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onDrawerToggle }) => {
                     sx={{
                         width: 30,
                         height: 30,
-                        bgcolor: 'background.paper',
+                        bgcolor: sidebarColor || 'background.paper',
                         border: '1px solid',
                         borderColor: 'divider',
                         boxShadow: '0 4px 10px rgba(0,0,0,0.1)',
                         '&:hover': {
                             bgcolor: 'primary.main',
-                            color: 'white',
+                            color: 'primary.contrastText',
                             transform: 'scale(1.1)',
                         },
                         transition: 'all 0.2s',
-                        color: 'text.secondary',
+                        // The button sits on the sidebar color, so it uses the sidebar's text color to stay visible.
+                        color: sidebarFontColor || 'text.secondary',
                         p: 0,
                     }}
                 >
@@ -157,6 +179,8 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onDrawerToggle }) => {
                     px: 2,
                     pb: 1.5,
                     '&::-webkit-scrollbar': { width: 6 },
+                    // The global light track would show as a strip on dark sidebars.
+                    '&::-webkit-scrollbar-track': { backgroundColor: 'transparent' },
                     '&::-webkit-scrollbar-thumb': {
                         backgroundColor: alpha(theme.palette.primary.main, 0.35),
                         borderRadius: 8,
@@ -183,12 +207,12 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onDrawerToggle }) => {
                                             justifyContent: isSidebarCollapsed ? 'center' : 'initial',
                                             borderRadius: 2,
                                             backgroundColor: isActive ? 'primary.main' : 'transparent',
-                                            color: isActive ? 'primary.contrastText' : 'text.primary',
+                                            color: sidebarFontColor || (isActive ? 'primary.contrastText' : 'text.primary'),
                                             '&:hover': {
                                                 backgroundColor: isActive ? 'primary.dark' : (theme) => alpha(theme.palette.primary.main, 0.1),
-                                                color: isActive ? 'primary.contrastText' : 'primary.main',
+                                                color: sidebarFontColor || (isActive ? 'primary.contrastText' : 'primary.main'),
                                                 '& .MuiListItemIcon-root': {
-                                                    color: isActive ? 'primary.contrastText' : 'primary.main',
+                                                    color: sidebarFontColor || (isActive ? 'primary.contrastText' : 'primary.main'),
                                                 }
                                             },
                                         }}
@@ -198,7 +222,7 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onDrawerToggle }) => {
                                                 minWidth: isSidebarCollapsed ? 0 : 40,
                                                 mr: isSidebarCollapsed ? 0 : 0,
                                                 justifyContent: 'center',
-                                                color: isActive ? 'primary.contrastText' : 'text.secondary'
+                                                color: sidebarFontColor || (isActive ? 'primary.contrastText' : 'text.secondary')
                                             }}
                                         >
                                             {item.icon}
@@ -218,7 +242,12 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onDrawerToggle }) => {
                 </List>
             </Box>
             <Box sx={{ mt: 'auto', p: 2 }}>
-                <Divider sx={{ mb: 2 }} />
+                <Divider sx={{ mb: isSidebarCollapsed ? 2 : 1.5 }} />
+                {!isSidebarCollapsed && (
+                    <Typography variant="caption" component="p" noWrap sx={{ textAlign: 'center', color: sidebarFontColor || 'text.secondary', opacity: 0.8 }}>
+                        Powered by <Box component="span" sx={{ fontWeight: 800 }}>ItemHive</Box>
+                    </Typography>
+                )}
             </Box>
         </Box>
     );
@@ -242,7 +271,7 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onDrawerToggle }) => {
                 ModalProps={{ keepMounted: true }}
                 sx={{
                     display: { xs: 'block', sm: 'none' },
-                    '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
+                    '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth, bgcolor: sidebarColor || 'background.paper', borderRadius: 0 },
                 }}
             >
                 {drawer}
@@ -254,6 +283,9 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onDrawerToggle }) => {
                     '& .MuiDrawer-paper': {
                         boxSizing: 'border-box',
                         width: currentWidth,
+                        bgcolor: sidebarColor || 'background.paper',
+                        // The theme rounds every Paper; the full-height nav must stay square so no page shows at its corners.
+                        borderRadius: 0,
                         borderRight: '1px solid',
                         borderColor: 'divider',
                         transition: (theme) => theme.transitions.create('width', {

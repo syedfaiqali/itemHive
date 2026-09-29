@@ -31,6 +31,7 @@ export const serializeUser = (user: IUser) => ({
     role: normalizeRole(user.role),
     preferences: user.preferences,
     photoUrl: user.avatar,
+    appearance: user.appearance,
     isActive: user.isActive,
     isVisible: user.isVisible,
     installmentAccess: normalizeRole(user.role) === 'super_admin' || Boolean(user.installmentAccess),
