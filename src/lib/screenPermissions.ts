@@ -19,6 +19,8 @@ export const ADMIN_SCREEN_PERMISSIONS = [
     { key: 'reports', label: 'Reports', group: 'Operations' },
     { key: 'notes', label: 'Sticky Notes', group: 'Operations' },
     { key: 'notifications', label: 'Notifications', group: 'Operations' },
+    { key: 'employees', label: 'Employee Profiles', group: 'HR & Attendance' },
+    { key: 'attendance', label: 'Attendance', group: 'HR & Attendance' },
     { key: 'team', label: 'Team Management', group: 'Administration' },
     { key: 'settings', label: 'Settings', group: 'Administration' },
 ] as const;

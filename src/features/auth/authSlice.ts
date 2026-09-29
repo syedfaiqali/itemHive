@@ -28,6 +28,10 @@ export interface User {
     businessName?: string;
     createdBy?: string;
     visiblePassword?: string;
+    /** True for team users: `appearance` is their business's theme and they cannot change it. */
+    themeManaged?: boolean;
+    /** Team rows only: the employee profile linked to this login. */
+    employeeId?: string | null;
     preferences?: {
         country: 'PK' | 'US' | 'DE' | 'GB' | 'CH' | 'CD' | 'CG' | 'IN' | 'AE';
         currency: 'USD' | 'EUR' | 'GBP' | 'CHF' | 'CDF' | 'XAF' | 'PKR' | 'INR' | 'AED';

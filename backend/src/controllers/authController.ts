@@ -1,11 +1,15 @@
 import { Response } from 'express';
 import jwt from 'jsonwebtoken';
+import mongoose from 'mongoose';
 import User from '../models/User';
 import type { AuthRequest } from '../middleware/auth';
 import { isSuperAdminEmail, normalizeRole, serializeUser } from '../utils/accessControl';
 import Business from '../models/Business';
 import { ensureLegacyBusiness, getGlobalAppSettings } from '../utils/tenancy';
 import SignupRequest from '../models/SignupRequest';
+import Employee from '../models/Employee';
+import { createEmployeeForAccount, isStaffRole } from '../utils/employeeAccounts';
+import { resolveThemeOwner, serializeUserWithTheme } from '../utils/appearance';
 import {
     createPendingSignupRequest,
     sendSignupApprovalRequestEmail,
@@ -35,6 +39,7 @@ export const register = async (req: AuthRequest, res: Response) => {
             employeeCount,
             address,
             notes,
+            employeeId,
         } = req.body;
         const normalizedEmail = String(email || '').trim().toLowerCase();
         const requestedRole = normalizeRole(role);
@@ -165,6 +170,22 @@ export const register = async (req: AuthRequest, res: Response) => {
             }
         }
 
+        // Creating a login for an existing employee profile (from Employees or Team).
+        let employeeToLink: { _id: mongoose.Types.ObjectId } | null = null;
+        if (employeeId) {
+            if (!req.user || !businessId) {
+                return res.status(400).json({ message: 'A login can only be linked to an employee by a signed-in admin' });
+            }
+            const employee = await Employee.findOne({ _id: employeeId, businessId }).select('_id userId').lean();
+            if (!employee) {
+                return res.status(400).json({ message: 'That employee was not found in this business' });
+            }
+            if (employee.userId) {
+                return res.status(409).json({ message: 'This employee already has a login account' });
+            }
+            employeeToLink = employee;
+        }
+
         const user = new User({
             name,
             email: normalizedEmail,
@@ -183,6 +204,18 @@ export const register = async (req: AuthRequest, res: Response) => {
             } : undefined,
         });
         await user.save();
+
+        // Staff logins and employee profiles are the same people, so each login gets a profile.
+        // A failure here must not undo the account; the Employees screen backfills missing profiles.
+        try {
+            if (employeeToLink) {
+                await Employee.updateOne({ _id: employeeToLink._id, userId: null }, { $set: { userId: user._id } });
+            } else if (isStaffRole(user.role)) {
+                await createEmployeeForAccount(user);
+            }
+        } catch (linkError) {
+            console.error('Failed to link employee profile to new account:', linkError);
+        }
 
         const token = signToken(String(user._id), user.role);
 
@@ -226,7 +259,7 @@ export const login = async (req: AuthRequest, res: Response) => {
 
         res.json({
             token,
-            user: serializeUser(user),
+            user: await serializeUserWithTheme(user),
         });
     } catch (error: any) {
         res.status(500).json({ message: error.message });
@@ -242,7 +275,7 @@ export const getCurrentUser = async (req: AuthRequest, res: Response) => {
 
         return res.json({
             user: {
-                ...serializeUser(user),
+                ...(await serializeUserWithTheme(user)),
                 businessName: req.user?.businessName || '',
             },
         });
@@ -254,6 +287,10 @@ export const getCurrentUser = async (req: AuthRequest, res: Response) => {
 export const updateAppearance = async (req: AuthRequest, res: Response) => {
     try {
         const { themeColor, backgroundColor, sidebarColor, navbarColor, sidebarFontColor, navbarFontColor, borderColor, headingColor, secondaryTextColor, secondaryColor, successColor, warningColor, errorColor, fontColor, logo } = req.body;
+        const currentUser = await User.findById(req.user?.id);
+        if (currentUser && await resolveThemeOwner(currentUser)) {
+            return res.status(403).json({ message: "Your theme follows your business's theme, which your administrator sets." });
+        }
         const user = await User.findByIdAndUpdate(req.user?.id,
             { $set: { appearance: { themeColor, backgroundColor, sidebarColor, navbarColor, sidebarFontColor, navbarFontColor, borderColor, headingColor, secondaryTextColor, secondaryColor, successColor, warningColor, errorColor, fontColor, logo } } },
             { new: true, runValidators: true });

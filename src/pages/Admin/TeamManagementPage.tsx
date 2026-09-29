@@ -2,8 +2,11 @@ import React from 'react';
 import axios from 'axios';
 import {
     Alert,
+    Avatar,
     Box,
     Button,
+    Card,
+    CardContent,
     Chip,
     CircularProgress,
     Dialog,
@@ -28,11 +31,15 @@ import {
     Tooltip,
     Typography,
 } from '@mui/material';
-import { CircleDollarSign, Edit3, Eye, EyeOff, Info, Search, ShieldCheck, Trash2, UserPlus, Users } from 'lucide-react';
+import { CircleDollarSign, Edit3, Eye, EyeOff, IdCard, Info, KeyRound, Search, ShieldCheck, Trash2, UserPlus, Users } from 'lucide-react';
 import { useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import type { RootState } from '../../store';
 import type { User, UserRole } from '../../features/auth/authSlice';
 import api from '../../api/axios';
+import CreateLoginDialog, { type LoginTarget } from '../../components/Employees/CreateLoginDialog';
+import { hasScreenAccess } from '../../lib/screenPermissions';
+import { getInitials } from '../../lib/employees';
 
 interface UsersPage {
     users: User[];
@@ -64,6 +71,12 @@ interface CreateAccountDraft {
     businessName: string;
 }
 
+interface UnlinkedEmployee extends LoginTarget {
+    employeeCode: string;
+    designation: string;
+    photo: string;
+}
+
 interface BusinessOption {
     id: string;
     name: string;
@@ -90,6 +103,12 @@ const BusinessLabel = () => (
 const TeamManagementPage: React.FC = () => {
     const { user: currentUser } = useSelector((state: RootState) => state.auth);
     const isSuperAdmin = currentUser?.role === 'super_admin';
+    const navigate = useNavigate();
+    const canOpenEmployees = hasScreenAccess(currentUser, 'employees');
+    // Employee profiles belong to the workspace being viewed; a super admin can be viewing another shop.
+    const activeBusinessId = localStorage.getItem('itemhive-workspace-id') || currentUser?.businessId || '';
+    const [unlinkedEmployees, setUnlinkedEmployees] = React.useState<UnlinkedEmployee[]>([]);
+    const [loginTarget, setLoginTarget] = React.useState<LoginTarget | null>(null);
     const [users, setUsers] = React.useState<User[]>([]);
     const [businesses, setBusinesses] = React.useState<BusinessOption[]>([]);
     const [loading, setLoading] = React.useState(true);
@@ -143,6 +162,27 @@ const TeamManagementPage: React.FC = () => {
         const timeoutId = window.setTimeout(loadUsers, 250);
         return () => window.clearTimeout(timeoutId);
     }, [loadUsers]);
+
+    const loadUnlinkedEmployees = React.useCallback(async () => {
+        try {
+            const response = await api.get<UnlinkedEmployee[]>('/users/unlinked-employees');
+            setUnlinkedEmployees(response.data || []);
+        } catch {
+            setUnlinkedEmployees([]);
+        }
+    }, []);
+
+    React.useEffect(() => {
+        loadUnlinkedEmployees();
+        window.addEventListener('itemhive-workspace-changed', loadUnlinkedEmployees);
+        return () => window.removeEventListener('itemhive-workspace-changed', loadUnlinkedEmployees);
+    }, [loadUnlinkedEmployees]);
+
+    const handleLoginCreated = async () => {
+        setLoginTarget(null);
+        setSnack('Login created. Set their rights in the table.');
+        await Promise.all([loadUsers(), loadUnlinkedEmployees()]);
+    };
 
     const loadBusinesses = React.useCallback(async () => {
         if (!isSuperAdmin) {
@@ -218,6 +258,7 @@ const TeamManagementPage: React.FC = () => {
             setCreateDialogOpen(false);
             await loadUsers();
             await loadBusinesses();
+            await loadUnlinkedEmployees();
             window.dispatchEvent(new Event('itemhive-team-updated'));
             setSnack('Account created successfully.');
         } catch (requestError: unknown) {
@@ -265,6 +306,7 @@ const TeamManagementPage: React.FC = () => {
             await api.delete(`/users/${deletingUser.id}`);
             setDeletingUser(null);
             await loadUsers();
+            await loadUnlinkedEmployees();
             window.dispatchEvent(new Event('itemhive-team-updated'));
             setSnack('Account deleted successfully.');
         } catch (requestError: unknown) {
@@ -424,6 +466,13 @@ const TeamManagementPage: React.FC = () => {
                                     <TableCell align="center">{teamUser.role === 'admin' ? teamUser.userCreationLimit ?? 0 : '-'}</TableCell>
                                     <TableCell align="right">
                                         <Stack direction="row" spacing={1} justifyContent="flex-end">
+                                            {canOpenEmployees && teamUser.employeeId && teamUser.businessId === activeBusinessId && (
+                                                <Tooltip title="Employee profile">
+                                                    <IconButton size="small" color="primary" onClick={() => navigate(`/employees/${teamUser.employeeId}`)} aria-label={`Employee profile for ${teamUser.name}`}>
+                                                        <IdCard size={18} />
+                                                    </IconButton>
+                                                </Tooltip>
+                                            )}
                                             {isManageable && (
                                                 <Button size="small" variant="outlined" startIcon={<Edit3 size={15} />} onClick={() => openEditDialog(teamUser)} disabled={isBusy}>
                                                     Edit
@@ -469,6 +518,41 @@ const TeamManagementPage: React.FC = () => {
                     rowsPerPageOptions={[10, 20, 50, 100]}
                 />
             </TableContainer>
+
+            {unlinkedEmployees.length > 0 && (
+                <Card variant="outlined" sx={{ mt: 3, borderRadius: 3 }}>
+                    <CardContent>
+                        <Typography variant="h6" fontWeight={800}>Employees without a login</Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                            {isSuperAdmin ? 'In the workspace you are viewing, these' : 'These'} employees have a profile in Employees but cannot sign in yet.
+                            Create a login to give them access, then set their rights in the table above.
+                        </Typography>
+                        <Stack spacing={1}>
+                            {unlinkedEmployees.map((employee) => (
+                                <Stack key={employee._id} direction="row" spacing={1.5} alignItems="center" sx={{ p: 1.25, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
+                                    <Avatar src={employee.photo || undefined} sx={{ width: 36, height: 36, fontSize: 14, fontWeight: 800, bgcolor: 'primary.main' }}>
+                                        {getInitials(employee.fullName)}
+                                    </Avatar>
+                                    <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+                                        <Typography variant="body2" fontWeight={800} noWrap>{employee.fullName}</Typography>
+                                        <Typography variant="caption" color="text.secondary">
+                                            {employee.employeeCode}{employee.designation ? ` · ${employee.designation}` : ''}
+                                        </Typography>
+                                    </Box>
+                                    {canOpenEmployees && (
+                                        <Button size="small" startIcon={<IdCard size={15} />} onClick={() => navigate(`/employees/${employee._id}`)}>Profile</Button>
+                                    )}
+                                    <Button size="small" variant="contained" startIcon={<KeyRound size={15} />} onClick={() => setLoginTarget(employee)}>
+                                        Create Login
+                                    </Button>
+                                </Stack>
+                            ))}
+                        </Stack>
+                    </CardContent>
+                </Card>
+            )}
+
+            <CreateLoginDialog employee={loginTarget} onClose={() => setLoginTarget(null)} onCreated={handleLoginCreated} />
 
             <Dialog open={Boolean(monthlyPaymentUser)} onClose={() => !savingId && setMonthlyPaymentUser(null)} fullWidth maxWidth="xs">
                 <DialogTitle>Monthly Payment — {monthlyPaymentUser?.businessName || monthlyPaymentUser?.name}</DialogTitle>
@@ -656,6 +740,7 @@ const TeamManagementPage: React.FC = () => {
                 <DialogContent>
                     <Typography variant="body2" color="text.secondary">
                         Delete {deletingUser?.name}? This account will no longer be able to log in.
+                        {deletingUser?.employeeId ? ' Their employee profile and attendance history are kept in Employees.' : ''}
                     </Typography>
                 </DialogContent>
                 <DialogActions>

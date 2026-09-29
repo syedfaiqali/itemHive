@@ -21,6 +21,8 @@ export interface IAppSetting extends Document {
     autoRegistrationEnabled: boolean;
     /** Shows the Basic-plan customization offer on the public pricing screen. */
     basicCustomizationOfferEnabled: boolean;
+    /** Weekdays (0 = Sunday) the attendance report treats as off rather than absent. */
+    attendanceWeeklyOffDays: number[];
 }
 
 const AppSettingSchema: Schema<IAppSetting> = new Schema({
@@ -42,6 +44,7 @@ const AppSettingSchema: Schema<IAppSetting> = new Schema({
     restaurantEnabled: { type: Boolean, default: false },
     autoRegistrationEnabled: { type: Boolean, default: true },
     basicCustomizationOfferEnabled: { type: Boolean, default: false },
+    attendanceWeeklyOffDays: { type: [Number], default: [0] },
 }, { timestamps: true });
 
 export default mongoose.model<IAppSetting>('AppSetting', AppSettingSchema);

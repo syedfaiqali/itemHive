@@ -18,8 +18,6 @@ import { alpha, useTheme } from '@mui/material/styles';
 import {
     Menu as MenuIcon,
     Bell as NotificationsIcon,
-    Sun,
-    Moon,
     UserCircle2,
     Settings,
     Palette,
@@ -32,7 +30,6 @@ import {
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState } from '../../store';
 import { logout } from '../../features/auth/authSlice';
-import { toggleDarkMode, setDarkMode } from '../../features/theme/themeSlice';
 import { fetchProducts, resetInventory } from '../../features/inventory/inventorySlice';
 import { resetTransactions } from '../../features/transactions/transactionSlice';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -83,7 +80,7 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
             : state.auth.user?.appearance?.logo) || '/favicon.png';
     });
     const logoPlate = useLogoPlate(logo, navbarColor || theme.palette.background.paper, [theme.palette.background.default]);
-    const { mode, isSidebarCollapsed } = useSelector((state: RootState) => state.theme);
+    const { isSidebarCollapsed } = useSelector((state: RootState) => state.theme);
     const { transactions } = useSelector((state: RootState) => state.transactions);
     const { orders } = useSelector((state: RootState) => state.orders);
     const { products } = useSelector((state: RootState) => state.inventory);
@@ -232,10 +229,6 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
     const handleNavigateTo = (path: string) => {
         navigate(path);
         handleClose();
-    };
-
-    const handleThemeToggle = () => {
-        dispatch(toggleDarkMode());
     };
 
     const isActivePath = (path: string) => location.pathname === path;
@@ -441,69 +434,6 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
                         </Box>
                     )}
 
-                    <Box
-                        sx={{
-                            display: { xs: 'none', md: 'flex' },
-                            alignItems: 'center',
-                            position: 'relative',
-                            borderRadius: 999,
-                            p: 0.5,
-                            bgcolor: 'action.hover',
-                            border: '1px solid',
-                            borderColor: 'divider',
-                            minWidth: 72,
-                            height: 38,
-                            boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.06)',
-                            gap: 1
-                        }}
-                    >
-                        <Box
-                            sx={{
-                                position: 'absolute',
-                                top: 4,
-                                left: mode === 'light' ? 4 : 'calc(50% + 2px)',
-                                width: 'calc(50% - 6px)',
-                                height: 28,
-                                borderRadius: 999,
-                                bgcolor: 'background.paper',
-                                boxShadow: '0 4px 10px rgba(0,0,0,0.1)',
-                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                border: '1px solid',
-                                borderColor: 'divider',
-                            }}
-                        />
-                        <IconButton
-                            onClick={() => dispatch(setDarkMode('light'))}
-                            size="small"
-                            sx={{
-                                flex: 1,
-                                height: 28,
-                                zIndex: 1,
-                                color: mode === 'light' ? 'primary.main' : 'text.secondary',
-                                transition: 'color 0.3s',
-                            }}
-                        >
-                            <Sun size={18} strokeWidth={2.5} />
-                        </IconButton>
-                        <IconButton
-                            onClick={() => dispatch(setDarkMode('dark'))}
-                            size="small"
-                            sx={{
-                                flex: 1,
-                                height: 28,
-                                zIndex: 1,
-                                color: mode === 'dark' ? 'primary.main' : 'text.secondary',
-                                transition: 'color 0.3s',
-                            }}
-                        >
-                            <Moon size={18} strokeWidth={2.5} />
-                        </IconButton>
-                    </Box>
-
-                    <IconButton color="inherit" onClick={handleThemeToggle} sx={{ display: { xs: 'inline-flex', md: 'none' } }}>
-                        {mode === 'light' ? <Moon size={20} /> : <Sun size={20} />}
-                    </IconButton>
-
                     {canAccessNotes && (
                         <Tooltip title="Sticky Notes">
                             <IconButton
@@ -609,11 +539,14 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
                             <Box sx={{ flexGrow: 1, ml: 1 }}>Profile</Box>
                             <ChevronRight size={16} className="menu-action-arrow" />
                         </MenuItem>
-                        <MenuItem onClick={() => handleNavigateTo('/theme-settings')} sx={buildActionItemSx(false, isActivePath('/theme-settings'))}>
-                            <Palette size={18} className="menu-action-icon" />
-                            <Box sx={{ flexGrow: 1, ml: 1 }}>Theme Settings</Box>
-                            <ChevronRight size={16} />
-                        </MenuItem>
+                        {/* Team users wear their business's theme, so there is nothing for them to set. */}
+                        {!user?.themeManaged && (
+                            <MenuItem onClick={() => handleNavigateTo('/theme-settings')} sx={buildActionItemSx(false, isActivePath('/theme-settings'))}>
+                                <Palette size={18} className="menu-action-icon" />
+                                <Box sx={{ flexGrow: 1, ml: 1 }}>Theme Settings</Box>
+                                <ChevronRight size={16} />
+                            </MenuItem>
+                        )}
                         {canAccessSettings && (
                             <MenuItem onClick={() => handleNavigateTo('/settings')} sx={buildActionItemSx(false, isActivePath('/settings'))}>
                                 <Settings size={18} className="menu-action-icon" />

@@ -17,6 +17,8 @@ export const ADMIN_SCREEN_PERMISSIONS = [
     'reports',
     'notes',
     'notifications',
+    'employees',
+    'attendance',
     'team',
     'settings',
 ] as const;

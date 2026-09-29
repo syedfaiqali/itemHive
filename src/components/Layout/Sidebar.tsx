@@ -32,6 +32,8 @@ import {
     ClipboardCheck,
     ShieldCheck,
     Scale,
+    IdCard,
+    ScanFace,
     ChevronLeft,
     ChevronRight
 } from 'lucide-react';
@@ -97,6 +99,8 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onDrawerToggle }) => {
         { text: 'Customer Records', icon: <ReceiptText size={20} />, path: '/customer-records', roles: ['super_admin', 'admin', 'user'], permission: 'customer_records' },
         { text: 'Credit Customers', icon: <WalletCards size={20} />, path: '/credits', roles: ['super_admin', 'admin', 'user'], permission: 'credits' },
         { text: 'Installments', icon: <CalendarClock size={20} />, path: '/installments', roles: ['super_admin', 'admin', 'user'], permission: 'installments', requiresInstallmentAccess: true },
+        { text: 'Employees', icon: <IdCard size={20} />, path: '/employees', roles: ['super_admin', 'admin'], permission: 'employees' },
+        { text: 'Attendance', icon: <ScanFace size={20} />, path: '/attendance', roles: ['super_admin', 'admin', 'user'], permission: 'attendance' },
         { text: 'Reports', icon: <BarChart3 size={20} />, path: '/reports', roles: ['super_admin', 'admin'], permission: 'reports' },
         { text: 'Team', icon: <Users size={20} />, path: '/team', roles: ['super_admin', 'admin'], permission: 'team' },
         { text: 'Permissions', icon: <ShieldCheck size={20} />, path: '/permission-management', roles: ['super_admin'] },
@@ -194,7 +198,7 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onDrawerToggle }) => {
                             && (!item.requiresInstallmentAccess || canAccessInstallments)
                             && (!item.requiresSignupApproval || !app?.autoRegistrationEnabled))
                         .map((item) => {
-                            const isActive = location.pathname === item.path;
+                            const isActive = location.pathname === item.path || (item.path === '/employees' && location.pathname.startsWith('/employees/'));
                             return (
                                 <ListItem key={item.text} disablePadding sx={{ mb: 0.5 }}>
                                     <ListItemButton

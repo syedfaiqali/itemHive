@@ -12,6 +12,7 @@ import Customer from '../models/Customer';
 import Category from '../models/Category';
 import POSShift from '../models/POSShift';
 import OrderDraft from '../models/OrderDraft';
+import Employee from '../models/Employee';
 import { ensureLegacyBusiness } from './tenancy';
 
 const dropLegacyIndex = async (model: Model<unknown>, indexName: string) => {
@@ -59,6 +60,8 @@ export const ensureTenantIndexes = async () => {
     await dropLegacyIndex(Product, 'sku_1');
     await dropLegacyIndex(Transaction, 'id_1');
     await dropLegacyIndex(InstallmentPlan, 'planCode_1');
+    // Replaced by a partial index so employees added from Team can have a blank CNIC.
+    await dropLegacyIndex(Employee as unknown as Model<unknown>, 'businessId_1_cnic_1');
 
     await Product.collection.createIndex({ businessId: 1, id: 1 }, { unique: true });
     await Product.collection.createIndex({ businessId: 1, sku: 1 }, { unique: true });
