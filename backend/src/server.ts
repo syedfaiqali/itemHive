@@ -69,6 +69,9 @@ const corsOptions: cors.CorsOptions = {
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'x-itemhive-workspace-id'],
+    // Authorization makes POS requests non-simple CORS requests. Cache the
+    // preflight so consecutive payments do not pay an extra network round trip.
+    maxAge: 86400,
     optionsSuccessStatus: 204
 };
 

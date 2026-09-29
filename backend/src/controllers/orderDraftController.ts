@@ -29,10 +29,20 @@ const buildDraftPayload = async (req: AuthRequest) => {
     const productIds = Array.from(new Set(normalizedItems.map((item) => item.productId)));
     if (productIds.length !== normalizedItems.length) throw new Error('Duplicate products are not allowed in a draft');
 
-    const products = await Product.find({
-        id: { $in: productIds },
-        ...buildTenantFilter(req.user!),
-    }).lean();
+    // These two reads are independent. Running them together removes a remote
+    // database round trip from every Save as Draft request while preserving
+    // server-authoritative product, price, and discount validation.
+    const [products, appSettings] = await Promise.all([
+        Product.find({
+            id: { $in: productIds },
+            ...buildTenantFilter(req.user!),
+        })
+            // Draft validation has no need for product images or inventory
+            // metadata; avoid transferring those large fields on Save as Draft.
+            .select('id name salePrice price')
+            .lean(),
+        getCachedAppSettingsForTenant(req.user!),
+    ]);
     const productsById = new Map(products.map((product) => [product.id, product]));
     if (productsById.size !== productIds.length) throw new Error('One or more draft products no longer exist');
 
@@ -50,7 +60,6 @@ const buildDraftPayload = async (req: AuthRequest) => {
     });
 
     const requestedDiscount = Number(req.body.discountPercent || 0);
-    const appSettings = await getCachedAppSettingsForTenant(req.user!);
     const allowedDiscountOptions = (appSettings?.discountOptions || []).map(Number);
     const discountPercent = appSettings?.discountsEnabled
         && Number.isFinite(requestedDiscount)
@@ -110,12 +119,15 @@ export const createOrderDraft = async (req: AuthRequest, res: Response) => {
 
 export const updateOrderDraft = async (req: AuthRequest, res: Response) => {
     try {
-        const draft = await OrderDraft.findOne({ _id: req.params.id, ...buildTenantFilter(req.user!) });
-        if (!draft) return res.status(404).json({ message: 'Order draft not found' });
-
         const payload = await buildDraftPayload(req);
-        draft.set(payload);
-        await draft.save();
+        // Avoid hydrating a draft only to save it again. This is one atomic
+        // update, scoped to the current tenant, and still runs schema checks.
+        const draft = await OrderDraft.findOneAndUpdate(
+            { _id: req.params.id, ...buildTenantFilter(req.user!) },
+            payload,
+            { new: true, runValidators: true },
+        );
+        if (!draft) return res.status(404).json({ message: 'Order draft not found' });
         return res.json(draft);
     } catch (error: any) {
         return res.status(400).json({ message: error.message || 'Failed to update order draft' });

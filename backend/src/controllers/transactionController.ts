@@ -19,29 +19,37 @@ export const getTransactions = async (req: AuthRequest, res: Response) => {
 export const createPOSCheckout = async (req: AuthRequest, res: Response) => {
     const session = await mongoose.startSession();
     const orderId = String(req.body.orderId || '').trim();
+    const checkoutStartedAt = Date.now();
+    const setCheckoutTiming = () => {
+        res.setHeader('Server-Timing', `checkout;dur=${Date.now() - checkoutStartedAt}`);
+    };
 
     try {
         if (!orderId) return res.status(400).json({ message: 'Order ID is required' });
-        const existingLines = await Transaction.find({ orderId, source: 'pos', ...buildTenantFilter(req.user!) }).sort({ id: 1 }).lean();
-        if (existingLines.length > 0) return res.status(200).json({ transactions: existingLines });
 
         const requestedItems = Array.isArray(req.body.items) ? req.body.items : [];
         if (requestedItems.length === 0) return res.status(400).json({ message: 'Add at least one product before payment' });
         if (requestedItems.length > 100) return res.status(400).json({ message: 'An order cannot contain more than 100 products' });
+
+        // Settings are read-only and cached for 15 seconds. Start this lookup
+        // before the transaction so it overlaps the shift validation instead
+        // of adding another database round trip to payment confirmation.
+        const appSettingsPromise = getCachedAppSettingsForTenant(req.user!);
 
         let savedTransactions: any[] = [];
         await session.withTransaction(async () => {
             if (!mongoose.Types.ObjectId.isValid(String(req.body.shiftId || ''))) {
                 throw new Error('Open a POS shift before taking payment');
             }
-            const activeShift = await POSShift.findOneAndUpdate(
+            const activeShiftId = new mongoose.Types.ObjectId(req.body.shiftId);
+            const activeShiftUpdate = await POSShift.updateOne(
                 { _id: req.body.shiftId, status: 'open', ...buildTenantFilter(req.user!) },
                 { $inc: { activityVersion: 1 } },
-                { new: true, session },
+                { session },
             );
-            if (!activeShift) throw new Error('This POS shift is closed. Open a new shift before taking payment');
+            if (activeShiftUpdate.modifiedCount !== 1) throw new Error('This POS shift is closed. Open a new shift before taking payment');
 
-            const appSettings = await getCachedAppSettingsForTenant(req.user!);
+            const appSettings = await appSettingsPromise;
             const actorRole = normalizeRole(req.user?.role);
             const requestedDiscountPercent = Number(req.body.discountPercent || 0);
             const allowedDiscountOptions = (appSettings?.discountOptions || []).map(Number);
@@ -53,7 +61,13 @@ export const createPOSCheckout = async (req: AuthRequest, res: Response) => {
             const taxRate = Number(appSettings?.salesTaxRate || 0) / 100;
             const productIds = requestedItems.map((item: any) => String(item.productId || ''));
             if (new Set(productIds).size !== productIds.length) throw new Error('Duplicate products are not allowed in one checkout');
-            const products = await Product.find({ id: { $in: productIds }, ...buildTenantFilter(req.user!) }).session(session);
+            // Do not pull descriptions, supplier data, or potentially-megabyte
+            // image URLs into the payment transaction. Checkout only needs
+            // these fields to validate price/stock and write its ledger lines.
+            const products = await Product.find({ id: { $in: productIds }, ...buildTenantFilter(req.user!) })
+                .select('_id id name stock salePrice price purchasePrice')
+                .session(session)
+                .lean();
             const productMap = new Map(products.map((product) => [product.id, product]));
             if (productMap.size !== productIds.length) throw new Error('One or more products no longer exist');
 
@@ -107,7 +121,7 @@ export const createPOSCheckout = async (req: AuthRequest, res: Response) => {
                 id: `${orderId}-L${index + 1}`,
                 orderId,
                 source: 'pos',
-                shiftId: activeShift._id,
+                shiftId: activeShiftId,
                 productId: line.product.id,
                 productName: line.product.name,
                 type: 'reduction',
@@ -135,18 +149,39 @@ export const createPOSCheckout = async (req: AuthRequest, res: Response) => {
             }));
 
             savedTransactions = await Transaction.insertMany(transactionDocuments, { session });
-            for (const line of lineInputs) {
-                line.product.stock -= line.quantity;
-                await line.product.save({ session });
+
+            // A POS basket used to save one product document at a time. On a
+            // remote MongoDB cluster that adds a network round trip per line
+            // item. Keep the same transaction and stock guard, but send every
+            // stock decrement in one atomic bulk request instead.
+            const stockUpdate = await Product.bulkWrite(
+                lineInputs.map((line: any) => ({
+                    updateOne: {
+                        filter: { _id: line.product._id, stock: { $gte: line.quantity } },
+                        update: {
+                            $inc: { stock: -line.quantity },
+                            $set: { lastUpdated: new Date() },
+                        },
+                    },
+                })),
+                { session, ordered: true },
+            );
+            if (stockUpdate.modifiedCount !== lineInputs.length) {
+                throw new Error('Insufficient stock');
             }
         });
 
+        setCheckoutTiming();
         return res.status(201).json({ transactions: savedTransactions });
     } catch (error: any) {
         if (error?.code === 11000 && orderId) {
             const existingLines = await Transaction.find({ orderId, source: 'pos', ...buildTenantFilter(req.user!) }).sort({ id: 1 }).lean();
-            if (existingLines.length > 0) return res.status(200).json({ transactions: existingLines });
+            if (existingLines.length > 0) {
+                setCheckoutTiming();
+                return res.status(200).json({ transactions: existingLines });
+            }
         }
+        setCheckoutTiming();
         return res.status(400).json({ message: error.message || 'POS checkout could not be completed' });
     } finally {
         await session.endSession();

@@ -134,6 +134,9 @@ const POSTerminal: React.FC = () => {
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [pendingMethod, setPendingMethod] = useState<CheckoutMethod | null>(null);
     const [confirmingPayment, setConfirmingPayment] = useState(false);
+    // The receipt can be shown immediately, but it remains non-final until the
+    // server has atomically recorded the sale and stock movement.
+    const [paymentCommitPending, setPaymentCommitPending] = useState(false);
     const [savingDraft, setSavingDraft] = useState(false);
     const [activeDraftId, setActiveDraftId] = useState<string | null>(null);
     const [activeDraftCode, setActiveDraftCode] = useState('');
@@ -441,11 +444,19 @@ const POSTerminal: React.FC = () => {
             };
 
             const wasUpdatingDraft = Boolean(activeDraftId);
-            const response = activeDraftId
-                ? await api.put<OrderDraft>(`/order-drafts/${activeDraftId}`, payload)
-                : await api.post<OrderDraft>('/order-drafts', payload);
-
             if (wasUpdatingDraft) {
+                const draftId = activeDraftId!;
+                const originalCart = cart;
+                const originalDiscountPercent = appliedDiscountPercent;
+                const originalOrderType = orderType;
+                const originalOtherOrderType = otherOrderType;
+                const originalDeliveryNumber = deliveryNumber;
+                const originalDraftCode = activeDraftCode;
+
+                // Updating a draft never changes stock. Move the cashier
+                // straight to a new order and let the remote save finish in
+                // the background; if it fails, restore the exact draft so it
+                // can be retried without losing any edits.
                 dispatch(clearCart());
                 setPendingMethod(null);
                 setOrderType('');
@@ -457,10 +468,35 @@ const POSTerminal: React.FC = () => {
                 navigate('/pos', { replace: true });
                 setStockToast({
                     open: true,
-                    message: `${response.data.draftCode} updated. POS is ready for a new order.`,
+                    message: `${originalDraftCode || 'Draft'} is saving. POS is ready for a new order.`,
                 });
+                setSavingDraft(false);
+
+                void api.put<OrderDraft>(`/order-drafts/${draftId}`, payload)
+                    .then((response) => {
+                        setStockToast({
+                            open: true,
+                            message: `${response.data.draftCode} updated successfully.`,
+                        });
+                    })
+                    .catch((requestError: unknown) => {
+                        dispatch(replaceCart({ cart: originalCart, discountPercent: originalDiscountPercent }));
+                        setOrderType(originalOrderType);
+                        setOtherOrderType(originalOtherOrderType);
+                        setDeliveryNumber(originalDeliveryNumber);
+                        setActiveDraftId(draftId);
+                        setActiveDraftCode(originalDraftCode);
+                        loadedDraftRef.current = draftId;
+                        navigate(`/pos?draft=${draftId}`, { replace: true });
+                        setStockToast({
+                            open: true,
+                            message: `${getRequestErrorMessage(requestError, 'Draft update could not be saved.')} Your edits were restored.`,
+                        });
+                    });
                 return;
             }
+
+            const response = await api.post<OrderDraft>('/order-drafts', payload);
 
             setActiveDraftId(response.data._id);
             setActiveDraftCode(response.data.draftCode);
@@ -488,6 +524,16 @@ const POSTerminal: React.FC = () => {
         } catch {
             setStockToast({ open: true, message: 'Payment succeeded, but the paid draft could not be removed. Please delete it from Order Drafts.' });
         }
+    };
+
+    // Product and history reloads can be large for an established business.
+    // They keep the shared caches current, but a completed checkout must not
+    // wait for them before showing the receipt to the cashier.
+    const refreshPosDataInBackground = () => {
+        void Promise.allSettled([
+            dispatch(fetchProducts({ force: true })).unwrap(),
+            dispatch(fetchTransactions()).unwrap(),
+        ]);
     };
 
     const handleCheckout = (method: 'cash' | 'card') => {
@@ -599,6 +645,13 @@ const POSTerminal: React.FC = () => {
         const receiptTimeIso = new Date().toISOString();
         const currentMethod = pendingMethod;
         setConfirmingPayment(true);
+        setPaymentCommitPending(true);
+        setReceiptId(id);
+        setReceiptTime(receiptTimeIso);
+        setPaymentMethod(currentMethod);
+        setOrderDone(true);
+        setConfirmOpen(false);
+        setPendingMethod(null);
 
         try {
         if (pendingMethod === 'installment') {
@@ -631,22 +684,17 @@ const POSTerminal: React.FC = () => {
                     ],
                 });
 
-                await Promise.all([
-                    dispatch(fetchProducts({ force: true })),
-                    dispatch(fetchTransactions()),
-                ]);
-
-                await removePaidDraft();
-
                 window.dispatchEvent(new Event('itemhive-installments-updated'));
-                setReceiptId(id);
-                setReceiptTime(receiptTimeIso);
-                setPaymentMethod(currentMethod);
-                setOrderDone(true);
-                setConfirmOpen(false);
-                setPendingMethod(null);
+                setPaymentCommitPending(false);
+                refreshPosDataInBackground();
+                void removePaidDraft();
                 return;
             } catch (error: unknown) {
+                setPaymentCommitPending(false);
+                setOrderDone(false);
+                setPaymentMethod(null);
+                setConfirmOpen(true);
+                setPendingMethod(currentMethod);
                 setStockToast({
                     open: true,
                     message: getRequestErrorMessage(error, 'Installment plan could not be created.'),
@@ -672,23 +720,18 @@ const POSTerminal: React.FC = () => {
                 foodpandaRiderName: isFoodpandaOrder ? foodpandaRiderName.trim() : undefined,
             });
         } catch (error: unknown) {
+            setPaymentCommitPending(false);
+            setOrderDone(false);
+            setPaymentMethod(null);
+            setConfirmOpen(true);
+            setPendingMethod(currentMethod);
             setStockToast({ open: true, message: getRequestErrorMessage(error, 'Sale could not be completed.') });
             return;
         }
 
-        await Promise.all([
-            dispatch(fetchProducts({ force: true })),
-            dispatch(fetchTransactions()),
-        ]);
-
-        await removePaidDraft();
-
-        setReceiptId(id);
-        setReceiptTime(receiptTimeIso);
-        setPaymentMethod(currentMethod);
-        setOrderDone(true);
-        setConfirmOpen(false);
-        setPendingMethod(null);
+        setPaymentCommitPending(false);
+        refreshPosDataInBackground();
+        void removePaidDraft();
         } finally {
             setConfirmingPayment(false);
             checkoutInFlightRef.current = false;
@@ -717,6 +760,7 @@ const POSTerminal: React.FC = () => {
     };
 
     const handleCloseOrder = () => {
+        if (paymentCommitPending) return;
         dispatch(clearCart());
         setOrderDone(false);
         setPrintingReceipt(false);
@@ -1765,7 +1809,7 @@ const POSTerminal: React.FC = () => {
             {/* Checkout Success & Receipt Dialog */}
             <Dialog
                 open={orderDone}
-                onClose={handleCloseOrder}
+                onClose={paymentCommitPending ? undefined : handleCloseOrder}
                 maxWidth="md"
                 fullWidth
                 PaperProps={{
@@ -1776,8 +1820,14 @@ const POSTerminal: React.FC = () => {
                     <Box sx={{ color: 'success.main', mb: 2 }}>
                         <CheckCircle size={64} strokeWidth={2.5} />
                     </Box>
-                    <Typography variant="h5" fontWeight={900}>Payment Successful!</Typography>
+                    <Typography variant="h5" fontWeight={900}>{paymentCommitPending ? 'Saving payment...' : 'Payment Successful!'}</Typography>
                     <Typography variant="body2" color="text.secondary">Order #{receiptId}</Typography>
+                    {paymentCommitPending && (
+                        <Stack direction="row" justifyContent="center" alignItems="center" spacing={1} sx={{ mt: 1 }}>
+                            <CircularProgress size={16} />
+                            <Typography variant="body2" color="text.secondary">Receipt is ready. Saving securely in the background.</Typography>
+                        </Stack>
+                    )}
                 </DialogTitle>
                 <DialogContent>
                     <Box
@@ -2114,6 +2164,7 @@ const POSTerminal: React.FC = () => {
                             if (!paymentMethod || !receiptId) return;
                             handleSaveReceiptPdf(receiptId, paymentMethod, receiptTime || new Date().toISOString());
                         }}
+                        disabled={paymentCommitPending}
                         sx={{ borderRadius: 2 }}
                     >
                         Save
@@ -2122,7 +2173,7 @@ const POSTerminal: React.FC = () => {
                         fullWidth
                         variant="outlined"
                         startIcon={<Share2 size={18} />}
-                        disabled={sharingReceipt}
+                        disabled={sharingReceipt || paymentCommitPending}
                         onClick={() => {
                             if (!paymentMethod || !receiptId) return;
                             handleShareReceiptPdf(receiptId, paymentMethod, receiptTime || new Date().toISOString());
@@ -2136,7 +2187,7 @@ const POSTerminal: React.FC = () => {
                         variant="contained"
                         startIcon={printingReceipt ? <CircularProgress size={18} color="inherit" /> : <Printer size={18} />}
                         onClick={handlePrint}
-                        disabled={printingReceipt}
+                        disabled={printingReceipt || paymentCommitPending}
                         sx={{ borderRadius: 2 }}
                     >
                         {printingReceipt ? 'Preparing...' : 'Print'}
@@ -2148,7 +2199,7 @@ const POSTerminal: React.FC = () => {
                             variant="contained"
                             startIcon={printingKot ? <CircularProgress size={18} color="inherit" /> : <Receipt size={18} />}
                             onClick={handlePrintKot}
-                            disabled={printingKot}
+                            disabled={printingKot || paymentCommitPending}
                             sx={{ borderRadius: 2 }}
                         >
                             {printingKot ? 'Preparing...' : 'Print KOT'}
@@ -2157,6 +2208,7 @@ const POSTerminal: React.FC = () => {
                 </DialogActions>
                 <IconButton
                     onClick={handleCloseOrder}
+                    disabled={paymentCommitPending}
                     sx={{ position: 'absolute', right: 16, top: 16, color: 'text.secondary' }}
                 >
                     <X size={20} />
