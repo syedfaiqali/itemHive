@@ -21,6 +21,7 @@ import signupRequestRoutes from './routes/signupRequestRoutes';
 import customerRoutes from './routes/customerRoutes';
 import orderDraftRoutes from './routes/orderDraftRoutes';
 import posShiftRoutes from './routes/posShiftRoutes';
+import digitalMenuRoutes from './routes/digitalMenuRoutes';
 import { errorHandler, notFound } from './middleware/errorHandler';
 import { ensureTenantIndexes } from './utils/tenantIndexes';
 
@@ -122,6 +123,7 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/order-drafts', orderDraftRoutes);
 app.use('/api/pos-shifts', posShiftRoutes);
+app.use('/api/digital-menus', digitalMenuRoutes);
 app.use('/api/inventory-requests', inventoryRequestRoutes);
 app.use('/api/signup-requests', signupRequestRoutes);
 app.use('/api/notes', notesRoutes);

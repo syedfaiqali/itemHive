@@ -36,6 +36,9 @@ export const serializeUser = (user: IUser) => ({
     isVisible: user.isVisible,
     installmentAccess: normalizeRole(user.role) === 'super_admin' || Boolean(user.installmentAccess),
     discountAccess: normalizeRole(user.role) === 'super_admin' || Boolean(user.discountAccess),
+    // Super admin keeps complete access. Every other account starts at no
+    // access and must be explicitly configured from Team Management.
+    digitalMenuAccess: normalizeRole(user.role) === 'super_admin' ? 'pos' : user.digitalMenuAccess || 'none',
     screenPermissions: user.screenPermissions == null ? null : [...user.screenPermissions],
     userCreationLimit: user.userCreationLimit ?? 0,
     businessId: user.businessId ? String(user.businessId) : '',
