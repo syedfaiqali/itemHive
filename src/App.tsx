@@ -45,6 +45,8 @@ const SignupRequestsPage = React.lazy(() => import('./pages/Admin/SignupRequests
 const InventoryRequestsPage = React.lazy(() => import('./pages/Inventory/InventoryRequestsPage'));
 const PermissionManagementPage = React.lazy(() => import('./pages/Admin/PermissionManagementPage'));
 const AccessDeniedPage = React.lazy(() => import('./pages/Auth/AccessDeniedPage'));
+const DigitalMenusPage = React.lazy(() => import('./pages/DigitalMenus/DigitalMenusPage'));
+const PublicMenuPage = React.lazy(() => import('./pages/DigitalMenus/PublicMenuPage'));
 // Keep route elements stable during color previews. Only theme consumers need updates.
 const AppThemeProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
   const mode = useSelector((state: RootState) => state.theme.mode);
@@ -85,6 +87,7 @@ const AppContent: React.FC = () => {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
+            <Route path="/menu/:token" element={<PublicMenuPage />} />
 
             <Route path="/" element={
               <ProtectedRoute>
@@ -113,6 +116,7 @@ const AppContent: React.FC = () => {
                   <OrderDesk />
                 </ProtectedRoute>
               } />
+              <Route path="digital-menus" element={<ProtectedRoute allowedRoles={['super_admin', 'admin', 'user']} requiredScreen="digital_menus" requireDigitalMenuAccess><DigitalMenusPage /></ProtectedRoute>} />
               <Route path="transactions" element={<ProtectedRoute requiredScreen="transactions"><TransactionHistory /></ProtectedRoute>} />
               <Route path="reports" element={<ProtectedRoute allowedRoles={['super_admin', 'admin']} requiredScreen="reports"><ReportsPage /></ProtectedRoute>} />
               <Route path="notes" element={

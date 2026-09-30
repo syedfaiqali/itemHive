@@ -22,7 +22,13 @@ export const createDigitalMenu = async (req: AuthRequest, res: Response) => {
     const tableName = String(req.body.tableName || '').trim();
     const productIds: string[] = [...new Set<string>((Array.isArray(req.body.productIds) ? req.body.productIds : []).map((value: unknown) => String(value)).filter(Boolean))];
     if (!name || !tableName || !productIds.length) return res.status(400).json({ message: 'Name, table number, and at least one item are required' });
-    const menu = await DigitalMenu.create({ name, tableName, productIds, token: crypto.randomBytes(12).toString('hex'), businessId: getTenantObjectId(req.user!) });
+    const menu = await DigitalMenu.create({
+        name, tableName, productIds,
+        token: crypto.randomBytes(12).toString('hex'),
+        orderingEnabled: req.user?.role === 'super_admin' || req.user?.digitalMenuAccess === 'pos',
+        createdBy: req.user!.id,
+        businessId: getTenantObjectId(req.user!),
+    });
     return res.status(201).json(menu);
 };
 
@@ -42,14 +48,17 @@ export const getTableDrafts = async (req: AuthRequest, res: Response) => {
 export const getPublicMenu = async (req: AuthRequest, res: Response) => {
     const menu = await DigitalMenu.findOne({ token: req.params.token, isActive: true }).lean();
     if (!menu) return res.status(404).json({ message: 'This QR menu is unavailable' });
-    const products = await Product.find({ id: { $in: menu.productIds }, businessId: menu.businessId }).select('id name salePrice price image category').lean();
+    const products = await Product.find({ id: { $in: menu.productIds }, businessId: menu.businessId }).select('id name salePrice price imageUrl category').lean();
     const ordered = menu.productIds.map((id) => products.find((product) => product.id === id)).filter(Boolean);
-    return res.json({ menu: { name: menu.name, tableName: menu.tableName, token: menu.token }, products: ordered });
+    // Older QR records predate this flag. Keep them safely view-only instead
+    // of exposing an order button until a POS-enabled user creates a new QR.
+    return res.json({ menu: { name: menu.name, tableName: menu.tableName, token: menu.token, orderingEnabled: Boolean(menu.orderingEnabled) }, products: ordered });
 };
 
 export const submitPublicOrder = async (req: AuthRequest, res: Response) => {
     const menu = await DigitalMenu.findOne({ token: req.params.token, isActive: true }).lean();
     if (!menu) return res.status(404).json({ message: 'This QR menu is unavailable' });
+    if (!menu.orderingEnabled) return res.status(403).json({ message: 'This menu is view-only. Please call a waiter to order.' });
     const requested = Array.isArray(req.body.items) ? req.body.items : [];
     const quantities = new Map<string, number>();
     requested.forEach((item: any) => {

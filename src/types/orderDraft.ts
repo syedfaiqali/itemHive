@@ -13,6 +13,8 @@ export interface OrderDraft {
     orderType?: string;
     otherOrderType?: string;
     deliveryNumber?: string;
+    /** Present when this draft was created/merged from a table QR menu. */
+    digitalMenuTable?: string;
     createdByName: string;
     createdAt: string;
     updatedAt: string;
