@@ -77,6 +77,8 @@ export const ensureTenantIndexes = async () => {
         Transaction.collection.createIndex({ businessId: 1, type: 1, timestamp: -1 }),
         Transaction.collection.createIndex({ businessId: 1, paymentMethod: 1, type: 1, timestamp: -1 }),
         Transaction.collection.createIndex({ businessId: 1, shiftId: 1, source: 1, type: 1 }),
+        // Checkout idempotency looks up these fields before and after a sale.
+        Transaction.collection.createIndex({ businessId: 1, orderId: 1, source: 1, id: 1 }),
         CreditPayment.collection.createIndex({ businessId: 1, timestamp: -1 }),
         CreditPayment.collection.createIndex({ businessId: 1, customerName: 1, customerCnic: 1, timestamp: -1 }),
         CreditPayment.collection.createIndex({ businessId: 1, shiftId: 1 }),
