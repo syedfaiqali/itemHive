@@ -17,6 +17,7 @@ export interface AuthRequest extends Request {
         isVisible: boolean;
         installmentAccess: boolean;
         discountAccess: boolean;
+        digitalMenuAccess: 'none' | 'menu' | 'pos';
         screenPermissions: AdminScreenPermission[] | null;
         userCreationLimit: number;
         businessId: string;
@@ -65,7 +66,7 @@ const attachUserFromToken = async (req: AuthRequest) => {
     }
 
     const decoded: any = jwt.verify(token, process.env.JWT_SECRET || 'secret');
-    const user = await User.findById(decoded.id).select('name email role isActive isVisible installmentAccess discountAccess screenPermissions userCreationLimit businessId');
+    const user = await User.findById(decoded.id).select('name email role isActive isVisible installmentAccess discountAccess digitalMenuAccess screenPermissions userCreationLimit businessId');
 
     if (!user) {
         throw new Error('Not authorized, user not found');
@@ -87,6 +88,7 @@ const attachUserFromToken = async (req: AuthRequest) => {
         isVisible: user.isVisible,
         installmentAccess: normalizedRole === 'super_admin' || Boolean(user.installmentAccess),
         discountAccess: normalizedRole === 'super_admin' || Boolean(user.discountAccess),
+        digitalMenuAccess: normalizedRole === 'super_admin' ? 'pos' : user.digitalMenuAccess || 'none',
         screenPermissions: user.screenPermissions == null ? null : [...user.screenPermissions],
         userCreationLimit: user.userCreationLimit ?? 0,
         businessId: String(business._id),

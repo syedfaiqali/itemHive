@@ -4,6 +4,7 @@ export const ADMIN_SCREEN_PERMISSIONS = [
     { key: 'dashboard', label: 'Dashboard', group: 'Overview' },
     { key: 'pos', label: 'POS Terminal', group: 'Sales' },
     { key: 'orders', label: 'Order Desk', group: 'Sales' },
+    { key: 'digital_menus', label: 'Digital Menus', group: 'Sales' },
     { key: 'transactions', label: 'Transactions', group: 'Sales' },
     { key: 'inventory', label: 'Inventory', group: 'Inventory' },
     { key: 'inventory_categories', label: 'Categories', group: 'Inventory' },

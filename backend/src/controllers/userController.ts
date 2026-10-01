@@ -88,7 +88,7 @@ export const getUsers = async (req: AuthRequest, res: Response) => {
             : baseQuery;
 
         const usersQuery = User.find(query)
-            .select('name email role isActive isVisible installmentAccess discountAccess screenPermissions userCreationLimit createdBy businessId preferences avatar +visiblePassword')
+            .select('name email role isActive isVisible installmentAccess discountAccess digitalMenuAccess screenPermissions userCreationLimit createdBy businessId preferences avatar +visiblePassword')
             .sort({ createdAt: -1 });
 
         if (!paginated) {
@@ -148,6 +148,13 @@ export const updateUserStatus = async (req: AuthRequest, res: Response) => {
                 return res.status(400).json({ message: 'Discount access can only be assigned to admin accounts' });
             }
             user.discountAccess = req.body.discountAccess;
+        }
+
+        if (['none', 'menu', 'pos'].includes(req.body.digitalMenuAccess)) {
+            if (!['admin', 'user'].includes(normalizeRole(user.role))) {
+                return res.status(400).json({ message: 'Digital Menu access can only be assigned to admin or user accounts' });
+            }
+            user.digitalMenuAccess = req.body.digitalMenuAccess;
         }
 
         if (typeof req.body.restaurantEnabled === 'boolean') {

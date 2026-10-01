@@ -18,6 +18,7 @@ export interface User {
     isVisible?: boolean;
     installmentAccess?: boolean;
     discountAccess?: boolean;
+    digitalMenuAccess?: 'none' | 'menu' | 'pos';
     /** null/undefined means legacy full access; an array is an explicit Admin assignment. */
     screenPermissions?: ScreenPermission[] | null;
     /** Workspace-level flag provided to client-admin rows in Team Management. */

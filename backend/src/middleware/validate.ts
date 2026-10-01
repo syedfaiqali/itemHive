@@ -206,8 +206,9 @@ export const updateUserStatusSchema = Joi.object({
     isVisible: Joi.boolean().optional(),
     installmentAccess: Joi.boolean().optional(),
     discountAccess: Joi.boolean().optional(),
+    digitalMenuAccess: Joi.string().valid('none', 'menu', 'pos').optional(),
     restaurantEnabled: Joi.boolean().optional(),
-}).or('isActive', 'isVisible', 'installmentAccess', 'discountAccess', 'restaurantEnabled');
+}).or('isActive', 'isVisible', 'installmentAccess', 'discountAccess', 'digitalMenuAccess', 'restaurantEnabled');
 
 export const updateMonthlyPaymentSchema = Joi.object({
     enabled: Joi.boolean().required(),

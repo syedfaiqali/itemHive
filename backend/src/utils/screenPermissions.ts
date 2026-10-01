@@ -9,6 +9,7 @@ export const ADMIN_SCREEN_PERMISSIONS = [
     'inventory_requests',
     'inventory_reduce',
     'orders',
+    'digital_menus',
     'transactions',
     'customers',
     'customer_records',

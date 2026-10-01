@@ -31,7 +31,11 @@ import {
     Tooltip,
     Typography,
 } from '@mui/material';
+<<<<<<< .mine
 import { CircleDollarSign, Edit3, Eye, EyeOff, IdCard, Info, KeyRound, Search, ShieldCheck, Trash2, UserPlus, Users } from 'lucide-react';
+=======
+import { CircleDollarSign, Edit3, Eye, EyeOff, Info, QrCode, Search, ShieldCheck, Trash2, UserPlus, Users } from 'lucide-react';
+>>>>>>> .theirs
 import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import type { RootState } from '../../store';
@@ -139,6 +143,8 @@ const TeamManagementPage: React.FC = () => {
     });
     const [snack, setSnack] = React.useState('');
     const [error, setError] = React.useState('');
+    const [digitalMenuUser, setDigitalMenuUser] = React.useState<User | null>(null);
+    const [digitalMenuAccess, setDigitalMenuAccess] = React.useState<'none' | 'menu' | 'pos'>('none');
 
     const loadUsers = React.useCallback(async () => {
         setLoading(true);
@@ -202,7 +208,7 @@ const TeamManagementPage: React.FC = () => {
         loadBusinesses();
     }, [loadBusinesses]);
 
-    const handleStatusChange = async (target: User, updates: { isActive?: boolean; isVisible?: boolean; installmentAccess?: boolean; discountAccess?: boolean; restaurantEnabled?: boolean }) => {
+    const handleStatusChange = async (target: User, updates: { isActive?: boolean; isVisible?: boolean; installmentAccess?: boolean; discountAccess?: boolean; digitalMenuAccess?: 'none' | 'menu' | 'pos'; restaurantEnabled?: boolean }) => {
         setSavingId(target.id);
         try {
             await api.patch(`/users/${target.id}/status`, updates);
@@ -213,6 +219,12 @@ const TeamManagementPage: React.FC = () => {
         } finally {
             setSavingId('');
         }
+    };
+
+    const saveDigitalMenuAccess = async () => {
+        if (!digitalMenuUser) return;
+        await handleStatusChange(digitalMenuUser, { digitalMenuAccess });
+        setDigitalMenuUser(null);
     };
 
     const openEditDialog = (target: User) => {
@@ -393,6 +405,7 @@ const TeamManagementPage: React.FC = () => {
                             <TableCell align="center">Installments</TableCell>
                             <TableCell align="center">Discount Access</TableCell>
                             <TableCell align="center">Restaurant / KOT</TableCell>
+                            <TableCell align="center">Digital Menu</TableCell>
                             <TableCell align="center">Monthly</TableCell>
                             <TableCell align="center">User Limit</TableCell>
                             <TableCell align="right">Actions</TableCell>
@@ -454,6 +467,11 @@ const TeamManagementPage: React.FC = () => {
                                                 onChange={(_, checked) => handleStatusChange(teamUser, { restaurantEnabled: checked })}
                                                 inputProps={{ 'aria-label': `Restaurant mode for ${teamUser.businessName || teamUser.name}` }}
                                             />
+                                        ) : '-'}
+                                    </TableCell>
+                                    <TableCell align="center">
+                                        {isSuperAdmin && teamUser.role !== 'super_admin' ? (
+                                            <Tooltip title="Configure Digital Menu access"><span><IconButton size="small" disabled={isBusy} color={teamUser.digitalMenuAccess === 'pos' ? 'primary' : teamUser.digitalMenuAccess === 'menu' ? 'secondary' : 'default'} onClick={() => { setDigitalMenuUser(teamUser); setDigitalMenuAccess(teamUser.digitalMenuAccess || 'none'); }} aria-label={`Digital menu access for ${teamUser.name}`}><QrCode size={19} /></IconButton></span></Tooltip>
                                         ) : '-'}
                                     </TableCell>
                                     <TableCell align="center">
@@ -565,6 +583,18 @@ const TeamManagementPage: React.FC = () => {
                     </Stack>
                 </DialogContent>
                 <DialogActions><Button onClick={() => setMonthlyPaymentUser(null)} disabled={Boolean(savingId)}>Cancel</Button><Button variant="contained" onClick={saveMonthlyPayment} disabled={Boolean(savingId)}>Save</Button></DialogActions>
+            </Dialog>
+            <Dialog open={Boolean(digitalMenuUser)} onClose={() => !savingId && setDigitalMenuUser(null)} fullWidth maxWidth="xs">
+                <DialogTitle>Digital Menu Access — {digitalMenuUser?.name}</DialogTitle>
+                <DialogContent>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>Choose what this account can do with QR table menus.</Typography>
+                    <TextField select fullWidth label="Access level" value={digitalMenuAccess} onChange={(event) => setDigitalMenuAccess(event.target.value as 'none' | 'menu' | 'pos')}>
+                        <MenuItem value="none">No access</MenuItem>
+                        <MenuItem value="menu">Menu only — manage and show QR menus</MenuItem>
+                        <MenuItem value="pos">Menu + Add to POS — send table bills to billing</MenuItem>
+                    </TextField>
+                </DialogContent>
+                <DialogActions><Button onClick={() => setDigitalMenuUser(null)} disabled={Boolean(savingId)}>Cancel</Button><Button variant="contained" onClick={saveDigitalMenuAccess} disabled={Boolean(savingId)}>Save</Button></DialogActions>
             </Dialog>
 
             <Dialog open={createDialogOpen} onClose={() => !createSaving && setCreateDialogOpen(false)} fullWidth maxWidth="sm">
