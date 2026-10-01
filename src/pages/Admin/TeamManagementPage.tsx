@@ -31,11 +31,8 @@ import {
     Tooltip,
     Typography,
 } from '@mui/material';
-<<<<<<< .mine
 import { CircleDollarSign, Edit3, Eye, EyeOff, IdCard, Info, KeyRound, Search, ShieldCheck, Trash2, UserPlus, Users } from 'lucide-react';
-=======
 import { CircleDollarSign, Edit3, Eye, EyeOff, Info, QrCode, Search, ShieldCheck, Trash2, UserPlus, Users } from 'lucide-react';
->>>>>>> .theirs
 import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import type { RootState } from '../../store';
