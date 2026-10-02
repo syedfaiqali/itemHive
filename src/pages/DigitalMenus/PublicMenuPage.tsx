@@ -64,8 +64,8 @@ const PublicMenuPage: React.FC = () => {
                     </Box>;
                         })}</Box>
                     </Box>)}
-                    {deals.length > 0 && <Box component="section" aria-labelledby="menu-deals">
-                        <Typography id="menu-deals" component="h2" sx={{ color: '#1d4936', fontSize: '1.12rem', fontWeight: 900, mb: 1.15 }}>DEALS</Typography>
+                    {deals.length > 0 && <Box component="section" aria-labelledby="menu-deals" sx={{ order: -1 }}>
+                        <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.15 }}><Typography id="menu-deals" component="h2" sx={{ color: '#b96500', fontSize: '1.12rem', fontWeight: 900 }}>OUR DEALS</Typography><Box sx={{ height: 1, flex: 1, bgcolor: '#e5c78d' }} /></Stack>
                         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' }, gap: 1.5 }}>
                             {deals.map(deal => {
                                 const quantity = dealCart[deal.id] || 0;
