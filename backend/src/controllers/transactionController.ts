@@ -6,6 +6,7 @@ import type { AuthRequest } from '../middleware/auth';
 import { normalizeRole } from '../utils/accessControl';
 import { buildTenantFilter, getCachedAppSettingsForTenant, getTenantObjectId } from '../utils/tenancy';
 import POSShift from '../models/POSShift';
+import OrderDraft from '../models/OrderDraft';
 
 export const getTransactions = async (req: AuthRequest, res: Response) => {
     try {
@@ -51,6 +52,11 @@ export const createPOSCheckout = async (req: AuthRequest, res: Response) => {
 
             const appSettings = await appSettingsPromise;
             const actorRole = normalizeRole(req.user?.role);
+            // Cashiers may bill server-priced QR deals without being allowed
+            // to enter arbitrary sale prices. Match the saved quantity as well.
+            const qrDraft = actorRole === 'user' && req.user?.digitalMenuAccess === 'pos' && mongoose.Types.ObjectId.isValid(String(req.body.draftId || ''))
+                ? await OrderDraft.findOne({ _id: req.body.draftId, ...buildTenantFilter(req.user!), digitalMenuTable: { $exists: true, $ne: '' } }).session(session).lean()
+                : null;
             const requestedDiscountPercent = Number(req.body.discountPercent || 0);
             const allowedDiscountOptions = (appSettings?.discountOptions || []).map(Number);
             const discountPercent = appSettings?.discountsEnabled
@@ -80,7 +86,9 @@ export const createPOSCheckout = async (req: AuthRequest, res: Response) => {
                 const defaultPrice = Number(product.salePrice ?? product.price ?? 0);
                 const requestedPrice = Number(item.unitPrice ?? defaultPrice);
                 if (!Number.isFinite(requestedPrice) || requestedPrice < 0) throw new Error(`Invalid sale price for ${product.name}`);
-                if (actorRole === 'user' && requestedPrice !== defaultPrice) throw new Error('Users are not allowed to change the sale price');
+                const savedLine = qrDraft?.items.find(line => line.productId === productId);
+                const matchesQrPrice = savedLine?.quantity === quantity && savedLine?.unitPrice === requestedPrice;
+                if (actorRole === 'user' && requestedPrice !== defaultPrice && !matchesQrPrice) throw new Error('Users are not allowed to change the sale price');
                 const subtotal = requestedPrice * quantity;
                 const discountAmount = subtotal * (discountPercent / 100);
                 const taxAmount = subtotal * taxRate;

@@ -1,0 +1,38 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import DigitalMenu from '../models/DigitalMenu';
+import Product from '../models/Product';
+import OrderDraft from '../models/OrderDraft';
+import { submitPublicOrder } from './digitalMenuController';
+import type { AuthRequest } from '../middleware/auth';
+import type { Response } from 'express';
+
+test('bundle orders use server prices, preserve quantities and totals when merged, and reject unavailable deals', async (t) => {
+    const root = { _id: 'root', productIds: ['sugar'] };
+    const table = { tableName: 'Table 1', sourceMenuId: 'root', businessId: 'business', orderingEnabled: true };
+    const deals = [{ _id: 'lunch', productIds: ['sugar', 'jelly'], dealPrice: 120 }];
+    const products = [{ id: 'sugar', name: 'Sugar', price: 145 }, { id: 'jelly', name: 'Jelly', price: 15 }];
+    const existing = { items: [{ productId: 'sugar', productName: 'Sugar', quantity: 1, unitPrice: 145 }], save: async () => {} };
+    t.mock.method(DigitalMenu, 'findOne', (filter: { token?: string }) => ({ lean: async () => filter.token ? table : root }));
+    t.mock.method(DigitalMenu, 'find', () => ({ lean: async () => deals }));
+    t.mock.method(Product, 'find', () => ({ select: () => ({ lean: async () => products }) }));
+    t.mock.method(OrderDraft, 'findOne', async () => existing);
+    let status = 200;
+    const res = { status: (value: number) => { status = value; return res; }, json: (value: unknown) => value } as unknown as Response;
+    const req = { params: { token: 'qr' }, body: { items: [], deals: [{ dealId: 'lunch', quantity: 2, dealPrice: 1 }] } } as unknown as AuthRequest;
+    await submitPublicOrder(req, res);
+    assert.equal(status, 200);
+    assert.equal(existing.items.find(item => item.productId === 'sugar')?.quantity, 3);
+    assert.equal(existing.items.find(item => item.productId === 'jelly')?.quantity, 2);
+    const total = () => existing.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+    assert.ok(Math.abs(total() - 385) < 1e-8);
+    await submitPublicOrder(req, res);
+    assert.ok(Math.abs(total() - 625) < 1e-8);
+    req.body.deals = [{ dealId: 'foreign-deal', quantity: 1 }];
+    await submitPublicOrder(req, res);
+    assert.equal(status, 400);
+    assert.ok(Math.abs(total() - 625) < 1e-8);
+    req.body.deals = [{ dealId: 'lunch', quantity: 0.5 }];
+    await submitPublicOrder(req, res);
+    assert.equal(status, 400);
+});

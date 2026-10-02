@@ -754,6 +754,7 @@ const POSTerminal: React.FC = () => {
         try {
             await api.post('/transactions/checkout', {
                 orderId: id,
+                draftId: activeDraftId || undefined,
                 shiftId: openShift._id,
                 items: cart.map((item) => ({ productId: item.id, quantity: item.quantity, unitPrice: item.price })),
                 discountPercent: appliedDiscountPercent,

@@ -47,15 +47,20 @@ const buildDraftPayload = async (req: AuthRequest) => {
     if (productsById.size !== productIds.length) throw new Error('One or more draft products no longer exist');
 
     const actorRole = normalizeRole(req.user?.role);
+    const qrDraft = actorRole === 'user' && req.user?.digitalMenuAccess === 'pos' && req.params.id
+        ? await OrderDraft.findOne({ _id: req.params.id, ...buildTenantFilter(req.user!), digitalMenuTable: { $exists: true, $ne: '' } }).lean()
+        : null;
     const items = normalizedItems.map((item) => {
         const product = productsById.get(item.productId)!;
         const currentPrice = Number(product.salePrice ?? product.price ?? 0);
         const requestedPrice = Number.isFinite(item.unitPrice) && item.unitPrice >= 0 ? item.unitPrice : currentPrice;
+        const savedLine = qrDraft?.items.find(line => line.productId === item.productId);
+        const matchesQrPrice = savedLine?.quantity === item.quantity && savedLine?.unitPrice === requestedPrice;
         return {
             productId: item.productId,
             productName: product.name,
             quantity: item.quantity,
-            unitPrice: actorRole === 'user' ? currentPrice : requestedPrice,
+            unitPrice: actorRole === 'user' && !matchesQrPrice ? currentPrice : requestedPrice,
         };
     });
 
