@@ -5,7 +5,7 @@ import {
     Grid,
     Typography,
     Card,
-    CardContent,
+    CardActionArea,
     TextField,
     InputAdornment,
     Tabs,
@@ -61,13 +61,22 @@ import InvoiceItemsTable from '../../components/Common/InvoiceItemsTable';
 import { amountToWords } from '../../lib/numberToWords';
 import { buildInvoicePdfBlob, shareOrDownloadPdf } from '../../lib/invoicePdf';
 import { thermalInvoicePrintCss } from '../../lib/thermalPrintCss';
-import { printReceipt } from '../../lib/printReceipt';
+import { printCheckoutCopies, printReceipt } from '../../lib/printReceipt';
 import type { OrderDraft } from '../../types/orderDraft';
+
+const productCardFallback = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160"><g fill="none" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M80 35 119 57v46l-39 22-39-22V57z"/><path d="m41 57 39 23 39-23M80 80v45M60 46l39 23v17"/></g></svg>')}`;
 import type { POSShift } from '../../types/posShift';
 
 
 type CheckoutMethod = 'cash' | 'card' | 'credit' | 'installment';
 type OrderType = string;
+type KitchenTicket = {
+    draftCode: string;
+    items: Array<{ id: string; name: string; quantity: number }>;
+    orderTypeLabel: string;
+    deliveryNumber: string;
+    createdAt: string;
+};
 const showCreditKot = false;
 
 const getRequestErrorMessage = (error: unknown, fallback: string) =>
@@ -131,6 +140,8 @@ const POSTerminal: React.FC = () => {
     const [sharingReceipt, setSharingReceipt] = useState(false);
     const [printingReceipt, setPrintingReceipt] = useState(false);
     const [printingKot, setPrintingKot] = useState(false);
+    const [checkoutNeedsKot, setCheckoutNeedsKot] = useState(false);
+    const autoPrintedOrderRef = React.useRef<string | null>(null);
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [pendingMethod, setPendingMethod] = useState<CheckoutMethod | null>(null);
     const [confirmingPayment, setConfirmingPayment] = useState(false);
@@ -141,6 +152,10 @@ const POSTerminal: React.FC = () => {
     const [activeDraftId, setActiveDraftId] = useState<string | null>(null);
     const [activeDraftCode, setActiveDraftCode] = useState('');
     const loadedDraftRef = React.useRef<string | null>(null);
+    // This is the last saved version of an open draft. It lets an update KOT
+    // contain only the items (or additional quantities) newly sent to kitchen.
+    const savedDraftItemsRef = React.useRef<OrderDraft['items']>([]);
+    const [draftKot, setDraftKot] = useState<KitchenTicket | null>(null);
     // State updates apply on the next render; this ref blocks a rapid double
     // click immediately, before the button visually becomes disabled.
     const checkoutInFlightRef = React.useRef(false);
@@ -229,7 +244,7 @@ const POSTerminal: React.FC = () => {
         ? (draftInstallmentUnitPrice - installmentItem.purchasePrice) * installmentQuantity
         : 0;
     const isOrderTypeComplete = !isRestaurant || Boolean(orderType && (orderType !== 'other' || otherOrderType.trim()));
-    const canChoosePayment = cart.length > 0 && isOrderTypeComplete && Boolean(openShift) && !shiftLoading;
+    const canChoosePayment = cart.length > 0 && isOrderTypeComplete && Boolean(openShift) && !shiftLoading && !savingDraft;
     const orderTypeLabel = isRestaurant ? getOrderTypeLabel(orderType, otherOrderType) : '';
 
     React.useEffect(() => {
@@ -275,6 +290,7 @@ const POSTerminal: React.FC = () => {
                 setPendingMethod('cash');
                 setActiveDraftId(response.data._id);
                 setActiveDraftCode(response.data.draftCode);
+                savedDraftItemsRef.current = response.data.items;
                 loadedDraftRef.current = requestedDraftId;
                 if (unavailableNames.length > 0) {
                     setStockToast({ open: true, message: `${unavailableNames.join(', ')} could not be restored because they no longer exist.` });
@@ -291,6 +307,34 @@ const POSTerminal: React.FC = () => {
             cancelled = true;
         };
     }, [dispatch, navigate, products, productsLoaded, requestedDraftId]);
+
+    React.useEffect(() => {
+        if (!draftKot) return;
+
+        let cancelled = false;
+        const printDraftKot = async () => {
+            // Wait for React to place the snapshot into the hidden print node.
+            await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+            if (cancelled) return;
+
+            const kitchenTicket = document.getElementById('pos-draft-kot');
+            if (!kitchenTicket) return;
+
+            try {
+                // A 58mm roll uses a 52mm receipt box, including its padding.
+                // printReceipt measures the items to determine the page height.
+                await printReceipt(kitchenTicket, '#pos-draft-kot', 58);
+                if (!cancelled) setDraftKot(null);
+            } catch {
+                if (!cancelled) {
+                    setStockToast({ open: true, message: 'Draft was updated, but the KOT could not be prepared for printing.' });
+                }
+            }
+        };
+
+        void printDraftKot();
+        return () => { cancelled = true; };
+    }, [draftKot]);
 
     /** POS invoice PDF: uses the same document structure as Order Desk. */
     const buildReceiptPdf = (id: string, method: CheckoutMethod, receiptTimeIso: string) => {
@@ -411,6 +455,7 @@ const POSTerminal: React.FC = () => {
     };
 
     const handleAddToCart = (product: Product) => {
+        if (savingDraft) return;
         const itemInCart = cart.find(item => item.id === product.id);
         const currentQty = itemInCart ? itemInCart.quantity : 0;
 
@@ -446,65 +491,65 @@ const POSTerminal: React.FC = () => {
             const wasUpdatingDraft = Boolean(activeDraftId);
             if (wasUpdatingDraft) {
                 const draftId = activeDraftId!;
-                const originalCart = cart;
-                const originalDiscountPercent = appliedDiscountPercent;
-                const originalOrderType = orderType;
-                const originalOtherOrderType = otherOrderType;
-                const originalDeliveryNumber = deliveryNumber;
-                const originalDraftCode = activeDraftCode;
-
-                // Updating a draft never changes stock. Move the cashier
-                // straight to a new order and let the remote save finish in
-                // the background; if it fails, restore the exact draft so it
-                // can be retried without losing any edits.
-                dispatch(clearCart());
-                setPendingMethod(null);
-                setOrderType('');
-                setOtherOrderType('');
-                setDeliveryNumber('');
+                const originalDraftItems = savedDraftItemsRef.current;
+                // Keep the cart intact until saving succeeds so failures can
+                // be retried without losing edits or replacing another order.
+                const response = await api.put<OrderDraft>(`/order-drafts/${draftId}`, payload);
+                const savedQuantities = new Map(originalDraftItems.map((item) => [item.productId, item.quantity]));
+                const addedItems = response.data.items.flatMap((item) => {
+                    const addedQuantity = item.quantity - (savedQuantities.get(item.productId) || 0);
+                    return addedQuantity > 0
+                        ? [{ id: item.productId, name: item.productName, quantity: addedQuantity }]
+                        : [];
+                });
+                if (addedItems.length > 0 && isRestaurant) {
+                    setDraftKot({
+                        draftCode: response.data.draftCode,
+                        items: addedItems,
+                        orderTypeLabel: getOrderTypeLabel(orderType, otherOrderType),
+                        deliveryNumber: deliveryNumber.trim(),
+                        createdAt: new Date().toISOString(),
+                    });
+                }
+                handleCloseOrder();
                 setActiveDraftId(null);
                 setActiveDraftCode('');
+                savedDraftItemsRef.current = [];
                 loadedDraftRef.current = null;
                 navigate('/pos', { replace: true });
                 setStockToast({
                     open: true,
-                    message: `${originalDraftCode || 'Draft'} is saving. POS is ready for a new order.`,
+                    message: addedItems.length > 0 && isRestaurant
+                        ? `${response.data.draftCode} updated. KOT is ready for the new items.`
+                        : `${response.data.draftCode} updated successfully.`,
                 });
-                setSavingDraft(false);
-
-                void api.put<OrderDraft>(`/order-drafts/${draftId}`, payload)
-                    .then((response) => {
-                        setStockToast({
-                            open: true,
-                            message: `${response.data.draftCode} updated successfully.`,
-                        });
-                    })
-                    .catch((requestError: unknown) => {
-                        dispatch(replaceCart({ cart: originalCart, discountPercent: originalDiscountPercent }));
-                        setOrderType(originalOrderType);
-                        setOtherOrderType(originalOtherOrderType);
-                        setDeliveryNumber(originalDeliveryNumber);
-                        setActiveDraftId(draftId);
-                        setActiveDraftCode(originalDraftCode);
-                        loadedDraftRef.current = draftId;
-                        navigate(`/pos?draft=${draftId}`, { replace: true });
-                        setStockToast({
-                            open: true,
-                            message: `${getRequestErrorMessage(requestError, 'Draft update could not be saved.')} Your edits were restored.`,
-                        });
-                    });
                 return;
             }
 
             const response = await api.post<OrderDraft>('/order-drafts', payload);
 
-            setActiveDraftId(response.data._id);
-            setActiveDraftCode(response.data.draftCode);
-            loadedDraftRef.current = response.data._id;
-            navigate(`/pos?draft=${response.data._id}`, { replace: true });
+            if (isRestaurant) {
+                setDraftKot({
+                    draftCode: response.data.draftCode,
+                    items: response.data.items.map((item) => ({ id: item.productId, name: item.productName, quantity: item.quantity })),
+                    orderTypeLabel: getOrderTypeLabel(orderType, otherOrderType),
+                    deliveryNumber: deliveryNumber.trim(),
+                    createdAt: new Date().toISOString(),
+                });
+            }
+            // The KOT owns a snapshot, so clearing the terminal cannot empty
+            // the printout. Keep the saved draft in Order Drafts for payment.
+            handleCloseOrder();
+            setActiveDraftId(null);
+            setActiveDraftCode('');
+            savedDraftItemsRef.current = [];
+            loadedDraftRef.current = null;
+            navigate('/pos', { replace: true });
             setStockToast({
                 open: true,
-                message: `${response.data.draftCode} saved. You can continue editing or take payment.`,
+                message: isRestaurant
+                    ? `${response.data.draftCode} saved. KOT is ready for the kitchen.`
+                    : `${response.data.draftCode} saved. POS is ready for a new order.`,
             });
         } catch (requestError: unknown) {
             setStockToast({ open: true, message: getRequestErrorMessage(requestError, 'Order draft could not be saved.') });
@@ -644,6 +689,9 @@ const POSTerminal: React.FC = () => {
         const id = `R-${crypto.randomUUID()}`;
         const receiptTimeIso = new Date().toISOString();
         const currentMethod = pendingMethod;
+        // A saved draft has already sent its KOT to the kitchen. Capture this
+        // before the paid draft is deleted in the background.
+        setCheckoutNeedsKot(isRestaurant && !activeDraftId);
         setConfirmingPayment(true);
         setPaymentCommitPending(true);
         setReceiptId(id);
@@ -765,6 +813,7 @@ const POSTerminal: React.FC = () => {
         setOrderDone(false);
         setPrintingReceipt(false);
         setPrintingKot(false);
+        setCheckoutNeedsKot(false);
         setPaymentMethod(null);
         setOrderType('');
         setOtherOrderType('');
@@ -794,11 +843,18 @@ const POSTerminal: React.FC = () => {
 
     const handlePrint = async () => {
         const receipt = document.getElementById('pos-receipt');
-        if (!receipt || printingReceipt) return;
+        if (!receipt || printingReceipt || printingKot || paymentCommitPending) return;
 
         setPrintingReceipt(true);
         try {
-            await printReceipt(receipt);
+            if (checkoutNeedsKot) {
+                const kitchenTicket = receipt.closest('[role="dialog"]')?.querySelector<HTMLElement>('#pos-kot');
+                if (!kitchenTicket) throw new Error('Kitchen ticket is unavailable.');
+                await printCheckoutCopies(receipt, kitchenTicket);
+            } else {
+                await printReceipt(receipt);
+            }
+            handleCloseOrder();
         } catch {
             setStockToast({ open: true, message: 'Could not prepare the receipt for printing.' });
         } finally {
@@ -808,7 +864,7 @@ const POSTerminal: React.FC = () => {
 
     const handlePrintKot = async () => {
         const kitchenTicket = document.getElementById('pos-kot');
-        if (!kitchenTicket || printingKot) return;
+        if (!kitchenTicket || printingKot || printingReceipt || paymentCommitPending) return;
 
         setPrintingKot(true);
         try {
@@ -820,20 +876,37 @@ const POSTerminal: React.FC = () => {
         }
     };
 
+    React.useEffect(() => {
+        if (!orderDone || paymentCommitPending || !checkoutNeedsKot || !receiptId
+            || autoPrintedOrderRef.current === receiptId) return;
+        const receipt = document.getElementById('pos-receipt');
+        const kitchenTicket = receipt?.closest('[role="dialog"]')?.querySelector<HTMLElement>('#pos-kot');
+        if (!receipt || !kitchenTicket) return;
+
+        // Mark before awaiting printing so rerenders cannot duplicate the job.
+        autoPrintedOrderRef.current = receiptId;
+        setPrintingReceipt(true);
+        void printCheckoutCopies(receipt, kitchenTicket)
+            .catch(() => {
+                setStockToast({ open: true, message: 'Payment succeeded, but printing could not be prepared. Use Receipt to retry.' });
+            })
+            .finally(() => setPrintingReceipt(false));
+    }, [orderDone, paymentCommitPending, checkoutNeedsKot, receiptId]);
+
     return (
         <Box
             sx={{
                 display: 'flex',
                 flexDirection: { xs: 'column', lg: 'row' },
                 gap: { xs: 1.5, sm: 2 },
-                height: { xs: 'auto', lg: 'calc(100vh - 120px)' },
-                minHeight: { lg: 'calc(100vh - 120px)' },
+                height: { xs: 'auto', lg: 'calc(100vh - 96px)' },
+                minHeight: { lg: 'calc(100vh - 96px)' },
                 overflow: { xs: 'visible', lg: 'hidden' }
             }}
         >
             {/* Left Side: Product Selection */}
-            <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
-                <Paper sx={{ p: { xs: 1.5, sm: 2 }, mb: 1.5, borderRadius: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Box inert={savingDraft} sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
+                <Paper sx={{ p: { xs: 1.25, sm: 1.5 }, mb: 1, borderRadius: 2, display: 'flex', alignItems: 'center', gap: 1, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
                     <TextField
                         fullWidth
                         placeholder="Scan Barcode or Search (Name/SKU)..."
@@ -857,14 +930,14 @@ const POSTerminal: React.FC = () => {
                     onChange={(_, v) => setActiveTab(v)}
                     variant="scrollable"
                     scrollButtons="auto"
-                    sx={{ mb: 1.5, borderBottom: 1, borderColor: 'divider' }}
+                    sx={{ mb: 0.75, minHeight: 42, borderBottom: 1, borderColor: 'divider' }}
                 >
                     {categories.map((cat) => (
-                        <Tab key={cat} label={cat} sx={{ fontWeight: 700, px: { xs: 1.5, sm: 2.5 }, minHeight: 44, textTransform: 'none' }} />
+                        <Tab key={cat} label={cat} sx={{ fontWeight: 750, fontSize: '0.82rem', px: { xs: 1.25, sm: 1.75 }, minHeight: 42, textTransform: 'none' }} />
                     ))}
                 </Tabs>
 
-                <Box sx={{ flexGrow: 1, overflowY: 'auto', pr: { xs: 0.5, sm: 1 }, pt: 1.25, pb: 1, px: { xs: 0.5, sm: 1.5 } }}>
+                <Box sx={{ flexGrow: 1, overflowY: 'auto', pr: { xs: 0.5, sm: 1 }, pt: 0.75, pb: 1, px: { xs: 0.5, sm: 1 } }}>
                     {productsError ? (
                         <Alert
                             severity="error"
@@ -879,267 +952,56 @@ const POSTerminal: React.FC = () => {
                             <Typography variant="body2" color="text.secondary">Try another category or search term.</Typography>
                         </Stack>
                     ) : (
-                    <Grid container spacing={{ xs: 2, sm: 2.5, md: 3 }}>
+                    <Grid container spacing={{ xs: 1.25, sm: 1.5 }}>
                         {filteredProducts.map((product) => (
                             <Grid
                                 key={product.id}
-                                size={{ xs: 12, sm: 6, md: 6, lg: 4, xl: 3 }}
+                                size={{ xs: 6, sm: 6, md: 4, xl: 3 }}
                             >
-                                <motion.div
-                                    whileHover={{ y: -5, transition: { duration: 0.22 } }}
-                                    whileTap={{ scale: 0.98 }}
-                                    style={{ height: '100%' }}
+                                <Card
+                                    sx={{
+                                        height: '100%', display: 'flex', flexDirection: 'column',
+                                        borderRadius: 2.5, border: '1px solid', borderColor: 'divider',
+                                        bgcolor: 'background.paper', overflow: 'hidden',
+                                        boxShadow: `0 2px 6px ${alpha(theme.palette.common.black, 0.025)}`,
+                                        transition: 'border-color 160ms ease, box-shadow 160ms ease',
+                                        '&:hover': product.stock > 0 ? {
+                                            borderColor: alpha(theme.palette.primary.main, 0.5),
+                                            boxShadow: `0 6px 18px ${alpha(theme.palette.common.black, 0.06)}`,
+                                        } : {},
+                                    }}
                                 >
-                                    <Card
+                                    <CardActionArea
+                                        aria-label={`Add ${product.name} to order`}
+                                        disabled={product.stock <= 0}
                                         onClick={() => handleAddToCart(product)}
-                                        sx={{
-                                            cursor: product.stock > 0 ? 'pointer' : 'default',
-                                            height: '100%',
-                                            display: 'flex',
-                                            flexDirection: 'column',
-                                            borderRadius: 4,
-                                            border: '1px solid',
-                                            borderColor: alpha(theme.palette.primary.main, 0.14),
-                                            bgcolor: 'background.paper',
-                                            boxShadow: theme.palette.mode === 'dark'
-                                                ? `0 16px 28px -22px ${alpha('#000', 0.9)}`
-                                                : `0 14px 28px -22px ${alpha(theme.palette.primary.dark, 0.38)}`,
-                                            overflow: 'hidden',
-                                            position: 'relative',
-                                            '&::before': {
-                                                content: '""',
-                                                position: 'absolute',
-                                                top: 0,
-                                                left: 0,
-                                                right: 0,
-                                                height: 3,
-                                                background: `linear-gradient(90deg, ${alpha(theme.palette.primary.main, 0.7)} 0%, ${alpha(theme.palette.primary.light, 0.8)} 100%)`,
-                                                opacity: product.stock > 0 ? 1 : 0.5,
-                                                zIndex: 1
-                                            },
-                                            '&:hover': {
-                                                borderColor: product.stock > 0 ? 'primary.main' : 'divider',
-                                                boxShadow: (theme) => product.stock > 0
-                                                    ? `0 26px 48px -22px ${alpha(theme.palette.primary.main, 0.42)}`
-                                                    : `0 14px 26px -22px ${alpha(theme.palette.error.main, 0.4)}`,
-                                                '& .product-img': { transform: product.stock > 0 ? 'scale(1.05)' : 'none' },
-                                                '& .add-btn': { opacity: product.stock > 0 ? 1 : 0.4, transform: 'translateY(0)' }
-                                            },
-                                            opacity: product.stock === 0 ? 0.78 : 1,
-                                            transition: 'all 0.3s'
-                                        }}
+                                        sx={{ p: { xs: 1.25, sm: 1.75 }, pb: 0, flexGrow: 1, display: 'block', '&.Mui-focusVisible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: -2 } }}
                                     >
-                                        <Box sx={{
-                                            position: 'relative',
-                                            pt: '90%',
-                                            bgcolor: (theme) => alpha(theme.palette.text.primary, 0.02),
-                                            background: `linear-gradient(165deg, ${alpha(theme.palette.primary.main, 0.06)} 0%, ${alpha(theme.palette.background.paper, 0)} 70%)`,
-                                            overflow: 'hidden'
-                                        }}>
-                                            <Box
-                                                className="product-img"
-                                                component="img"
-                                                src={resolveProductImage(product)}
-                                                alt={product.name}
-                                                loading="lazy"
-                                                decoding="async"
-                                                onError={(event) => {
-                                                    const image = event.currentTarget;
-                                                    if (image.src !== placeholderFallback) image.src = placeholderFallback;
-                                                }}
-                                                sx={{
-                                                    position: 'absolute',
-                                                    top: 0,
-                                                    left: 0,
-                                                    width: '100%',
-                                                    height: '100%',
-                                                    objectFit: 'contain',
-                                                    p: 2.5,
-                                                    transition: 'transform 0.5s ease',
-                                                }}
+                                        <Box sx={{ height: { xs: 140, sm: 160 }, p: 1.5, mb: 1.5, borderRadius: 1.5, bgcolor: theme.palette.mode === 'dark' ? alpha(theme.palette.common.white, 0.035) : '#F8FAFC', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                                            <Box component="img"
+                                                src={resolveProductImage(product) === placeholderFallback ? productCardFallback : resolveProductImage(product)}
+                                                alt={product.name} loading="lazy" decoding="async"
+                                                onError={(event) => { if (event.currentTarget.src !== productCardFallback) event.currentTarget.src = productCardFallback; }}
+                                                sx={{ display: 'block', width: '100%', height: '100%', objectFit: 'contain', opacity: product.stock <= 0 ? 0.55 : 1 }}
                                             />
-                                            {product.stock <= 5 && (
-                                                <Chip
-                                                    label={product.stock === 0 ? "Out of Stock" : "Limited Stock"}
-                                                    size="small"
-                                                    color={product.stock === 0 ? "error" : "warning"}
-                                                    sx={{
-                                                        position: 'absolute',
-                                                        top: 10,
-                                                        left: 10,
-                                                        fontSize: '0.62rem',
-                                                        fontWeight: 900,
-                                                        height: 22,
-                                                        borderRadius: 1.5,
-                                                        textTransform: 'uppercase'
-                                                    }}
-                                                />
-                                            )}
-                                            <Box
-                                                sx={{
-                                                    position: 'absolute',
-                                                    top: 10,
-                                                    right: 10,
-                                                    zIndex: 2,
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    gap: 0.5,
-                                                    px: 1,
-                                                    py: 0.45,
-                                                    borderRadius: 2,
-                                                    bgcolor: alpha(theme.palette.background.paper, 0.92),
-                                                    border: '1px solid',
-                                                    borderColor: product.stock === 0
-                                                        ? alpha(theme.palette.error.main, 0.35)
-                                                        : product.stock <= 5
-                                                            ? alpha(theme.palette.warning.main, 0.4)
-                                                            : alpha(theme.palette.success.main, 0.35),
-                                                    boxShadow: `0 3px 10px ${alpha('#000', 0.12)}`,
-                                                }}
-                                            >
-                                                <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: product.stock === 0 ? 'error.main' : product.stock <= 5 ? 'warning.main' : 'success.main' }} />
-                                                <Typography variant="caption" fontWeight={900} sx={{ fontSize: '0.67rem', color: product.stock === 0 ? 'error.main' : product.stock <= 5 ? 'warning.main' : 'success.main', whiteSpace: 'nowrap' }}>
-                                                    {product.stock === 0 ? 'Out' : `${product.stock} left`}
-                                                </Typography>
-                                            </Box>
-                                            {product.stock === 0 && (
-                                                <Box
-                                                    sx={{
-                                                        position: 'absolute',
-                                                        inset: 0,
-                                                        bgcolor: alpha(theme.palette.error.main, 0.18),
-                                                        backdropFilter: 'blur(1px)',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        zIndex: 2,
-                                                        pointerEvents: 'none',
-                                                    }}
-                                                >
-                                                    <Typography
-                                                        variant="caption"
-                                                        sx={{
-                                                            px: 1.2,
-                                                            py: 0.6,
-                                                            borderRadius: 1,
-                                                            bgcolor: alpha(theme.palette.background.paper, 0.9),
-                                                            color: 'error.main',
-                                                            border: '1px solid',
-                                                            borderColor: alpha(theme.palette.error.main, 0.4),
-                                                            fontWeight: 900,
-                                                            letterSpacing: 0.5,
-                                                            textTransform: 'uppercase'
-                                                        }}
-                                                    >
-                                                        Out of Stock
-                                                    </Typography>
-                                                </Box>
-                                            )}
-
-                                            <Box
-                                                className="add-btn"
-                                                sx={{
-                                                    position: 'absolute',
-                                                    bottom: 12,
-                                                    right: 12,
-                                                    p: 1,
-                                                    borderRadius: 2,
-                                                    bgcolor: product.stock > 0 ? 'primary.main' : 'action.disabledBackground',
-                                                    color: product.stock > 0 ? 'white' : 'action.disabled',
-                                                    display: 'flex',
-                                                    opacity: 0,
-                                                    transform: 'translateY(10px)',
-                                                    transition: 'all 0.3s ease',
-                                                    boxShadow: product.stock > 0 ? '0 4px 12px rgba(14, 165, 165, 0.3)' : 'none',
-                                                    cursor: product.stock > 0 ? 'pointer' : 'not-allowed'
-                                                }}
-                                            >
-                                                <Plus size={18} strokeWidth={3} />
-                                            </Box>
                                         </Box>
-
-                                        <CardContent sx={{ p: 2.25, pt: 2, flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
-                                            <Typography
-                                                variant="caption"
-                                                color="primary.main"
-                                                fontWeight={900}
-                                                sx={{ mb: 0.55, letterSpacing: 0.55, opacity: 0.9, lineHeight: 1.15 }}
-                                            >
-                                                {product.category.toUpperCase()}
-                                            </Typography>
-
-                                            <Typography
-                                                variant="subtitle1"
-                                                color="text.primary"
-                                                fontWeight={700}
-                                                sx={{
-                                                    lineHeight: 1.3,
-                                                    mb: 1.25,
-                                                    fontSize: '1rem',
-                                                    minHeight: '2.6em',
-                                                    overflow: 'hidden',
-                                                    display: '-webkit-box',
-                                                    WebkitLineClamp: 2,
-                                                    WebkitBoxOrient: 'vertical',
-                                                    textWrap: 'balance'
-                                                }}
-                                            >
-                                                {product.name}
-                                            </Typography>
-
-                                            <Box sx={{ mt: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
-                                                <Typography variant="h5" color="primary.main" fontWeight={900} sx={{ letterSpacing: -0.4 }}>
-                                                    {formatCurrency(product.price)}
-                                                </Typography>
-
-                                                <Box sx={{
-                                                    display: 'none',
-                                                    alignItems: 'center',
-                                                    gap: 0.5,
-                                                    px: 1.1,
-                                                    py: 0.35,
-                                                    borderRadius: 2,
-                                                    bgcolor: (theme) => {
-                                                        if (product.stock === 0) return alpha(theme.palette.error.main, 0.1);
-                                                        if (product.stock <= 5) return alpha(theme.palette.warning.main, 0.1);
-                                                        return alpha(theme.palette.success.main, 0.06);
-                                                    },
-                                                    border: '1px solid',
-                                                    borderColor: (theme) => {
-                                                        if (product.stock === 0) return alpha(theme.palette.error.main, 0.24);
-                                                        if (product.stock <= 5) return alpha(theme.palette.warning.main, 0.26);
-                                                        return alpha(theme.palette.success.main, 0.22);
-                                                    }
-                                                }}>
-                                                    <Box sx={{
-                                                        width: 6,
-                                                        height: 6,
-                                                        borderRadius: '50%',
-                                                        bgcolor: (theme) => {
-                                                            if (product.stock === 0) return theme.palette.error.main;
-                                                            if (product.stock <= 5) return theme.palette.warning.main;
-                                                            return theme.palette.success.main;
-                                                        }
-                                                    }} />
-                                                    <Typography
-                                                        variant="caption"
-                                                        fontWeight={800}
-                                                        sx={{
-                                                            fontSize: '0.65rem',
-                                                            color: (theme) => {
-                                                                if (product.stock === 0) return theme.palette.error.main;
-                                                                if (product.stock <= 5) return theme.palette.warning.main;
-                                                                return theme.palette.success.main;
-                                                            }
-                                                        }}
-                                                    >
-                                                        {product.stock === 0 ? 'Out' : product.stock} left
-                                                    </Typography>
-                                                </Box>
-                                            </Box>
-                                        </CardContent>
-                                    </Card>
-                                </motion.div>
+                                        <Typography title={product.name} fontWeight={700} sx={{ color: 'text.primary', fontSize: { xs: '0.85rem', sm: '0.9rem' }, lineHeight: 1.4, minHeight: '2.8em', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                                            {product.name}
+                                        </Typography>
+                                        <Typography variant="caption" sx={{ display: 'block', mt: 0.5, fontSize: '0.7rem', color: product.stock <= 0 ? 'error.main' : product.stock <= 5 ? 'warning.main' : 'text.secondary' }}>
+                                            {product.stock <= 0 ? 'Out of stock' : product.stock <= 5 ? `Only ${product.stock} left` : `${product.stock} in stock`}
+                                        </Typography>
+                                    </CardActionArea>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 0.75, m: { xs: 1.25, sm: 1.75 }, mt: 1.25, pt: 1.25, borderTop: '1px solid', borderColor: 'divider' }}>
+                                        <Typography fontWeight={800} sx={{ color: 'text.primary', fontSize: { xs: '0.92rem', sm: '1rem' }, letterSpacing: '-0.025em', fontVariantNumeric: 'tabular-nums', overflowWrap: 'anywhere', lineHeight: 1.25 }}>
+                                            {formatCurrency(product.price)}
+                                        </Typography>
+                                        <IconButton aria-label={`Add ${product.name}`} disabled={product.stock <= 0} onClick={() => handleAddToCart(product)}
+                                            sx={{ width: 44, height: 44, flexShrink: 0, borderRadius: 1.5, bgcolor: 'primary.main', color: 'primary.contrastText', '&:hover': { bgcolor: 'primary.dark' }, '&.Mui-disabled': { bgcolor: 'action.disabledBackground', color: 'action.disabled' } }}>
+                                            <Plus size={21} strokeWidth={2.25} />
+                                        </IconButton>
+                                    </Box>
+                                </Card>
                             </Grid>
                         ))}
                     </Grid>
@@ -1149,30 +1011,34 @@ const POSTerminal: React.FC = () => {
 
             {/* Right Side: Cart / Order Summary */}
             <Paper
-                elevation={3}
+                inert={savingDraft}
+                elevation={0}
                 sx={{
-                    width: { xs: '100%', lg: 420 },
+                    width: { xs: '100%', lg: 440 },
                     flexShrink: 0,
                     display: 'flex',
                     flexDirection: 'column',
-                    borderRadius: 4,
+                    borderRadius: 3,
                     overflow: 'hidden',
-                    bgcolor: 'background.paper',
+                    bgcolor: (theme) => theme.palette.mode === 'dark' ? 'background.paper' : '#FFFFFF',
                     border: '1px solid',
                     borderColor: 'divider',
+                    boxShadow: (theme) => theme.palette.mode === 'dark' ? 'none' : `0 18px 44px -34px ${alpha(theme.palette.primary.dark, 0.55)}`,
                     minHeight: { xs: 360, sm: 420, lg: 0 },
                     height: { lg: '100%' },
                     maxHeight: { xs: 'calc(100dvh - 12px)', lg: '100%' }
                 }}
             >
-                <Box sx={{ p: { xs: 1.5, sm: 2.5 }, bgcolor: 'primary.main', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                        <ShoppingCart size={22} />
+                <Box sx={{ p: { xs: 1.5, sm: 2 }, color: 'text.primary', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0, borderBottom: '1px solid', borderColor: 'divider', position: 'relative', overflow: 'hidden', '&::after': { content: '""', position: 'absolute', width: 150, height: 150, borderRadius: '50%', right: -78, top: -105, bgcolor: (theme) => alpha(theme.palette.primary.main, 0.1), pointerEvents: 'none' } }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.15 }}>
+                        <Box sx={{ display: 'grid', placeItems: 'center', width: 38, height: 38, borderRadius: 2, bgcolor: (theme) => alpha(theme.palette.primary.main, 0.12), color: 'primary.main' }}><ShoppingCart size={19} /></Box>
                         <Box>
-                            <Typography variant="h6" fontWeight={800} lineHeight={1.15}>Current Order</Typography>
-                            {activeDraftCode && <Typography variant="caption" sx={{ opacity: 0.85 }}>Editing {activeDraftCode}</Typography>}
+                            <Typography variant="caption" color="text.secondary" fontWeight={800} sx={{ letterSpacing: '0.08em', fontSize: '0.62rem' }}>CHECKOUT</Typography>
+                            <Typography variant="subtitle1" fontWeight={850} lineHeight={1.15}>Current Order</Typography>
+                            {activeDraftCode && <Typography variant="caption" color="text.secondary">Editing {activeDraftCode}</Typography>}
                         </Box>
                     </Box>
+                    <Chip size="small" label={`${cart.length} item${cart.length === 1 ? '' : 's'}`} sx={{ height: 26, fontWeight: 800, position: 'relative', zIndex: 1, bgcolor: (theme) => alpha(theme.palette.primary.main, 0.1), color: 'primary.dark', '& .MuiChip-label': { px: 1 } }} />
                 </Box>
 
                 <Box
@@ -1197,21 +1063,23 @@ const POSTerminal: React.FC = () => {
                         overscrollBehavior: 'contain'
                     }}
                 >
-                    <Box sx={{ minHeight: cart.length === 0 ? 180 : 'auto', display: 'flex', flexDirection: 'column', justifyContent: cart.length === 0 ? 'center' : 'flex-start' }}>
+                    <Box sx={{ minHeight: cart.length === 0 ? 210 : 'auto', display: 'flex', flexDirection: 'column', justifyContent: cart.length === 0 ? 'center' : 'flex-start' }}>
                         {cart.length === 0 ? (
                             <Box sx={{
                                 textAlign: 'center',
-                                opacity: 0.4,
                                 width: '100%',
                                 px: 3,
-                                py: 2
+                                py: 2,
+                                color: 'text.secondary'
                             }}>
-                                <ShoppingCart size={56} strokeWidth={1} style={{ marginBottom: 12 }} />
-                                <Typography variant="h6" fontWeight={800}>Cart is empty</Typography>
-                                <Typography variant="body2" fontWeight={600}>Select products to start</Typography>
+                                <Box sx={{ width: 58, height: 58, borderRadius: '50%', display: 'grid', placeItems: 'center', mx: 'auto', mb: 1.25, bgcolor: (theme) => alpha(theme.palette.primary.main, 0.08), color: 'primary.main' }}>
+                                    <ShoppingCart size={27} strokeWidth={1.5} />
+                                </Box>
+                                <Typography variant="subtitle2" fontWeight={850} color="text.primary">Your cart is empty</Typography>
+                                <Typography variant="caption" sx={{ display: 'block', mt: 0.4 }}>Choose a product to start this order</Typography>
                             </Box>
                         ) : (
-                            <Box sx={{ p: 2, pb: 1 }}>
+                            <Box sx={{ p: 1.25, pb: 0.5 }}>
                                 <AnimatePresence>
                                     {cart.map((item) => (
                                         <motion.div
@@ -1220,11 +1088,12 @@ const POSTerminal: React.FC = () => {
                                             animate={{ opacity: 1, y: 0 }}
                                             exit={{ opacity: 0, scale: 0.95 }}
                                         >
-                                            <Box sx={{ mb: 1.25, display: 'flex', alignItems: { xs: 'flex-start', sm: 'center' }, gap: { xs: 1, sm: 2 }, flexWrap: 'wrap' }}>
+                                            <Box sx={{ mb: 0.9, display: 'flex', alignItems: { xs: 'flex-start', sm: 'center' }, gap: { xs: 0.75, sm: 1 }, flexWrap: 'wrap' }}>
                                                 <Box sx={{ flexGrow: 1, minWidth: { xs: '100%', sm: 160 } }}>
                                                     <Typography variant="body2" fontWeight={700} noWrap={false} sx={{ wordBreak: 'break-word' }}>{item.name}</Typography>
+                                                    {canOverridePrice ? <>
                                                     <Typography variant="caption" color="text.secondary" display="block">
-                                                        Cost: {formatCurrency(item.purchasePrice)} | Default sell: {formatCurrency(item.salePrice)}
+                                                        Cost {formatCurrency(item.purchasePrice)} · Default {formatCurrency(item.salePrice)}
                                                     </Typography>
                                                     <TextField
                                                         size="small"
@@ -1233,15 +1102,18 @@ const POSTerminal: React.FC = () => {
                                                         value={item.price}
                                                         onChange={(e) => dispatch(updateCartItemPrice({ id: item.id, price: Number(e.target.value || 0) }))}
                                                         disabled={!canOverridePrice}
-                                                        sx={{ mt: 1, maxWidth: 150 }}
+                                                        sx={{ mt: 0.6, maxWidth: 135 }}
                                                         InputProps={{
                                                             startAdornment: (
                                                                 <InputAdornment position="start">{currencySymbol}</InputAdornment>
                                                             ),
                                                         }}
                                                     />
+                                                    </> : <Typography variant="caption" color="text.secondary" display="block">
+                                                        {formatCurrency(item.price)} each
+                                                    </Typography>}
                                                 </Box>
-                                                <Stack direction="row" alignItems="center" spacing={1} sx={{ bgcolor: 'action.hover', borderRadius: 2, p: 0.5 }}>
+                                                <Stack direction="row" alignItems="center" spacing={0.5} sx={{ bgcolor: 'action.hover', borderRadius: 1.5, p: 0.35 }}>
                                                     <IconButton size="small" onClick={() => dispatch(updateQuantity({ id: item.id, quantity: item.quantity - 1 }))}>
                                                         <Minus size={14} />
                                                     </IconButton>
@@ -1264,7 +1136,7 @@ const POSTerminal: React.FC = () => {
                                                     {formatCurrency(item.price * item.quantity)}
                                                 </Typography>
                                             </Box>
-                                            <Divider sx={{ mb: 1.25, borderStyle: 'dashed' }} />
+                                            <Divider sx={{ mb: 0.9, borderStyle: 'dashed' }} />
                                         </motion.div>
                                     ))}
                                 </AnimatePresence>
@@ -1274,17 +1146,20 @@ const POSTerminal: React.FC = () => {
 
                 <Box
                     sx={{
-                        p: { xs: 1.5, sm: 2 },
-                        bgcolor: 'background.paper',
-                        borderTop: '1px solid',
-                        borderColor: 'divider',
-                        boxShadow: (theme) => `0 -10px 20px -16px ${alpha(theme.palette.text.primary, 0.35)}`,
+                        p: { xs: 1.25, sm: 1.5 },
+                        bgcolor: (theme) => theme.palette.mode === 'dark' ? 'background.paper' : '#FFFFFF',
                         position: 'relative',
                         zIndex: 2,
-                        flexShrink: 0
+                        flexShrink: 0,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        flexGrow: 1,
+                        // Keep totals, order details, and shift status beside
+                        // the bottom payment dock when the cart is short.
+                        justifyContent: 'flex-end'
                     }}
                 >
-                    <Stack spacing={0.75} sx={{ mb: 1.5 }}>
+                    <Stack spacing={0.35} sx={{ mb: 0.75, px: 0.3, py: 0.2 }}>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                             <Typography variant="body2" color="text.secondary">Subtotal</Typography>
                             <Typography variant="body2" fontWeight={700}>{formatCurrency(subtotal)}</Typography>
@@ -1294,18 +1169,19 @@ const POSTerminal: React.FC = () => {
                             <Typography variant="body2" fontWeight={700}>{formatCurrency(tax)}</Typography>
                         </Box>
                         {discountsEnabled && discountOptions.length > 0 && (
-                            <TextField
-                                select
-                                size="small"
-                                fullWidth
-                                label="Discount"
-                                value={appliedDiscountPercent}
-                                onChange={(event) => dispatch(setCartDiscountPercent(Number(event.target.value)))}
-                                helperText="Select an approved discount percentage."
-                            >
-                                <MenuItem value={0}>No discount</MenuItem>
-                                {discountOptions.map((option) => <MenuItem key={option} value={option}>{option}%</MenuItem>)}
-                            </TextField>
+                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+                                <Typography variant="body2" color="text.secondary">Discount</Typography>
+                                <TextField
+                                    select
+                                    size="small"
+                                    value={appliedDiscountPercent}
+                                    onChange={(event) => dispatch(setCartDiscountPercent(Number(event.target.value)))}
+                                    sx={{ width: 130, '& .MuiOutlinedInput-root': { height: 34, fontSize: '0.82rem' } }}
+                                >
+                                    <MenuItem value={0}>No discount</MenuItem>
+                                    {discountOptions.map((option) => <MenuItem key={option} value={option}>{option}%</MenuItem>)}
+                                </TextField>
+                            </Box>
                         )}
                         {activeDiscount > 0 && (
                             <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -1313,30 +1189,20 @@ const POSTerminal: React.FC = () => {
                                 <Typography variant="body2" fontWeight={700} color="error.main">-{formatCurrency(activeDiscount)}</Typography>
                             </Box>
                         )}
-                        <Divider sx={{ my: 1 }} />
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <Typography variant="h5" fontWeight={900}>Total Payable</Typography>
-                            <Typography variant="h5" fontWeight={900} color="primary.main">{formatCurrency(total)}</Typography>
-                        </Box>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <Typography variant="body2" color={projectedProfit >= 0 ? 'success.main' : 'error.main'}>
-                                Profit / Loss
-                            </Typography>
-                            <Typography variant="body2" fontWeight={800} color={projectedProfit >= 0 ? 'success.main' : 'error.main'}>
-                                {formatCurrency(projectedProfit)}
-                            </Typography>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 0.25, px: 1, py: 0.55, borderRadius: 1.25, bgcolor: (theme) => alpha(theme.palette.primary.main, 0.09), borderLeft: '3px solid', borderColor: 'primary.main' }}>
+                            <Typography variant="body2" fontWeight={850}>Total payable</Typography>
+                            <Typography variant="subtitle1" fontWeight={900} color="primary.dark">{formatCurrency(total)}</Typography>
                         </Box>
                     </Stack>
 
-                    <Stack spacing={1} sx={{ mb: 1.25 }}>
-                        {isRestaurant && !isFoodpandaOrder && <TextField
+                    <Box sx={{ display: 'grid', gridTemplateColumns: isRestaurant ? 'minmax(0, 1fr) minmax(0, 1fr)' : '1fr', gap: 0.75, mb: isRestaurant ? 0.8 : 0 }}>
+                        {isRestaurant && <TextField
                             select
                             fullWidth
                             size="small"
-                            label="Order Type"
+                            label="Order type"
                             value={orderType}
                             onChange={(event) => handleOrderTypeChange(event.target.value as OrderType)}
-                            helperText="Select an order type to enable payment options."
                         >
                             {orderTypeOptions.map((option) => <MenuItem key={option} value={option}>{option}</MenuItem>)}
                         </TextField>}
@@ -1353,27 +1219,28 @@ const POSTerminal: React.FC = () => {
                                     setPendingMethod(null);
                                 }}
                                 required
+                                sx={{ gridColumn: '1 / -1' }}
                             />
                         )}
                         {isRestaurant && <TextField
                             fullWidth
                             size="small"
-                            label="Delivery No. (optional)"
+                            label="Delivery no."
                             placeholder="e.g. 0312 1234567"
                             value={deliveryNumber}
                             onChange={(event) => setDeliveryNumber(event.target.value)}
                             inputProps={{ maxLength: 40 }}
                         />}
-                    </Stack>
+                    </Box>
 
                     {!shiftLoading && !openShift && (
-                        <Alert
-                            severity="warning"
-                            action={<Button color="inherit" size="small" onClick={() => navigate('/pos-reports')} sx={{ fontWeight: 900 }}>Open Shift</Button>}
-                            sx={{ mb: 1.25, alignItems: 'center' }}
-                        >
-                            Payment is locked until a POS shift is opened. You can still save this order as a draft.
-                        </Alert>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, mb: 0.8, px: 1, py: 0.65, borderRadius: 1.25, bgcolor: (theme) => alpha(theme.palette.warning.main, 0.09) }}>
+                            <Box sx={{ minWidth: 0 }}>
+                                <Typography variant="caption" fontWeight={850} color="warning.dark" sx={{ display: 'block', lineHeight: 1.2 }}>Shift closed</Typography>
+                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', lineHeight: 1.2 }}>Open a shift to take payment</Typography>
+                            </Box>
+                            <Button size="small" onClick={() => navigate('/pos-reports')} sx={{ flexShrink: 0, minWidth: 0, px: 1, py: 0.35, borderRadius: 1, bgcolor: 'background.paper', fontSize: '0.7rem', fontWeight: 850 }}>Open shift</Button>
+                        </Box>
                     )}
                     {openShift && (
                         <Chip
@@ -1381,93 +1248,101 @@ const POSTerminal: React.FC = () => {
                             color="success"
                             variant="outlined"
                             label={`${openShift.shiftCode} · ${openShift.registerName}`}
-                            sx={{ alignSelf: 'flex-start', mb: 1.25, fontWeight: 800 }}
+                            sx={{ alignSelf: 'flex-start', mb: 0.8, fontWeight: 800, height: 22 }}
                         />
                     )}
 
-                    <Grid container spacing={1}>
-                        <Grid size={{ xs: canAccessInstallments ? 3 : 4 }}>
+                    <Box sx={{
+                        position: 'sticky',
+                        bottom: -1,
+                        zIndex: 5,
+                        mx: { xs: -1, sm: -1.1 },
+                        mb: { xs: -1, sm: -1.1 },
+                        mt: 0,
+                        px: { xs: 1, sm: 1.1 },
+                        pt: 0.85,
+                        pb: { xs: 1, sm: 1.1 },
+                        borderTop: '1px solid',
+                        borderColor: (theme) => alpha(theme.palette.primary.main, 0.18),
+                        bgcolor: (theme) => alpha(theme.palette.background.paper, 0.96),
+                        backdropFilter: 'blur(16px)',
+                        boxShadow: (theme) => `0 -12px 30px -24px ${alpha(theme.palette.primary.dark, 0.5)}`
+                    }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.55 }}>
+                        <Typography variant="caption" color="text.secondary" fontWeight={850} sx={{ letterSpacing: '0.06em', fontSize: '0.6rem' }}>PAYMENT METHOD</Typography>
+                        <Button size="small" disabled={cart.length === 0} onClick={() => dispatch(clearCart())} sx={{ minWidth: 0, py: 0.1, px: 0.5, fontSize: '0.7rem', fontWeight: 800, color: 'text.secondary' }}>Clear order</Button>
+                    </Box>
+                    <Grid container spacing={0.65}>
+                        <Grid size={{ xs: canAccessInstallments ? 6 : 4 }}>
                             <Button
                                 fullWidth
                                 variant={pendingMethod === 'cash' ? 'contained' : 'outlined'}
                                 startIcon={<Banknote size={20} />}
                                 disabled={!canChoosePayment}
                                 onClick={() => handleCheckout('cash')}
-                                sx={{ py: 1, borderRadius: 2, fontWeight: 700 }}
+                                sx={{ minHeight: 42, borderRadius: 1.5, fontWeight: 800, fontSize: '0.78rem', whiteSpace: 'nowrap', transition: 'all .18s ease', ...(pendingMethod === 'cash' && { boxShadow: (theme) => `0 10px 16px -10px ${alpha(theme.palette.primary.dark, 0.9)}` }) }}
                             >
                                 Cash
                             </Button>
                         </Grid>
-                        <Grid size={{ xs: canAccessInstallments ? 3 : 4 }}>
+                        <Grid size={{ xs: canAccessInstallments ? 6 : 4 }}>
                             <Button
                                 fullWidth
                                 variant={pendingMethod === 'card' ? 'contained' : 'outlined'}
                                 startIcon={<CreditCard size={20} />}
                                 disabled={!canChoosePayment}
                                 onClick={() => handleCheckout('card')}
-                                sx={{ py: 1, borderRadius: 2, fontWeight: 700 }}
+                                sx={{ minHeight: 42, borderRadius: 1.5, fontWeight: 800, fontSize: '0.78rem', whiteSpace: 'nowrap', transition: 'all .18s ease', ...(pendingMethod === 'card' && { boxShadow: (theme) => `0 10px 16px -10px ${alpha(theme.palette.primary.dark, 0.9)}` }) }}
                             >
-                                {isFoodpandaOrder ? 'Foodpanda' : 'Online / Card'}
+                                {isFoodpandaOrder ? 'Foodpanda' : 'Card'}
                             </Button>
                         </Grid>
-                        <Grid size={{ xs: canAccessInstallments ? 3 : 4 }}>
+                        <Grid size={{ xs: canAccessInstallments ? 6 : 4 }}>
                             <Button
                                 fullWidth
                                 variant={pendingMethod === 'credit' ? 'contained' : 'outlined'}
                                 startIcon={<Receipt size={20} />}
                                 disabled={!canChoosePayment}
                                 onClick={handleOpenCredit}
-                                sx={{ py: 1, borderRadius: 2, fontWeight: 700 }}
+                                sx={{ minHeight: 42, borderRadius: 1.5, fontWeight: 800, fontSize: '0.78rem', whiteSpace: 'nowrap', transition: 'all .18s ease', ...(pendingMethod === 'credit' && { boxShadow: (theme) => `0 10px 16px -10px ${alpha(theme.palette.primary.dark, 0.9)}` }) }}
                             >
                                 Credit
                             </Button>
                         </Grid>
-                        {canAccessInstallments && <Grid size={{ xs: 3 }}>
+                        {canAccessInstallments && <Grid size={{ xs: 6 }}>
                             <Button
                                 fullWidth
                                 variant={pendingMethod === 'installment' ? 'contained' : 'outlined'}
                                 startIcon={<Receipt size={20} />}
                                 disabled={!canChoosePayment}
                                 onClick={handleOpenInstallment}
-                                sx={{ py: 1, borderRadius: 2, fontWeight: 700 }}
+                                sx={{ minHeight: 42, borderRadius: 1.5, fontWeight: 800, fontSize: '0.78rem', whiteSpace: 'nowrap', transition: 'all .18s ease', ...(pendingMethod === 'installment' && { boxShadow: (theme) => `0 10px 16px -10px ${alpha(theme.palette.primary.dark, 0.9)}` }) }}
                             >
                                 EMI
                             </Button>
                         </Grid>}
-                        <Grid size={{ xs: 12 }}>
-                            <Button
-                                fullWidth
-                                variant="outlined"
-                                size="large"
-                                disabled={cart.length === 0}
-                                onClick={() => dispatch(clearCart())}
-                                sx={{
-                                    py: 1.3,
-                                    mt: 0.5,
-                                    borderRadius: 3,
-                                    fontWeight: 800
-                                }}
-                            >
-                                Clear
-                            </Button>
-                        </Grid>
                         <Grid size={{ xs: 6 }}>
                             <Button
                                 fullWidth
                                 variant="outlined"
                                 size="large"
-                                startIcon={savingDraft ? <CircularProgress size={19} color="inherit" /> : <Save size={21} />}
+                                startIcon={savingDraft ? <CircularProgress size={18} color="inherit" /> : <Save size={18} />}
                                 disabled={cart.length === 0 || savingDraft || confirmingPayment}
                                 onClick={handleSaveDraft}
                                 sx={{
-                                    py: 1.3,
-                                    mt: 0.5,
-                                    borderRadius: 3,
+                                    minHeight: 48,
+                                    mt: 0.15,
+                                    borderRadius: 1.75,
                                     fontWeight: 900,
-                                    fontSize: '0.95rem',
+                                    fontSize: '0.78rem',
+                                    whiteSpace: 'nowrap',
+                                    '& .MuiButton-startIcon': { mr: 0.65, ml: 0 },
+                                    borderColor: 'divider',
+                                    color: 'text.primary',
+                                    '&:hover': { borderColor: 'text.primary', bgcolor: 'action.hover' }
                                 }}
                             >
-                                {savingDraft ? 'Saving...' : activeDraftId ? 'Update Draft' : 'Save as Draft'}
+                                {savingDraft ? 'Saving...' : activeDraftId ? 'Update Draft' : 'Save Draft'}
                             </Button>
                         </Grid>
                         <Grid size={{ xs: 6 }}>
@@ -1475,22 +1350,29 @@ const POSTerminal: React.FC = () => {
                                 fullWidth
                                 variant="contained"
                                 size="large"
-                                startIcon={<Receipt size={24} />}
+                                startIcon={<Receipt size={18} />}
                                 disabled={!canChoosePayment || !pendingMethod}
                                 onClick={handlePayNow}
                                 sx={{
-                                    py: 1.3,
-                                    mt: 0.5,
-                                    borderRadius: 3,
-                                    fontWeight: 900,
-                                    fontSize: '1rem',
-                                    boxShadow: (theme) => `0 8px 16px -4px ${alpha(theme.palette.primary.main, 0.4)}`
+                                    minHeight: 48,
+                                    mt: 0.15,
+                                    borderRadius: 1.75,
+                                    fontWeight: 850,
+                                    fontSize: '0.82rem',
+                                    whiteSpace: 'nowrap',
+                                    bgcolor: 'primary.main',
+                                    color: 'primary.contrastText',
+                                    boxShadow: (theme) => `0 5px 12px -8px ${alpha(theme.palette.primary.dark, 0.72)}`,
+                                    transition: 'background-color .18s ease, box-shadow .18s ease',
+                                    '&:hover': { bgcolor: 'primary.dark', boxShadow: (theme) => `0 7px 16px -8px ${alpha(theme.palette.primary.dark, 0.78)}` },
+                                    '&.Mui-disabled': { bgcolor: 'action.disabledBackground', color: 'text.disabled', boxShadow: 'none' }
                                 }}
                             >
-                                {pendingMethod ? (isFoodpandaOrder && pendingMethod === 'card' ? 'Continue Foodpanda Order' : `Pay with ${pendingMethod === 'installment' ? 'EMI' : pendingMethod}`) : 'Pay Now'}
+                                {pendingMethod ? (isFoodpandaOrder && pendingMethod === 'card' ? 'Continue Foodpanda' : `Pay with ${pendingMethod === 'installment' ? 'EMI' : pendingMethod}`) : 'Pay Now'}
                             </Button>
                         </Grid>
                     </Grid>
+                    </Box>
                 </Box>
                 </Box>
             </Paper>
@@ -1809,7 +1691,7 @@ const POSTerminal: React.FC = () => {
             {/* Checkout Success & Receipt Dialog */}
             <Dialog
                 open={orderDone}
-                onClose={paymentCommitPending ? undefined : handleCloseOrder}
+                onClose={paymentCommitPending || printingReceipt || printingKot ? undefined : handleCloseOrder}
                 maxWidth="md"
                 fullWidth
                 PaperProps={{
@@ -2187,10 +2069,10 @@ const POSTerminal: React.FC = () => {
                         variant="contained"
                         startIcon={printingReceipt ? <CircularProgress size={18} color="inherit" /> : <Printer size={18} />}
                         onClick={handlePrint}
-                        disabled={printingReceipt || paymentCommitPending}
+                        disabled={printingReceipt || printingKot || paymentCommitPending}
                         sx={{ borderRadius: 2 }}
                     >
-                        {printingReceipt ? 'Preparing...' : 'Print'}
+                        {printingReceipt ? 'Preparing...' : 'Receipt'}
                     </Button>
                     {isRestaurant && (
                         <Button
@@ -2199,7 +2081,7 @@ const POSTerminal: React.FC = () => {
                             variant="contained"
                             startIcon={printingKot ? <CircularProgress size={18} color="inherit" /> : <Receipt size={18} />}
                             onClick={handlePrintKot}
-                            disabled={printingKot || paymentCommitPending}
+                            disabled={printingKot || printingReceipt || paymentCommitPending}
                             sx={{ borderRadius: 2 }}
                         >
                             {printingKot ? 'Preparing...' : 'Print KOT'}
@@ -2208,12 +2090,40 @@ const POSTerminal: React.FC = () => {
                 </DialogActions>
                 <IconButton
                     onClick={handleCloseOrder}
-                    disabled={paymentCommitPending}
+                    disabled={paymentCommitPending || printingReceipt || printingKot}
                     sx={{ position: 'absolute', right: 16, top: 16, color: 'text.secondary' }}
                 >
                     <X size={20} />
                 </IconButton>
             </Dialog>
+
+            {draftKot && (
+                <Box
+                    id="pos-draft-kot"
+                    sx={{ display: 'none', '@media print': { display: 'block', p: 2, color: '#000', bgcolor: '#fff' } }}
+                >
+                    <Typography align="center" fontWeight={900} sx={{ fontSize: '1.1rem', letterSpacing: 1 }}>KITCHEN TICKET</Typography>
+                    <Typography align="center" variant="caption" display="block" sx={{ mb: 1.5 }}>{appSettings.shopName || 'ItemHive POS'}</Typography>
+                    <Divider sx={{ borderStyle: 'dashed', borderColor: 'currentColor', mb: 1.25 }} />
+                    <Stack spacing={0.45} sx={{ mb: 1.25 }}>
+                        <Typography variant="caption">Draft: {draftKot.draftCode}</Typography>
+                        <Typography variant="caption">Time: {new Date(draftKot.createdAt).toLocaleString()}</Typography>
+                        <Typography variant="caption">Type: {draftKot.orderTypeLabel}</Typography>
+                        {draftKot.deliveryNumber && <Typography variant="caption">Delivery: {draftKot.deliveryNumber}</Typography>}
+                    </Stack>
+                    <Divider sx={{ borderStyle: 'dashed', borderColor: 'currentColor', mb: 1 }} />
+                    <Stack spacing={1}>
+                        {draftKot.items.map((item, index) => (
+                            <Box className="kitchen-ticket-item" key={item.id} sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}>
+                                <Typography variant="body2" fontWeight={700}>{index + 1}. {item.name}</Typography>
+                                <Typography variant="body2" fontWeight={900} sx={{ whiteSpace: 'nowrap' }}>x{item.quantity}</Typography>
+                            </Box>
+                        ))}
+                    </Stack>
+                    <Divider sx={{ borderStyle: 'dashed', borderColor: 'currentColor', my: 1.5 }} />
+                    <Typography align="center" variant="caption" fontWeight={700}>New items only - no prices</Typography>
+                </Box>
+            )}
 
             <Snackbar
                 open={stockToast.open}
@@ -2237,7 +2147,7 @@ const POSTerminal: React.FC = () => {
                 @media print {
                     /* Everything outside the slip leaves the layout entirely, otherwise
                        the terminal behind it prints as extra blank pages. */
-                    body *:not(:has(#pos-receipt)):not(:has(#pos-kot)):not(#pos-receipt):not(#pos-receipt *):not(#pos-kot):not(#pos-kot *) {
+                    body *:not(:has(#pos-receipt)):not(:has(#pos-kot)):not(:has(#pos-draft-kot)):not(#pos-receipt):not(#pos-receipt *):not(#pos-kot):not(#pos-kot *):not(#pos-draft-kot):not(#pos-draft-kot *) {
                         display: none !important;
                     }
 

@@ -199,7 +199,7 @@ const POSShiftReportsPage: React.FC = () => {
         if (!receipt || printing) return;
         setPrinting(true);
         try {
-            await printElement(receipt, shiftReportPrintCss());
+            await printElement(receipt, shiftReportPrintCss(), 80);
         } catch {
             setError('The Shift Closing Report could not be prepared for printing.');
         } finally {

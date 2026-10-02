@@ -119,12 +119,12 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onDrawerToggle }) => {
                 justifyContent: isSidebarCollapsed ? 'center' : 'flex-start',
                 minHeight: '80px !important'
             }}>
-                <Box
+                {!isSidebarCollapsed && <Box
                     component="img"
                     src={logo}
                     alt="Logo"
-                    sx={{ width: hasCustomLogo ? (isSidebarCollapsed ? 48 : '100%') : 32, height: hasCustomLogo ? 64 : 32, maxWidth: '100%', objectFit: 'contain', flexShrink: 0, ...(logoPlate && { bgcolor: logoPlate, borderRadius: 1.5, p: 0.75 }) }}
-                />
+                    sx={{ width: hasCustomLogo ? '100%' : 32, height: hasCustomLogo ? 64 : 32, maxWidth: '100%', objectFit: 'contain', flexShrink: 0, ...(logoPlate && { bgcolor: logoPlate, borderRadius: 1.5, p: 0.75 }) }}
+                />}
                 {!isSidebarCollapsed && !hasCustomLogo && (
                     <Typography
                         variant="h6"
@@ -248,14 +248,12 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onDrawerToggle }) => {
                         })}
                 </List>
             </Box>
-            <Box sx={{ mt: 'auto', p: 2 }}>
+            {!isSidebarCollapsed && <Box sx={{ mt: 'auto', p: 2 }}>
                 <Divider sx={{ mb: isSidebarCollapsed ? 2 : 1.5 }} />
-                {!isSidebarCollapsed && (
-                    <Typography variant="caption" component="p" noWrap sx={{ textAlign: 'center', color: sidebarFontColor || 'text.secondary', opacity: 0.8 }}>
-                        Powered by <Box component="span" sx={{ fontWeight: 800 }}>ItemHive</Box>
-                    </Typography>
-                )}
-            </Box>
+                <Typography variant="caption" component="p" noWrap sx={{ textAlign: 'center', color: sidebarFontColor || 'text.secondary', opacity: 0.8 }}>
+                    Powered by <Box component="span" sx={{ fontWeight: 800 }}>ItemHive</Box>
+                </Typography>
+            </Box>}
         </Box>
     );
 
