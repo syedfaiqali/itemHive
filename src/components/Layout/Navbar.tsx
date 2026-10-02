@@ -317,7 +317,7 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
                 <Box sx={{ display: 'flex', alignItems: 'center', flexGrow: 1 }}>
                     <Box
                         sx={{
-                            display: { xs: 'flex', sm: 'none' },
+                            display: { xs: 'flex', sm: isSidebarCollapsed ? 'flex' : 'none' },
                             alignItems: 'center',
                             gap: 1.5
                         }}
@@ -326,7 +326,7 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
                             component="img"
                             src={logo}
                             alt="Logo"
-                            sx={{ width: logo !== '/favicon.png' ? 140 : 28, height: logo !== '/favicon.png' ? 48 : 28, objectFit: 'contain', ...(logoPlate && { bgcolor: logoPlate, borderRadius: 1.5, p: 0.5 }) }}
+                            sx={{ width: logo !== '/favicon.png' ? { xs: 140, sm: 116 } : 28, height: logo !== '/favicon.png' ? { xs: 48, sm: 38 } : 28, maxWidth: '100%', objectFit: 'contain', ...(logoPlate && { bgcolor: logoPlate, borderRadius: 1.5, p: 0.5 }) }}
                         />
                         {logo === '/favicon.png' && (
                         <Typography

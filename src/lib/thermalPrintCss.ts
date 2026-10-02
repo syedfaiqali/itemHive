@@ -2,8 +2,8 @@
  * Print CSS that turns an on-screen invoice into a thermal slip.
  *
  * Receipt printers feed a fixed-width, continuous roll, so the page box is
- * declared to the target roll width with an auto height - a fixed height would eject a full
- * sheet's worth of blank paper after every short sale. The screen layout puts
+ * measured in printReceipt and declared with the content's actual height.
+ * The screen layout puts
  * the letterhead, meta column and shop block side by side and prices the table
  * in five columns; none of that survives 72mm of printable width, so the rules
  * below stack every row and drop the columns that a narrow slip does not need.
@@ -23,9 +23,8 @@ export const thermalInvoicePrintCss = (selector: string, rollWidthMm = DEFAULT_R
     const slipWidthMm = rollWidthMm - 6;
 
     return `
-    /* A continuous roll: match the paper width, let the height follow the content
-       so a three-line sale does not feed a full sheet of blank paper. */
-    @page { size: ${rollWidthMm}mm auto; margin: 0; }
+    /* printReceipt adds the measured roll width and content height. */
+    @page { size: auto; margin: 0; }
 
     html, body {
         width: ${rollWidthMm}mm !important;
@@ -254,6 +253,30 @@ export const thermalInvoicePrintCss = (selector: string, rollWidthMm = DEFAULT_R
 
     ${selector} tbody tr:last-child td {
         border-bottom: none !important;
+    }
+
+    /* Kitchen tickets also use this detached thermal layout. Reserve room
+       for quantities while allowing long names and delivery details to wrap. */
+    ${selector} .MuiTypography-root {
+        overflow-wrap: anywhere !important;
+    }
+
+    ${selector} .kitchen-ticket-item {
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        align-items: flex-start !important;
+        gap: 2mm !important;
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+    }
+
+    ${selector} .kitchen-ticket-item > :first-child {
+        flex: 1 1 0 !important;
+    }
+
+    ${selector} .kitchen-ticket-item > :last-child {
+        flex: 0 0 auto !important;
+        white-space: nowrap !important;
     }
 
     /* Never let a slip break mid-item. */
