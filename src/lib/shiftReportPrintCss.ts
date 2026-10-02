@@ -4,7 +4,7 @@
  * rules, so this includes the report's complete layout at print time.
  */
 export const shiftReportPrintCss = (selector = '#shift-report-receipt') => `
-    @page { size: 80mm auto; margin: 0; }
+    @page { size: auto; margin: 0; }
 
     html, body { width: 80mm !important; height: auto !important; min-height: 0 !important; margin: 0 !important; padding: 0 !important; background: #fff !important; color: #000 !important; }
     ${selector}, ${selector} * { box-sizing: border-box !important; }

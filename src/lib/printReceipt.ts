@@ -18,7 +18,13 @@ const waitForReceiptImages = async (document: Document) => {
  * which becomes noticeably slow for large inventories.
  */
 export const printReceipt = async (receipt: HTMLElement, selector = '#pos-receipt', rollWidthMm = 58) => {
-    await printElement(receipt, thermalInvoicePrintCss(selector, rollWidthMm));
+    await printElement(receipt, thermalInvoicePrintCss(selector, rollWidthMm), rollWidthMm);
+};
+
+/** Print kitchen and customer copies as separate thermal print jobs. */
+export const printCheckoutCopies = async (receipt: HTMLElement, kitchenTicket: HTMLElement) => {
+    await printReceipt(kitchenTicket, '#pos-kot');
+    await printReceipt(receipt);
 };
 
 /**
@@ -26,12 +32,12 @@ export const printReceipt = async (receipt: HTMLElement, selector = '#pos-receip
  * Use this for full-page reports; thermal receipts should keep using
  * printReceipt so their roll dimensions remain unchanged.
  */
-export const printElement = async (element: HTMLElement, printCss: string) => {
+export const printElement = async (element: HTMLElement, printCss: string, rollWidthMm?: number) => {
     const frame = document.createElement('iframe');
     frame.setAttribute('aria-hidden', 'true');
     // Keep the frame off-screen instead of using visibility:hidden; some
     // browser print engines treat hidden iframe content as non-printable.
-    frame.style.cssText = 'position:fixed;left:-10000px;top:-10000px;width:1px;height:1px;border:0;pointer-events:none;';
+    frame.style.cssText = `position:fixed;left:-10000px;top:-10000px;width:${rollWidthMm ? `${rollWidthMm}mm` : '1px'};height:1px;border:0;pointer-events:none;`;
     document.body.appendChild(frame);
 
     const printDocument = frame.contentDocument;
@@ -44,7 +50,14 @@ export const printElement = async (element: HTMLElement, printCss: string) => {
     // MUI/Emotion styles are injected as <style> elements. Copy them so the
     // receipt keeps its layout without taking the rest of the POS DOM along.
     const inheritedStyles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
-        .map((stylesheet) => stylesheet.outerHTML)
+        .map((stylesheet) => {
+            // Emotion inserts rules through CSSOM; outerHTML alone can copy
+            // an empty style tag and lose item spacing and typography.
+            if (stylesheet instanceof HTMLStyleElement && stylesheet.sheet) {
+                return `<style>${Array.from(stylesheet.sheet.cssRules, (rule) => rule.cssText).join('\n')}</style>`;
+            }
+            return stylesheet.outerHTML;
+        })
         .join('');
 
     printDocument.open();
@@ -61,6 +74,21 @@ ${inheritedStyles}
     printDocument.close();
 
     await waitForReceiptImages(printDocument);
+    await printDocument.fonts.ready;
+    if (rollWidthMm) {
+        // CSS does not accept "58mm auto" as a page size. Measure the slip
+        // with its thermal styles applied and supply two explicit lengths.
+        const slip = printDocument.body.firstElementChild as HTMLElement | null;
+        if (!slip) {
+            frame.remove();
+            throw new Error('The receipt is empty.');
+        }
+        const heightPx = Math.max(slip.getBoundingClientRect().height, slip.scrollHeight);
+        const heightMm = Math.ceil(heightPx * 25.4 / 96) + 1;
+        const pageStyle = printDocument.createElement('style');
+        pageStyle.textContent = `@page { size: ${rollWidthMm}mm ${heightMm}mm; margin: 0; }`;
+        printDocument.head.appendChild(pageStyle);
+    }
     await new Promise<void>((resolve) => {
         let cleanedUp = false;
         const cleanup = () => {
