@@ -2,8 +2,9 @@ import { Response } from 'express';
 import User from '../models/User';
 import Business from '../models/Business';
 import AppSetting from '../models/AppSetting';
+import Employee from '../models/Employee';
 import type { AuthRequest } from '../middleware/auth';
-import { normalizeRole, serializeUser } from '../utils/accessControl';
+import { ensureDeleteAllowed, ensureManageableTarget, normalizeRole, serializeUser } from '../utils/accessControl';
 import { isAdminScreenPermission } from '../utils/screenPermissions';
 import { getAppSettingsForTenant, invalidateAppSettingsCache } from '../utils/tenancy';
 
@@ -16,38 +17,9 @@ const isMonthlyPaymentOverdue = (settings: any, now = new Date()) => {
     return dueDate <= now;
 };
 
-const ensureManageableTarget = (role: string) => {
-    const normalizedRole = normalizeRole(role);
-
-    if (normalizedRole === 'super_admin') {
-        throw new Error('Super admin accounts cannot be changed from this endpoint');
-    }
-};
-
-const ensureDeleteAllowed = (actor: AuthRequest['user'], target: any) => {
-    ensureManageableTarget(target.role);
-
-    if (String(target._id) === actor?.id) {
-        throw new Error('You cannot delete your own account');
-    }
-
-    if (normalizeRole(actor?.role) === 'super_admin') {
-        return;
-    }
-
-    if (normalizeRole(actor?.role) === 'admin') {
-        const isOwnUser = normalizeRole(target.role) === 'user' && String(target.createdBy || '') === actor?.id;
-        if (isOwnUser) {
-            return;
-        }
-    }
-
-    throw new Error('You are not allowed to delete this account');
-};
-
 const serializeUsersWithBusinessNames = async (users: any[]) => {
     const businessIds = [...new Set(users.map((user) => String(user.businessId || '')).filter(Boolean))];
-    const [businesses, businessSettings] = await Promise.all([
+    const [businesses, businessSettings, linkedEmployees] = await Promise.all([
         Business.find({ _id: { $in: businessIds } }).select('name'),
         AppSetting.find({
             $or: [
@@ -55,7 +27,9 @@ const serializeUsersWithBusinessNames = async (users: any[]) => {
                 { key: { $in: businessIds.map((businessId) => `business:${businessId}`) } },
             ],
         }).select('key businessId restaurantEnabled monthlyPaymentTrackingEnabled monthlyPaymentPaidAt monthlyPaymentTrackingStartedAt'),
+        Employee.find({ userId: { $in: users.map((user) => user._id) } }).select('_id userId').lean(),
     ]);
+    const employeeIdByUserId = new Map(linkedEmployees.map((employee) => [String(employee.userId), String(employee._id)]));
     const businessNameById = new Map(businesses.map((business) => [String(business._id), business.name]));
     const restaurantEnabledByBusinessId = new Map<string, boolean>();
     const monthlyPaymentByBusinessId = new Map<string, { enabled: boolean; paidAt?: string; trackingStartedAt?: string; overdue: boolean }>();
@@ -85,6 +59,7 @@ const serializeUsersWithBusinessNames = async (users: any[]) => {
         businessName: businessNameById.get(String(user.businessId || '')) || '',
         restaurantEnabled: restaurantEnabledByBusinessId.get(String(user.businessId || '')) || false,
         monthlyPayment: monthlyPaymentByBusinessId.get(String(user.businessId || '')) || { enabled: false, overdue: false },
+        employeeId: employeeIdByUserId.get(String(user._id)) || null,
     }));
 };
 
@@ -113,7 +88,7 @@ export const getUsers = async (req: AuthRequest, res: Response) => {
             : baseQuery;
 
         const usersQuery = User.find(query)
-            .select('name email role isActive isVisible installmentAccess discountAccess screenPermissions userCreationLimit createdBy businessId preferences avatar +visiblePassword')
+            .select('name email role isActive isVisible installmentAccess discountAccess digitalMenuAccess screenPermissions userCreationLimit createdBy businessId preferences avatar +visiblePassword')
             .sort({ createdAt: -1 });
 
         if (!paginated) {
@@ -173,6 +148,13 @@ export const updateUserStatus = async (req: AuthRequest, res: Response) => {
                 return res.status(400).json({ message: 'Discount access can only be assigned to admin accounts' });
             }
             user.discountAccess = req.body.discountAccess;
+        }
+
+        if (['none', 'menu', 'pos'].includes(req.body.digitalMenuAccess)) {
+            if (!['admin', 'user'].includes(normalizeRole(user.role))) {
+                return res.status(400).json({ message: 'Digital Menu access can only be assigned to admin or user accounts' });
+            }
+            user.digitalMenuAccess = req.body.digitalMenuAccess;
         }
 
         if (typeof req.body.restaurantEnabled === 'boolean') {
@@ -377,6 +359,11 @@ export const updateUserAccount = async (req: AuthRequest, res: Response) => {
         }
         await user.save();
 
+        // The account and its employee profile are the same person; a move to another business
+        // detaches the old profile, and the new business gets one on its next Employees load.
+        await Employee.updateOne({ userId: user._id, businessId: { $ne: user.businessId } }, { $set: { userId: null } });
+        await Employee.updateOne({ userId: user._id }, { $set: { fullName: user.name } });
+
         return res.json({
             message: 'Account details updated successfully',
             user: serializeUser(user),
@@ -397,6 +384,8 @@ export const deleteUser = async (req: AuthRequest, res: Response) => {
         ensureDeleteAllowed(req.user, user);
 
         await user.deleteOne();
+        // Only the login goes; the employee profile and attendance history stay.
+        await Employee.updateOne({ userId: user._id }, { $set: { userId: null } });
 
         return res.json({ message: 'User deleted successfully' });
     } catch (error: any) {

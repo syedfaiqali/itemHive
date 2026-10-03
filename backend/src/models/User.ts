@@ -15,6 +15,7 @@ export interface IUser extends Document {
     isVisible: boolean;
     installmentAccess: boolean;
     discountAccess: boolean;
+    digitalMenuAccess: 'none' | 'menu' | 'pos';
     screenPermissions?: AdminScreenPermission[] | null;
     userCreationLimit: number;
     createdBy?: mongoose.Types.ObjectId;
@@ -59,6 +60,8 @@ const UserSchema: Schema = new Schema({
     installmentAccess: { type: Boolean, default: false },
     // Allows a workspace administrator to configure the discounts available in POS.
     discountAccess: { type: Boolean, default: false },
+    // Menu lets staff manage QR menus; pos additionally lets them send table drafts to billing.
+    digitalMenuAccess: { type: String, enum: ['none', 'menu', 'pos'], default: 'none' },
     // null means an existing Admin keeps legacy full access. Once configured,
     // even an empty array is an explicit permission assignment.
     screenPermissions: {

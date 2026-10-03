@@ -36,6 +36,9 @@ export const serializeUser = (user: IUser) => ({
     isVisible: user.isVisible,
     installmentAccess: normalizeRole(user.role) === 'super_admin' || Boolean(user.installmentAccess),
     discountAccess: normalizeRole(user.role) === 'super_admin' || Boolean(user.discountAccess),
+    // Super admin keeps complete access. Every other account starts at no
+    // access and must be explicitly configured from Team Management.
+    digitalMenuAccess: normalizeRole(user.role) === 'super_admin' ? 'pos' : user.digitalMenuAccess || 'none',
     screenPermissions: user.screenPermissions == null ? null : [...user.screenPermissions],
     userCreationLimit: user.userCreationLimit ?? 0,
     businessId: user.businessId ? String(user.businessId) : '',
@@ -46,4 +49,33 @@ export const serializeUser = (user: IUser) => ({
 export const canManageUsers = (role?: string | null) => {
     const normalizedRole = normalizeRole(role);
     return normalizedRole === 'super_admin' || normalizedRole === 'admin';
+};
+
+export const ensureManageableTarget = (role: string) => {
+    const normalizedRole = normalizeRole(role);
+
+    if (normalizedRole === 'super_admin') {
+        throw new Error('Super admin accounts cannot be changed from this endpoint');
+    }
+};
+
+export const ensureDeleteAllowed = (actor: { id?: string; role?: string } | undefined, target: { _id: unknown; role: string; createdBy?: unknown }) => {
+    ensureManageableTarget(target.role);
+
+    if (String(target._id) === actor?.id) {
+        throw new Error('You cannot delete your own account');
+    }
+
+    if (normalizeRole(actor?.role) === 'super_admin') {
+        return;
+    }
+
+    if (normalizeRole(actor?.role) === 'admin') {
+        const isOwnUser = normalizeRole(target.role) === 'user' && String(target.createdBy || '') === actor?.id;
+        if (isOwnUser) {
+            return;
+        }
+    }
+
+    throw new Error('You are not allowed to delete this account');
 };

@@ -4,6 +4,7 @@ export const ADMIN_SCREEN_PERMISSIONS = [
     { key: 'dashboard', label: 'Dashboard', group: 'Overview' },
     { key: 'pos', label: 'POS Terminal', group: 'Sales' },
     { key: 'orders', label: 'Order Desk', group: 'Sales' },
+    { key: 'digital_menus', label: 'Digital Menus', group: 'Sales' },
     { key: 'transactions', label: 'Transactions', group: 'Sales' },
     { key: 'inventory', label: 'Inventory', group: 'Inventory' },
     { key: 'inventory_categories', label: 'Categories', group: 'Inventory' },
@@ -19,6 +20,8 @@ export const ADMIN_SCREEN_PERMISSIONS = [
     { key: 'reports', label: 'Reports', group: 'Operations' },
     { key: 'notes', label: 'Sticky Notes', group: 'Operations' },
     { key: 'notifications', label: 'Notifications', group: 'Operations' },
+    { key: 'employees', label: 'Employee Profiles', group: 'HR & Attendance' },
+    { key: 'attendance', label: 'Attendance', group: 'HR & Attendance' },
     { key: 'team', label: 'Team Management', group: 'Administration' },
     { key: 'settings', label: 'Settings', group: 'Administration' },
 ] as const;

@@ -14,6 +14,7 @@ export interface IOrderDraft extends Document {
     orderType?: string;
     otherOrderType?: string;
     deliveryNumber?: string;
+    digitalMenuTable?: string;
     createdBy: mongoose.Types.ObjectId;
     createdByName: string;
     businessId?: mongoose.Types.ObjectId;
@@ -34,6 +35,7 @@ const OrderDraftSchema = new Schema<IOrderDraft>({
     orderType: { type: String, trim: true, maxlength: 80, default: undefined },
     otherOrderType: { type: String, default: '', trim: true, maxlength: 80 },
     deliveryNumber: { type: String, default: '', trim: true, maxlength: 40 },
+    digitalMenuTable: { type: String, default: '', trim: true, maxlength: 50, index: true },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     createdByName: { type: String, required: true, trim: true },
     businessId: { type: Schema.Types.ObjectId, ref: 'Business', default: null, index: true },

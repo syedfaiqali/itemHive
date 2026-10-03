@@ -21,8 +21,12 @@ import signupRequestRoutes from './routes/signupRequestRoutes';
 import customerRoutes from './routes/customerRoutes';
 import orderDraftRoutes from './routes/orderDraftRoutes';
 import posShiftRoutes from './routes/posShiftRoutes';
+import digitalMenuRoutes from './routes/digitalMenuRoutes';
+import employeeRoutes from './routes/employeeRoutes';
+import attendanceRoutes from './routes/attendanceRoutes';
 import { errorHandler, notFound } from './middleware/errorHandler';
 import { ensureTenantIndexes } from './utils/tenantIndexes';
+import { syncStaffEmployees } from './utils/employeeAccounts';
 
 // Environmental variables I LOVE YOU 2
 dotenv.config();
@@ -94,7 +98,7 @@ app.get('/', (_req: Request, res: Response) => {
         version: '1.0.0',
         commit: deploymentCommit,
         environment: process.env.NODE_ENV || 'development',
-        endpoints: ['/api/auth', '/api/products', '/api/transactions', '/api/reports', '/api/customers', '/api/credits', '/api/users', '/api/order-drafts', '/api/pos-shifts', '/api/signup-requests']
+        endpoints: ['/api/auth', '/api/products', '/api/transactions', '/api/reports', '/api/customers', '/api/credits', '/api/users', '/api/order-drafts', '/api/pos-shifts', '/api/signup-requests', '/api/employees', '/api/attendance']
     });
 });
 
@@ -122,9 +126,12 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/order-drafts', orderDraftRoutes);
 app.use('/api/pos-shifts', posShiftRoutes);
+app.use('/api/digital-menus', digitalMenuRoutes);
 app.use('/api/inventory-requests', inventoryRequestRoutes);
 app.use('/api/signup-requests', signupRequestRoutes);
 app.use('/api/notes', notesRoutes);
+app.use('/api/employees', employeeRoutes);
+app.use('/api/attendance', attendanceRoutes);
 
 // ── 404 & Error Handling ──────────────────────────────────────
 app.use(notFound);
@@ -135,6 +142,8 @@ const startServer = async () => {
     try {
         await connectDB();
         await ensureTenantIndexes();
+        // Every staff login in Team has an employee profile, including ones created before they were linked.
+        await syncStaffEmployees();
     } catch (error) {
         console.error('❌ Server database init failed:', error);
     }

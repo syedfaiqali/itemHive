@@ -24,15 +24,20 @@ const MainLayout: React.FC = () => {
 
     const apiLoading = productsLoading || transactionsLoading || settingsLoading;
 
-    useEffect(() => {
-        if (apiLoading) setInitialRequestStarted(true);
-    }, [apiLoading]);
-
     // Keep the branded full-page loader through the first post-login data
     // bootstrap. Later requests only cover the page content.
+    if (initiallyLoading) {
+        if (apiLoading && !initialRequestStarted) setInitialRequestStarted(true);
+        else if (!apiLoading && initialRequestStarted) setInitiallyLoading(false);
+    }
+
+    // No bootstrap request seen: the page doesn't use these slices (e.g. Attendance),
+    // or they finished while the lazy route chunk was still downloading.
     useEffect(() => {
-        if (initialRequestStarted && !apiLoading) setInitiallyLoading(false);
-    }, [apiLoading, initialRequestStarted]);
+        if (!initiallyLoading || initialRequestStarted || apiLoading) return;
+        const timer = window.setTimeout(() => setInitiallyLoading(false), 300);
+        return () => window.clearTimeout(timer);
+    }, [apiLoading, initialRequestStarted, initiallyLoading]);
 
     const handleDrawerToggle = () => {
         setMobileOpen(!mobileOpen);

@@ -38,6 +38,9 @@ const CustomersPage = React.lazy(() => import('./pages/Customers/CustomersPage')
 const CustomerRecordsPage = React.lazy(() => import('./pages/Customers/CustomerRecordsPage'));
 const CreditCustomersPage = React.lazy(() => import('./pages/Credit/CreditCustomersPage'));
 const InstallmentsPage = React.lazy(() => import('./pages/Installments/InstallmentsPage'));
+const EmployeesPage = React.lazy(() => import('./pages/Employees/EmployeesPage'));
+const EmployeeProfilePage = React.lazy(() => import('./pages/Employees/EmployeeProfilePage'));
+const AttendancePage = React.lazy(() => import('./pages/Attendance/AttendancePage'));
 const NotificationsPage = React.lazy(() => import('./pages/Notifications/NotificationsPage'));
 const StickyNotes = React.lazy(() => import('./pages/Notes/StickyNotes'));
 const TeamManagementPage = React.lazy(() => import('./pages/Admin/TeamManagementPage'));
@@ -45,6 +48,8 @@ const SignupRequestsPage = React.lazy(() => import('./pages/Admin/SignupRequests
 const InventoryRequestsPage = React.lazy(() => import('./pages/Inventory/InventoryRequestsPage'));
 const PermissionManagementPage = React.lazy(() => import('./pages/Admin/PermissionManagementPage'));
 const AccessDeniedPage = React.lazy(() => import('./pages/Auth/AccessDeniedPage'));
+const DigitalMenusPage = React.lazy(() => import('./pages/DigitalMenus/DigitalMenusPage'));
+const PublicMenuPage = React.lazy(() => import('./pages/DigitalMenus/PublicMenuPage'));
 // Keep route elements stable during color previews. Only theme consumers need updates.
 const AppThemeProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
   const mode = useSelector((state: RootState) => state.theme.mode);
@@ -61,6 +66,7 @@ const AppThemeProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
 const AppContent: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const { isAuthenticated } = useSelector((state: RootState) => state.auth);
+  const themeManaged = useSelector((state: RootState) => Boolean(state.auth.user?.themeManaged));
   const { app } = useSelector((state: RootState) => state.settings);
 
 
@@ -85,6 +91,7 @@ const AppContent: React.FC = () => {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
+            <Route path="/menu/:token" element={<PublicMenuPage />} />
 
             <Route path="/" element={
               <ProtectedRoute>
@@ -113,6 +120,7 @@ const AppContent: React.FC = () => {
                   <OrderDesk />
                 </ProtectedRoute>
               } />
+              <Route path="digital-menus" element={<ProtectedRoute allowedRoles={['super_admin', 'admin', 'user']} requiredScreen="digital_menus" requireDigitalMenuAccess><DigitalMenusPage /></ProtectedRoute>} />
               <Route path="transactions" element={<ProtectedRoute requiredScreen="transactions"><TransactionHistory /></ProtectedRoute>} />
               <Route path="reports" element={<ProtectedRoute allowedRoles={['super_admin', 'admin']} requiredScreen="reports"><ReportsPage /></ProtectedRoute>} />
               <Route path="notes" element={
@@ -138,6 +146,22 @@ const AppContent: React.FC = () => {
               <Route path="installments" element={
                 <ProtectedRoute allowedRoles={['super_admin', 'admin', 'user']} requireInstallmentAccess requiredScreen="installments">
                   <InstallmentsPage />
+                </ProtectedRoute>
+              } />
+              <Route path="employees" element={
+                <ProtectedRoute allowedRoles={['super_admin', 'admin']} requiredScreen="employees">
+                  <EmployeesPage />
+                </ProtectedRoute>
+              } />
+              {/* One route for "new" and saved profiles keeps the page mounted when a new profile gets its id. */}
+              <Route path="employees/:id" element={
+                <ProtectedRoute allowedRoles={['super_admin', 'admin']} requiredScreen="employees">
+                  <EmployeeProfilePage />
+                </ProtectedRoute>
+              } />
+              <Route path="attendance" element={
+                <ProtectedRoute allowedRoles={['super_admin', 'admin', 'user']} requiredScreen="attendance">
+                  <AttendancePage />
                 </ProtectedRoute>
               } />
               <Route path="notifications" element={
@@ -177,7 +201,7 @@ const AppContent: React.FC = () => {
                   <SettingsPage />
                 </ProtectedRoute>
               } />
-              <Route path="theme-settings" element={<ThemeSettingsPage />} />
+              <Route path="theme-settings" element={themeManaged ? <Navigate to="/" replace /> : <ThemeSettingsPage />} />
               <Route path="profile" element={
                 <ProtectedRoute allowedRoles={['super_admin', 'admin', 'user']}>
                   <ProfilePage />

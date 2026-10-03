@@ -2,6 +2,9 @@ import { Request, Response, NextFunction } from 'express';
 import Joi from 'joi';
 import { USER_ROLES } from '../utils/accessControl';
 import { ADMIN_SCREEN_PERMISSIONS } from '../utils/screenPermissions';
+import { FACE_DESCRIPTOR_LENGTH } from '../utils/faceMatch';
+import { EMPLOYEE_STATUSES, GENDERS, MARITAL_STATUSES, SALARY_TYPES } from '../models/Employee';
+import { LEAVE_TYPES } from '../models/EmployeeLeave';
 
 /**
  * Express middleware factory for validating request body against a Joi schema.
@@ -49,6 +52,7 @@ export const registerSchema = Joi.object({
     employeeCount: Joi.number().integer().min(1).max(100000).optional(),
     address: Joi.string().allow('').max(240).optional(),
     notes: Joi.string().allow('').max(600).optional(),
+    employeeId: Joi.string().hex().length(24).optional(),
 });
 
 export const signupRequestSchema = Joi.object({
@@ -202,8 +206,9 @@ export const updateUserStatusSchema = Joi.object({
     isVisible: Joi.boolean().optional(),
     installmentAccess: Joi.boolean().optional(),
     discountAccess: Joi.boolean().optional(),
+    digitalMenuAccess: Joi.string().valid('none', 'menu', 'pos').optional(),
     restaurantEnabled: Joi.boolean().optional(),
-}).or('isActive', 'isVisible', 'installmentAccess', 'discountAccess', 'restaurantEnabled');
+}).or('isActive', 'isVisible', 'installmentAccess', 'discountAccess', 'digitalMenuAccess', 'restaurantEnabled');
 
 export const updateMonthlyPaymentSchema = Joi.object({
     enabled: Joi.boolean().required(),
@@ -251,4 +256,107 @@ export const noteUpdateSchema = Joi.object({
     body: Joi.string().allow('').optional(),
     color: Joi.string().allow('').optional(),
     pinned: Joi.boolean().optional(),
+});
+
+// --- Employees & Attendance ---
+
+const dateKeySchema = Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/).messages({ 'string.pattern.base': '{{#label}} must be a YYYY-MM-DD date' });
+const optionalText = (max: number) => Joi.string().allow('').max(max).optional();
+const faceDescriptorSchema = Joi.array().length(FACE_DESCRIPTOR_LENGTH).items(Joi.number().required());
+
+/** Profile photos are optimized client-side to <= 180 KB before base64 encoding. */
+export const EMPLOYEE_PHOTO_MAX_LENGTH = 300_000;
+/** Base64 of a 2 MB file, which keeps each upload under the 3 MB JSON body cap. */
+export const EMPLOYEE_DOCUMENT_MAX_LENGTH = 2_800_000;
+
+export const employeeSchema = Joi.object({
+    fullName: Joi.string().trim().min(2).max(120).required(),
+    fatherName: optionalText(120),
+    motherName: optionalText(120),
+    cnic: Joi.string().trim().allow('').max(40).optional(),
+    phoneNumber: optionalText(60),
+    email: Joi.string().email().allow('').max(120).optional(),
+    address: optionalText(240),
+    dateOfBirth: dateKeySchema.allow('').optional(),
+    joiningDate: dateKeySchema.allow('').optional(),
+    gender: Joi.string().valid(...GENDERS.filter(Boolean)).allow('').optional(),
+    maritalStatus: Joi.string().valid(...MARITAL_STATUSES.filter(Boolean)).allow('').optional(),
+    religion: optionalText(60),
+    nationality: optionalText(60),
+    emergencyContactName: optionalText(120),
+    emergencyContactNumber: optionalText(60),
+    medicalConditions: optionalText(1000),
+    designation: optionalText(80),
+    salary: Joi.number().min(0).max(1_000_000_000).optional(),
+    salaryType: Joi.string().valid(...SALARY_TYPES).optional(),
+    status: Joi.string().valid(...EMPLOYEE_STATUSES).optional(),
+    education: Joi.array().max(20).items(Joi.object({
+        degree: optionalText(120),
+        institute: optionalText(160),
+        year: optionalText(20),
+        grade: optionalText(40),
+    })).optional(),
+    experience: Joi.array().max(30).items(Joi.object({
+        company: optionalText(160),
+        position: optionalText(120),
+        fromDate: dateKeySchema.allow('').optional(),
+        toDate: dateKeySchema.allow('').optional(),
+        description: optionalText(600),
+    })).optional(),
+    references: Joi.array().max(10).items(Joi.object({
+        name: optionalText(120),
+        relation: optionalText(80),
+        phoneNumber: optionalText(60),
+        cnic: optionalText(40),
+        address: optionalText(240),
+    })).optional(),
+    achievements: Joi.array().max(30).items(Joi.object({
+        title: optionalText(160),
+        date: dateKeySchema.allow('').optional(),
+        description: optionalText(600),
+    })).optional(),
+    notes: optionalText(1000),
+    photo: optionalText(EMPLOYEE_PHOTO_MAX_LENGTH),
+});
+
+export const employeeFaceSchema = Joi.object({
+    descriptors: Joi.array().min(1).max(10).items(faceDescriptorSchema).required(),
+});
+
+export const employeeDocumentSchema = Joi.object({
+    title: Joi.string().trim().min(1).max(120).required(),
+    fileName: Joi.string().trim().min(1).max(200).required(),
+    data: Joi.string().pattern(/^data:[^;,]+;base64,/).max(EMPLOYEE_DOCUMENT_MAX_LENGTH).required()
+        .messages({ 'string.max': 'Documents must be 2 MB or smaller' }),
+});
+
+export const designationSchema = Joi.object({
+    name: Joi.string().trim().min(2).max(60).required(),
+});
+
+export const attendancePunchSchema = Joi.object({
+    descriptor: faceDescriptorSchema.required(),
+    photo: optionalText(60_000),
+    timeZone: optionalText(64),
+});
+
+export const attendanceRecordSchema = Joi.object({
+    employeeId: Joi.string().hex().length(24).required(),
+    dateKey: dateKeySchema.required(),
+    checkIn: Joi.date().iso().allow(null).optional(),
+    checkOut: Joi.date().iso().allow(null).optional(),
+    note: optionalText(300),
+    timeZone: optionalText(64),
+});
+
+export const employeeLeaveSchema = Joi.object({
+    employeeId: Joi.string().hex().length(24).required(),
+    startDate: dateKeySchema.required(),
+    endDate: dateKeySchema.required(),
+    leaveType: Joi.string().valid(...LEAVE_TYPES).required(),
+    reason: optionalText(300),
+});
+
+export const attendanceSettingsSchema = Joi.object({
+    weeklyOffDays: Joi.array().max(6).unique().items(Joi.number().integer().min(0).max(6)).required(),
 });
