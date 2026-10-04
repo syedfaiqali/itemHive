@@ -77,6 +77,23 @@ export const signupRequestDecisionSchema = Joi.object({
 });
 
 export const productSchema = Joi.object({
+    unitSizeEnabled: Joi.boolean().optional(),
+    sellingType: Joi.string().valid('quantity', 'fixed').when('unitSizeEnabled', {
+        is: Joi.valid(true).required(),
+        then: Joi.required(),
+        otherwise: Joi.allow('').optional(),
+    }),
+    sizes: Joi.array().items(Joi.object({
+        id: Joi.string().trim().required(),
+        size: Joi.number().positive().required(),
+        purchasePrice: Joi.number().min(0).required(),
+        salePrice: Joi.number().min(0).required(),
+        stock: Joi.number().integer().min(0).required(),
+    })).unique('id').unique('size').when('unitSizeEnabled', {
+        is: Joi.valid(true).required(),
+        then: Joi.array().when('sellingType', { is: 'fixed', then: Joi.array().min(1).required(), otherwise: Joi.optional() }),
+        otherwise: Joi.optional(),
+    }),
     id: Joi.string().required(),
     sku: Joi.string().required(),
     name: Joi.string().min(2).required(),
@@ -86,8 +103,8 @@ export const productSchema = Joi.object({
     price: Joi.number().min(0).optional(),
     stock: Joi.number().min(0).required(),
     minStock: Joi.number().min(0).optional(),
-    productUnitCode: Joi.string().allow('').max(40).optional(),
-    productUnit: Joi.string().allow('').max(80).optional(),
+    productUnitCode: Joi.string().trim().max(40).when('unitSizeEnabled', { is: Joi.valid(true).required(), then: Joi.required(), otherwise: Joi.allow('').optional() }),
+    productUnit: Joi.string().trim().max(80).when('unitSizeEnabled', { is: Joi.valid(true).required(), then: Joi.required(), otherwise: Joi.allow('').optional() }),
     productUnitUrdu: Joi.string().allow('').max(80).optional(),
     description: Joi.string().allow('').optional(),
     imageUrl: Joi.alternatives().try(
@@ -124,10 +141,11 @@ export const customerSchema = Joi.object({
 });
 
 export const installmentPlanSchema = Joi.object({
+    sizeId: Joi.string().optional(),
     planCode: Joi.string().required(),
     productId: Joi.string().required(),
     productName: Joi.string().min(2).required(),
-    amount: Joi.number().integer().positive().required(),
+    amount: Joi.number().positive().required(),
     totalAmount: Joi.number().positive().required(),
     unitPrice: Joi.number().positive().required(),
     advancePayment: Joi.number().min(0).required(),

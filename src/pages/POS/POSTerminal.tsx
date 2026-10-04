@@ -1,3 +1,4 @@
+import { cartLineId, cartDescription, productForCart, isFixedProduct } from '../../lib/productSelling';
 import useProductCategories from '../../hooks/useProductCategories';
 import React, { useState, useMemo } from 'react';
 import {
@@ -102,7 +103,7 @@ const POSTerminal: React.FC = () => {
     const requestedDraftId = searchParams.get('draft');
 
     React.useEffect(() => {
-        dispatch(fetchProducts());
+        dispatch(fetchProducts({ force: true }));
     }, [dispatch]);
 
     const { user } = useSelector((state: RootState) => state.auth);
@@ -276,7 +277,8 @@ const POSTerminal: React.FC = () => {
                         unavailableNames.push(draftItem.productName);
                         return [];
                     }
-                    return [{ ...product, price: draftItem.unitPrice, quantity: draftItem.quantity }];
+                    try { return [{ ...productForCart(product, draftItem.sizeId || undefined), price: draftItem.unitPrice, quantity: draftItem.quantity }]; }
+                    catch { unavailableNames.push(draftItem.productName); return []; }
                 });
 
                 if (restoredCart.length === 0) {
@@ -382,7 +384,7 @@ const POSTerminal: React.FC = () => {
                 const lineUnitPrice = method === 'installment' ? draftInstallmentUnitPrice : item.price;
                 return [
                     String(index + 1),
-                    item.name,
+                    cartDescription(item),
                     String(item.quantity),
                     formatCurrency(lineUnitPrice),
                     formatCurrency(lineUnitPrice * item.quantity),
@@ -454,7 +456,27 @@ const POSTerminal: React.FC = () => {
         }
     };
 
+    const [sellingProduct, setSellingProduct] = useState<Product | null>(null);
+    const [sellingSizeId, setSellingSizeId] = useState('');
+    const [sellingQuantity, setSellingQuantity] = useState('');
+    const [sellingError, setSellingError] = useState('');
+    const addSellingProduct = () => {
+        if (!sellingProduct) return;
+        try {
+            const line = productForCart(sellingProduct, sellingSizeId || undefined);
+            const quantity = Number(sellingQuantity);
+            const existing = cart.find(item => item.id === line.id)?.quantity || 0;
+            const fractional = sellingProduct.sellingType === 'quantity';
+            if (!Number.isFinite(quantity) || quantity <= 0 || (!fractional && !Number.isInteger(quantity))) throw new Error(fractional ? 'Enter a positive quantity.' : 'Enter a whole number of bottles/packs.');
+            if (Number((existing + quantity).toPrecision(15)) > line.stock) throw new Error('Quantity exceeds available stock.');
+            dispatch(addToCart({ ...line, quantity }));
+            setSellingProduct(null);
+        } catch (error) { setSellingError(error instanceof Error ? error.message : 'Invalid quantity.'); }
+    };
     const handleAddToCart = (product: Product) => {
+        if (product.unitSizeEnabled) {
+            setSellingProduct(product); setSellingSizeId(''); setSellingQuantity(''); setSellingError(''); return;
+        }
         if (savingDraft) return;
         const itemInCart = cart.find(item => item.id === product.id);
         const currentQty = itemInCart ? itemInCart.quantity : 0;
@@ -478,7 +500,7 @@ const POSTerminal: React.FC = () => {
         try {
             const payload = {
                 items: cart.map((item) => ({
-                    productId: item.id,
+                    productId: item.productId || item.id, sizeId: item.sizeId,
                     quantity: item.quantity,
                     unitPrice: item.price,
                 })),
@@ -495,11 +517,11 @@ const POSTerminal: React.FC = () => {
                 // Keep the cart intact until saving succeeds so failures can
                 // be retried without losing edits or replacing another order.
                 const response = await api.put<OrderDraft>(`/order-drafts/${draftId}`, payload);
-                const savedQuantities = new Map(originalDraftItems.map((item) => [item.productId, item.quantity]));
+                const savedQuantities = new Map(originalDraftItems.map((item) => [cartLineId(item.productId, item.sizeId), item.quantity]));
                 const addedItems = response.data.items.flatMap((item) => {
-                    const addedQuantity = item.quantity - (savedQuantities.get(item.productId) || 0);
+                    const addedQuantity = item.quantity - (savedQuantities.get(cartLineId(item.productId, item.sizeId)) || 0);
                     return addedQuantity > 0
-                        ? [{ id: item.productId, name: item.productName, quantity: addedQuantity }]
+                        ? [{ id: cartLineId(item.productId, item.sizeId), name: item.productName, quantity: addedQuantity }]
                         : [];
                 });
                 if (addedItems.length > 0 && isRestaurant) {
@@ -708,7 +730,7 @@ const POSTerminal: React.FC = () => {
             try {
                 await api.post('/installments', {
                     planCode: `INS-${crypto.randomUUID()}`,
-                    productId: item.id,
+                    productId: item.productId || item.id, sizeId: item.sizeId,
                     productName: item.name,
                     amount: item.quantity,
                     totalAmount: draftInstallmentTotal,
@@ -756,7 +778,7 @@ const POSTerminal: React.FC = () => {
                 orderId: id,
                 draftId: activeDraftId || undefined,
                 shiftId: openShift._id,
-                items: cart.map((item) => ({ productId: item.id, quantity: item.quantity, unitPrice: item.price })),
+                items: cart.map((item) => ({ productId: item.productId || item.id, sizeId: item.sizeId, quantity: item.quantity, unitPrice: item.price })),
                 discountPercent: appliedDiscountPercent,
                 paymentMethod: pendingMethod,
                 paidVia: pendingMethod === 'credit' ? creditPaidVia : pendingMethod,
@@ -1091,7 +1113,7 @@ const POSTerminal: React.FC = () => {
                                         >
                                             <Box sx={{ mb: 0.9, display: 'flex', alignItems: { xs: 'flex-start', sm: 'center' }, gap: { xs: 0.75, sm: 1 }, flexWrap: 'wrap' }}>
                                                 <Box sx={{ flexGrow: 1, minWidth: { xs: '100%', sm: 160 } }}>
-                                                    <Typography variant="body2" fontWeight={700} noWrap={false} sx={{ wordBreak: 'break-word' }}>{item.name}</Typography>
+                                                    <Typography variant="body2" fontWeight={700} noWrap={false} sx={{ wordBreak: 'break-word' }}>{cartDescription(item)}</Typography>
                                                     {canOverridePrice ? <>
                                                     <Typography variant="caption" color="text.secondary" display="block">
                                                         Cost {formatCurrency(item.purchasePrice)} · Default {formatCurrency(item.salePrice)}
@@ -1118,14 +1140,19 @@ const POSTerminal: React.FC = () => {
                                                     <IconButton size="small" onClick={() => dispatch(updateQuantity({ id: item.id, quantity: item.quantity - 1 }))}>
                                                         <Minus size={14} />
                                                     </IconButton>
-                                                    <Typography variant="body2" sx={{ fontWeight: 800, minWidth: 20, textAlign: 'center' }}>
-                                                        {item.quantity}
-                                                    </Typography>
+                                                    <TextField size="small" type="number" aria-label={`Quantity for ${item.name}`} key={`${item.id}:${item.quantity}`} defaultValue={item.quantity} sx={{ width: 85 }} slotProps={{ htmlInput: { min: 0, step: item.unitSizeEnabled && item.sellingType === 'quantity' ? 'any' : 1 } }} onBlur={e => {
+                                                        const quantity = Number(e.target.value);
+                                                        const product = products.find(p => p.id === (item.productId || item.id));
+                                                        const stock = item.sizeId ? product?.sizes?.find(row => row.id === item.sizeId)?.stock : product?.stock;
+                                                        if (Number.isFinite(quantity) && quantity >= 0 && quantity <= (stock ?? 0) && (item.unitSizeEnabled && item.sellingType === 'quantity' || Number.isInteger(quantity))) dispatch(updateQuantity({ id: item.id, quantity }));
+                                                        else { e.target.value = String(item.quantity); setStockToast({ open: true, message: 'Enter a valid quantity within available stock.' }); }
+                                                    }} />
                                                     <IconButton
                                                         size="small"
                                                         onClick={() => {
-                                                            const product = products.find(p => p.id === item.id);
-                                                            if (product && item.quantity < product.stock) {
+                                                            const product = products.find(p => p.id === (item.productId || item.id));
+                                                            const stock = item.sizeId ? product?.sizes?.find(row => row.id === item.sizeId)?.stock : product?.stock;
+                                                            if (item.quantity + 1 <= (stock ?? 0)) {
                                                                 dispatch(updateQuantity({ id: item.id, quantity: item.quantity + 1 }));
                                                             }
                                                         }}
@@ -1503,7 +1530,7 @@ const POSTerminal: React.FC = () => {
                             <Box sx={{ display: 'grid', gap: 1 }}>
                                 {cart.map((item, index) => (
                                     <Box key={item.id} sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}>
-                                        <Typography variant="body2" fontWeight={700}>{index + 1}. {item.name}</Typography>
+                                        <Typography variant="body2" fontWeight={700}>{index + 1}. {cartDescription(item)}</Typography>
                                         <Typography variant="body2" fontWeight={900} sx={{ whiteSpace: 'nowrap' }}>x{item.quantity}</Typography>
                                     </Box>
                                 ))}
@@ -1689,6 +1716,29 @@ const POSTerminal: React.FC = () => {
                 </DialogActions>
             </Dialog>
 
+            <Dialog open={!!sellingProduct} onClose={() => setSellingProduct(null)} maxWidth="sm" fullWidth>
+                <DialogTitle>{sellingProduct && isFixedProduct(sellingProduct) ? `Select size — ${sellingProduct.name}` : `Enter quantity — ${sellingProduct?.name || ''}`}</DialogTitle>
+                <Box component="form" onSubmit={e => { e.preventDefault(); addSellingProduct(); }}>
+                <DialogContent><Stack spacing={2} sx={{ pt: 1 }}>
+                    {sellingError && <Alert severity="error">{sellingError}</Alert>}
+                    {sellingProduct && isFixedProduct(sellingProduct) && <>
+                        <Typography variant="body2">Choose a bottle/pack size:</Typography>
+                        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                            {(sellingProduct.sizes || []).map(size => <Button key={size.id} type="button" variant={sellingSizeId === size.id ? 'contained' : 'outlined'} disabled={size.stock <= 0} aria-pressed={sellingSizeId === size.id} onClick={() => { setSellingSizeId(size.id); setSellingError(''); }} sx={{ flex: '1 1 140px', py: 1.5 }}>
+                                <Stack spacing={0.5}>
+                                    <Typography fontWeight={800}>{size.size} {sellingProduct.productUnit}</Typography>
+                                    <Typography variant="body2">{formatCurrency(size.salePrice)}</Typography>
+                                    <Typography variant="caption">{size.stock} bottles/packs available</Typography>
+                                </Stack>
+                            </Button>)}
+                        </Box>
+                    </>}
+                    <TextField autoFocus required label={sellingProduct?.sellingType === 'quantity' ? `Quantity (${sellingProduct.productUnit})` : 'Bottles/packs quantity'} value={sellingQuantity} onChange={e => setSellingQuantity(e.target.value)} slotProps={{ htmlInput: { inputMode: sellingProduct?.sellingType === 'quantity' ? 'decimal' : 'numeric' } }} />
+                    {sellingProduct?.sellingType === 'quantity' && <Typography variant="body2">{formatCurrency(sellingProduct.salePrice)} per {sellingProduct.productUnit} - Stock: {sellingProduct.stock} {sellingProduct.productUnit}</Typography>}
+                </Stack></DialogContent>
+                <DialogActions><Button onClick={() => setSellingProduct(null)}>Cancel</Button><Button type="submit" variant="contained">Add to cart</Button></DialogActions>
+                </Box>
+            </Dialog>
             {/* Checkout Success & Receipt Dialog */}
             <Dialog
                 open={orderDone}
@@ -1758,7 +1808,7 @@ const POSTerminal: React.FC = () => {
                                 items={cart.map((item) => {
                                     const unitPrice = paymentMethod === 'installment' ? draftInstallmentUnitPrice : item.price;
                                     return {
-                                        description: item.name,
+                                        description: cartDescription(item),
                                         quantity: item.quantity,
                                         unitPrice: formatCurrency(unitPrice),
                                         total: formatCurrency(unitPrice * item.quantity),
@@ -1892,7 +1942,7 @@ const POSTerminal: React.FC = () => {
                                     {cart.map((item, index) => (
                                         <Box key={item.id} sx={{ px: 2, py: 1.5, display: 'flex', justifyContent: 'space-between', gap: 2 }}>
                                             <Box>
-                                                <Typography variant="body2" fontWeight={800}>{index + 1}. {item.name}</Typography>
+                                                <Typography variant="body2" fontWeight={800}>{index + 1}. {cartDescription(item)}</Typography>
                                                 <Typography variant="caption" color="text.secondary">
                                                     {item.quantity} x {formatCurrency(paymentMethod === 'installment' ? draftInstallmentUnitPrice : item.price)}
                                                 </Typography>
@@ -2028,7 +2078,7 @@ const POSTerminal: React.FC = () => {
                             <Stack spacing={1}>
                                 {cart.map((item, index) => (
                                     <Box key={item.id} sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}>
-                                        <Typography variant="body2" fontWeight={700}>{index + 1}. {item.name}</Typography>
+                                        <Typography variant="body2" fontWeight={700}>{index + 1}. {cartDescription(item)}</Typography>
                                         <Typography variant="body2" fontWeight={900} sx={{ whiteSpace: 'nowrap' }}>x{item.quantity}</Typography>
                                     </Box>
                                 ))}

@@ -1,3 +1,4 @@
+import { validateSellingProduct } from '../utils/productSelling';
 import { Response } from 'express';
 import mongoose from 'mongoose';
 import InventoryRequest from '../models/InventoryRequest';
@@ -7,6 +8,9 @@ import { normalizeRole } from '../utils/accessControl';
 import { buildTenantFilter, getTenantObjectId } from '../utils/tenancy';
 
 const buildProductPayload = (body: Record<string, any>) => ({
+    unitSizeEnabled: body.unitSizeEnabled === true,
+    sellingType: String(body.sellingType || ''),
+    sizes: Array.isArray(body.sizes) ? body.sizes : [],
     id: String(body.id),
     sku: String(body.sku).toUpperCase(),
     name: String(body.name),
@@ -16,8 +20,8 @@ const buildProductPayload = (body: Record<string, any>) => ({
     price: Number(body.salePrice ?? body.price ?? 0),
     stock: Number(body.stock),
     minStock: Number(body.minStock),
-    productUnitCode: String(body.productUnitCode || 'piece'),
-    productUnit: String(body.productUnit || 'Piece'),
+    productUnitCode: String(body.productUnitCode || (body.unitSizeEnabled ? '' : 'piece')),
+    productUnit: String(body.productUnit || (body.unitSizeEnabled ? '' : 'Piece')),
     productUnitUrdu: String(body.productUnitUrdu || 'عدد'),
     description: String(body.description || ''),
     imageUrl: String(body.imageUrl || ''),
@@ -57,11 +61,13 @@ export const createInventoryRequest = async (req: AuthRequest, res: Response) =>
             return res.status(400).json({ message: 'There is already a pending approval request for this SKU' });
         }
 
+        const productData = buildProductPayload(req.body);
+        validateSellingProduct(productData);
         const request = new InventoryRequest({
             requestedBy: req.user.id,
             requestedByName: req.user.name,
             requestedByEmail: req.user.email,
-            productData: buildProductPayload(req.body),
+            productData,
             businessId: getTenantObjectId(req.user),
         });
 

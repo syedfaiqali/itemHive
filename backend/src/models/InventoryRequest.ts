@@ -1,6 +1,10 @@
+import { type SizeData } from '../utils/productSelling';
 import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IInventoryRequestProductData {
+    unitSizeEnabled?: boolean;
+    sellingType?: string;
+    sizes?: SizeData[];
     id: string;
     sku: string;
     name: string;
@@ -39,6 +43,9 @@ const InventoryRequestSchema = new Schema<IInventoryRequest>({
     requestedByEmail: { type: String, required: true },
     status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending', index: true },
     productData: {
+        unitSizeEnabled: { type: Boolean, default: false },
+        sellingType: { type: String, default: '' },
+        sizes: [{ id: String, size: Number, purchasePrice: Number, salePrice: Number, stock: Number, _id: false }],
         id: { type: String, required: true },
         sku: { type: String, required: true },
         name: { type: String, required: true },

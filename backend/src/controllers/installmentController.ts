@@ -1,3 +1,4 @@
+import { resolveSellingLine } from '../utils/productSelling';
 import { Request, Response } from 'express';
 import mongoose from 'mongoose';
 import { randomUUID } from 'crypto';
@@ -109,12 +110,11 @@ export const createInstallmentPlan = async (req: AuthRequest, res: Response) => 
             throw new Error('Product not found');
         }
 
-        if (product.stock < Number(amount || 0)) {
-            throw new Error('Insufficient stock');
-        }
+        const sizeId = String(req.body.sizeId || '');
+        const sellingLine = resolveSellingLine(product, Number(amount), sizeId);
 
         const actorRole = normalizeRole(req.user?.role);
-        const defaultUnitPrice = Number(product.salePrice ?? product.price ?? 0);
+        const defaultUnitPrice = sellingLine.unitPrice;
         const resolvedUnitPrice = Number(unitPrice ?? defaultUnitPrice);
         const resolvedTotalAmount = Number(totalAmount ?? resolvedUnitPrice * Number(amount || 0));
         const resolvedAdvancePayment = round2(Number(advancePayment ?? 0));
@@ -143,7 +143,10 @@ export const createInstallmentPlan = async (req: AuthRequest, res: Response) => 
         const transaction = new Transaction({
             id: `INS-${randomUUID()}`,
             productId,
-            productName,
+            productName: sellingLine.name,
+            sizeId,
+            selectedSize: sellingLine.size?.size,
+            productUnit: product.unitSizeEnabled ? product.productUnit : undefined,
             type: 'reduction',
             amount,
             subtotal: resolvedTotalAmount,
@@ -159,9 +162,9 @@ export const createInstallmentPlan = async (req: AuthRequest, res: Response) => 
             customerCnic,
             orderType,
             otherOrderType,
-            unitCost: product.purchasePrice ?? 0,
+            unitCost: sellingLine.unitCost,
             unitPrice: resolvedUnitPrice,
-            grossProfit: (resolvedUnitPrice - (product.purchasePrice ?? 0)) * Number(amount || 0),
+            grossProfit: (resolvedUnitPrice - (sellingLine.unitCost)) * Number(amount || 0),
             installmentPlanId: planId,
             source: resolvedShiftId ? 'pos' : undefined,
             orderId: resolvedShiftId ? String(orderId || planId) : '',
@@ -171,13 +174,21 @@ export const createInstallmentPlan = async (req: AuthRequest, res: Response) => 
         });
         await transaction.save({ session });
 
+        if (sizeId) {
+            const size = product.sizes?.find(row => row.id === sizeId);
+            if (!size) throw new Error('Invalid product size');
+            size.stock -= Number(amount);
+        }
         product.stock -= Number(amount || 0);
         await product.save({ session });
 
         const plan = new InstallmentPlan({
             planCode: planId,
             productId,
-            productName,
+            productName: sellingLine.name,
+            sizeId,
+            selectedSize: sellingLine.size?.size,
+            productUnit: product.unitSizeEnabled ? product.productUnit : undefined,
             customerName,
             customerCnic,
             customerPhone,

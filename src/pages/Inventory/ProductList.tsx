@@ -1,3 +1,5 @@
+import ProductSellingFields from '../../components/Common/ProductSellingFields';
+import { emptySellingDetails, sellingPayload, sellingError, isFixedProduct } from '../../lib/productSelling';
 import ProductImageUpload from '../../components/Common/ProductImageUpload';
 import useProductCategories from '../../hooks/useProductCategories';
 import React, { useState } from 'react';
@@ -140,7 +142,8 @@ const ProductList: React.FC = () => {
         salePrice: '',
         stock: '',
         minStock: '',
-        productUnitCode: DEFAULT_PRODUCT_UNIT.code,
+        ...emptySellingDetails,
+        productUnitCode: DEFAULT_PRODUCT_UNIT.code as string,
         description: '',
         batchNumber: '',
         expiryDate: '',
@@ -228,7 +231,9 @@ const ProductList: React.FC = () => {
         if (!editProduct || editSaving) return;
         setEditSaving(true);
         try {
-            await dispatch(updateProductApi(editProduct)).unwrap();
+            const validationError = sellingError(editProduct);
+            if (validationError) { showSnack(validationError, 'error'); return; }
+            await dispatch(updateProductApi(sellingPayload(editProduct))).unwrap();
             setEditProduct(null);
             showSnack('Product updated successfully', 'success');
         } catch (error) {
@@ -246,6 +251,7 @@ const ProductList: React.FC = () => {
 
     const startInlineEdit = (product: Product, field: InlineField) => {
         if (!isManager || inlineSaving) return;
+        if (isFixedProduct(product)) { setEditProduct({ ...product }); return; }
         setInlineEdit({
             id: product.id,
             field,
@@ -304,7 +310,9 @@ const ProductList: React.FC = () => {
         if (editSaving) return;
         setEditSaving(true);
         try {
-        await dispatch(addProductApi({
+        const validationError = sellingError(addFormData);
+        if (validationError) { showSnack(validationError, 'error'); return; }
+        await dispatch(addProductApi(sellingPayload({
             id: Math.random().toString(36).substr(2, 9),
             sku: addFormData.sku.toUpperCase(),
             name: addFormData.name,
@@ -312,17 +320,20 @@ const ProductList: React.FC = () => {
             purchasePrice: parseFloat(addFormData.purchasePrice),
             salePrice: parseFloat(addFormData.salePrice),
             price: parseFloat(addFormData.salePrice),
-            stock: parseInt(addFormData.stock),
-            minStock: parseInt(addFormData.minStock),
-            productUnitCode: getProductUnit(addFormData.productUnitCode).code,
-            productUnit: getProductUnit(addFormData.productUnitCode).english,
+            stock: Number(addFormData.stock),
+            minStock: Number(addFormData.minStock),
+            unitSizeEnabled: addFormData.unitSizeEnabled,
+            sellingType: addFormData.sellingType,
+            sizes: addFormData.sizes,
+            productUnitCode: addFormData.productUnitCode,
+            productUnit: addFormData.productUnit || getProductUnit(addFormData.productUnitCode).english,
             productUnitUrdu: getProductUnit(addFormData.productUnitCode).urdu,
             description: addFormData.description,
             batchNumber: addFormData.batchNumber || `B-${Math.floor(Math.random() * 9000) + 1000}`,
             expiryDate: addFormData.expiryDate || new Date(Date.now() + 31536000000).toISOString().split('T')[0],
             supplier: addFormData.supplier || 'General Supplier',
             imageUrl: addFormData.imageUrl
-        })).unwrap();
+        }))).unwrap();
 
         setShowAddModal(false);
         setAddFormData({
@@ -333,7 +344,8 @@ const ProductList: React.FC = () => {
             salePrice: '',
             stock: '',
             minStock: '',
-            productUnitCode: DEFAULT_PRODUCT_UNIT.code,
+            ...emptySellingDetails,
+        productUnitCode: DEFAULT_PRODUCT_UNIT.code as string,
             description: '',
             batchNumber: '',
             expiryDate: '',
@@ -585,7 +597,7 @@ const ProductList: React.FC = () => {
                                             )}
                                         </TableCell>
                                         <TableCell sx={{ minWidth: 190 }}>
-                                            {isManager ? (
+                                            {isManager && !product.unitSizeEnabled && PRODUCT_UNITS.some(unit => unit.code === (product.productUnitCode || DEFAULT_PRODUCT_UNIT.code)) ? (
                                                 <TextField
                                                     select
                                                     size="small"
@@ -608,7 +620,7 @@ const ProductList: React.FC = () => {
                                                 </TextField>
                                             ) : (
                                                 <Typography variant="body2" fontWeight={700}>
-                                                    {getProductUnitLabel(product.productUnitCode, product.productUnit, product.productUnitUrdu)}
+                                                    {product.unitSizeEnabled ? (isFixedProduct(product) ? 'Bottles/packs' : product.productUnit) : getProductUnitLabel(product.productUnitCode, product.productUnit, product.productUnitUrdu)}
                                                 </Typography>
                                             )}
                                         </TableCell>
@@ -757,12 +769,18 @@ const ProductList: React.FC = () => {
                                 </Box>
                             </Box>
 
+                            {isFixedProduct(viewProduct) && <Stack spacing={1} sx={{ mb: 3 }}>
+                                {(viewProduct.sizes || []).map(size => <Box key={size.id} sx={{ p: 2, border: 1, borderColor: 'divider', borderRadius: 2 }}>
+                                    <Typography fontWeight={700}>{size.size} {viewProduct.productUnit}</Typography>
+                                    <Typography variant="body2">Purchase: {formatCurrency(size.purchasePrice)} - Sale: {formatCurrency(size.salePrice)} - Stock: {size.stock} bottles/packs</Typography>
+                                </Box>)}
+                            </Stack>}
                             <Grid container spacing={2}>
                                 {[
-                                    { label: 'BUY', value: formatCurrency(viewProduct.purchasePrice), icon: <DollarSign size={18} />, color: '#f59e0b' },
-                                    { label: 'SELL', value: formatCurrency(viewProduct.salePrice), icon: <DollarSign size={18} />, color: '#10b981' },
-                                    { label: 'STOCK', value: `${viewProduct.stock} ${getProductUnitLabel(viewProduct.productUnitCode, viewProduct.productUnit, viewProduct.productUnitUrdu)}`, icon: <TrendingUp size={18} />, color: '#6366f1' },
-                                    { label: 'MIN STOCK', value: `${viewProduct.minStock} ${getProductUnitLabel(viewProduct.productUnitCode, viewProduct.productUnit, viewProduct.productUnitUrdu)}`, icon: <ShieldCheck size={18} />, color: '#0ea5e9' },
+                                    { label: isFixedProduct(viewProduct) ? 'FIRST SIZE BUY' : 'BUY', value: formatCurrency(viewProduct.purchasePrice), icon: <DollarSign size={18} />, color: '#f59e0b' },
+                                    { label: isFixedProduct(viewProduct) ? 'FIRST SIZE SELL' : 'SELL', value: formatCurrency(viewProduct.salePrice), icon: <DollarSign size={18} />, color: '#10b981' },
+                                    { label: 'STOCK', value: `${viewProduct.stock} ${isFixedProduct(viewProduct) ? 'bottles/packs' : viewProduct.unitSizeEnabled ? viewProduct.productUnit : getProductUnitLabel(viewProduct.productUnitCode, viewProduct.productUnit, viewProduct.productUnitUrdu)}`, icon: <TrendingUp size={18} />, color: '#6366f1' },
+                                    { label: 'MIN STOCK', value: `${viewProduct.minStock} ${isFixedProduct(viewProduct) ? 'bottles/packs' : viewProduct.unitSizeEnabled ? viewProduct.productUnit : getProductUnitLabel(viewProduct.productUnitCode, viewProduct.productUnit, viewProduct.productUnitUrdu)}`, icon: <ShieldCheck size={18} />, color: '#0ea5e9' },
                                     { label: 'BATCH', value: viewProduct.batchNumber || 'N/A', icon: <Layers size={18} />, color: '#a855f7' },
                                     { label: 'EXPIRY', value: viewProduct.expiryDate || 'N/A', icon: <History size={18} />, color: '#ef4444' },
                                     { label: 'SUPPLIER', value: viewProduct.supplier || 'N/A', icon: <ShieldCheck size={18} />, color: '#0ea5e9' },
@@ -851,20 +869,20 @@ const ProductList: React.FC = () => {
                                 <Grid size={{ xs: 12, md: 4 }}>
                                     <TextField
                                         fullWidth
-                                        label={`Upload Price (${currency})`}
+                                        label={`Purchase Price (${currency})${editProduct.unitSizeEnabled && editProduct.sellingType === 'quantity' ? ` per ${editProduct.productUnit}` : ''}`}
                                         type="number"
                                         required
-                                        value={editProduct.purchasePrice}
+                                        disabled={!!isFixedProduct(editProduct)} slotProps={{ htmlInput: { min: 0, step: 'any' } }} value={editProduct.purchasePrice}
                                         onChange={(e) => setEditProduct({ ...editProduct, purchasePrice: parseFloat(e.target.value) })}
                                     />
                                 </Grid>
                                 <Grid size={{ xs: 12, md: 4 }}>
                                     <TextField
                                         fullWidth
-                                        label={`Sell Price (${currency})`}
+                                        label={`Sell Price (${currency})${editProduct.unitSizeEnabled && editProduct.sellingType === 'quantity' ? ` per ${editProduct.productUnit}` : ''}`}
                                         type="number"
                                         required
-                                        value={editProduct.salePrice}
+                                        disabled={!!isFixedProduct(editProduct)} slotProps={{ htmlInput: { min: 0, step: 'any' } }} value={editProduct.salePrice}
                                         onChange={(e) => setEditProduct({ ...editProduct, salePrice: parseFloat(e.target.value), price: parseFloat(e.target.value) })}
                                     />
                                 </Grid>
@@ -874,34 +892,11 @@ const ProductList: React.FC = () => {
                                         label="Current Stock"
                                         type="number"
                                         required
-                                        value={editProduct.stock}
+                                        disabled={!!isFixedProduct(editProduct)} slotProps={{ htmlInput: { min: 0, step: 'any' } }} value={editProduct.stock}
                                         onChange={(e) => setEditProduct({ ...editProduct, stock: parseFloat(e.target.value) })}
                                     />
                                 </Grid>
-                                <Grid size={{ xs: 12, md: 4 }}>
-                                    <TextField
-                                        select
-                                        fullWidth
-                                        label="Selling Unit / فروخت کی اکائی"
-                                        required
-                                        value={editProduct.productUnitCode || DEFAULT_PRODUCT_UNIT.code}
-                                        onChange={(e) => {
-                                            const unit = getProductUnit(e.target.value);
-                                            setEditProduct({
-                                                ...editProduct,
-                                                productUnitCode: unit.code,
-                                                productUnit: unit.english,
-                                                productUnitUrdu: unit.urdu,
-                                            });
-                                        }}
-                                    >
-                                        {PRODUCT_UNITS.map((unit) => (
-                                            <MenuItem key={unit.code} value={unit.code}>
-                                                {unit.english} / {unit.urdu}
-                                            </MenuItem>
-                                        ))}
-                                    </TextField>
-                                </Grid>
+                                <Grid size={12}><ProductSellingFields value={editProduct} onChange={details => setEditProduct(current => current ? ({ ...current, ...details }) : current)} /></Grid>
                                 <Grid size={{ xs: 12, md: 4 }}>
                                     <TextField
                                         fullWidth
@@ -909,7 +904,7 @@ const ProductList: React.FC = () => {
                                         type="number"
                                         required
                                         value={editProduct.minStock}
-                                        onChange={(e) => setEditProduct({ ...editProduct, minStock: parseInt(e.target.value) })}
+                                        onChange={(e) => setEditProduct({ ...editProduct, minStock: Number(e.target.value) })}
                                     />
                                 </Grid>
                                 <Grid size={12}>
@@ -1045,25 +1040,7 @@ const ProductList: React.FC = () => {
                                             ))}
                                     </TextField>
                                 </Grid>
-                                    <Grid size={12}>
-                                        <TextField
-                                            select
-                                            fullWidth
-                                            label="Selling Unit / فروخت کی اکائی"
-                                            name="productUnitCode"
-                                            required
-                                            value={addFormData.productUnitCode}
-                                            onChange={handleAddChange}
-                                            InputProps={{ sx: { borderRadius: 3 } }}
-                                            helperText="Choose how this product is sold: Bori, KG, Litre, Carton, etc."
-                                        >
-                                            {PRODUCT_UNITS.map((unit) => (
-                                                <MenuItem key={unit.code} value={unit.code} sx={{ fontWeight: 600 }}>
-                                                    {unit.english} / {unit.urdu}
-                                                </MenuItem>
-                                            ))}
-                                        </TextField>
-                                    </Grid>
+                                    <Grid size={12}><ProductSellingFields value={addFormData} onChange={details => setAddFormData(current => ({ ...current, ...details }))} /></Grid>
                                     <Grid size={12}>
                                         <TextField
                                             fullWidth
@@ -1126,7 +1103,7 @@ const ProductList: React.FC = () => {
                                         label={`Upload Price (${currency})`}
                                         name="purchasePrice"
                                         type="number"
-                                        required
+                                        disabled={!!isFixedProduct(addFormData)} slotProps={{ htmlInput: { min: 0, step: 'any' } }} required={!isFixedProduct(addFormData)}
                                         value={addFormData.purchasePrice}
                                         onChange={handleAddChange}
                                         InputProps={{
@@ -1139,7 +1116,7 @@ const ProductList: React.FC = () => {
                                         label={`Sell Price (${currency})`}
                                         name="salePrice"
                                         type="number"
-                                        required
+                                        disabled={!!isFixedProduct(addFormData)} slotProps={{ htmlInput: { min: 0, step: 'any' } }} required={!isFixedProduct(addFormData)}
                                         value={addFormData.salePrice}
                                         onChange={handleAddChange}
                                         InputProps={{
@@ -1149,19 +1126,19 @@ const ProductList: React.FC = () => {
                                     />
                                     <TextField
                                         fullWidth
-                                        label="Initial Stock"
+                                        label={addFormData.unitSizeEnabled && addFormData.sellingType === 'quantity' ? `Initial Stock (${addFormData.productUnit})` : 'Initial Stock'}
                                         name="stock"
                                         type="number"
-                                        required
+                                        disabled={!!isFixedProduct(addFormData)} slotProps={{ htmlInput: { min: 0, step: 'any' } }} required={!isFixedProduct(addFormData)}
                                         value={addFormData.stock}
                                         onChange={handleAddChange}
                                         InputProps={{ sx: { borderRadius: 3, bgcolor: 'background.paper' } }}
-                                        helperText={`Shown as ${addFormData.stock || 0} ${getProductUnitLabel(addFormData.productUnitCode)}`}
+                                        helperText={isFixedProduct(addFormData) ? 'Stock is entered for each size above.' : addFormData.unitSizeEnabled ? `Stock in ${addFormData.productUnit}` : 'Available item quantity'}
                                     />
                                     <TextField
                                         fullWidth
                                         label="Minimum Alert Level"
-                                        name="minStock"
+                                        slotProps={{ htmlInput: { min: 0, step: 'any' } }} name="minStock"
                                         type="number"
                                         required
                                         value={addFormData.minStock}

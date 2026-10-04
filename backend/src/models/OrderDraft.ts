@@ -1,6 +1,9 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
 export interface IOrderDraftItem {
+    sizeId?: string;
+    selectedSize?: number;
+    productUnit?: string;
     productId: string;
     productName: string;
     quantity: number;
@@ -25,9 +28,12 @@ export interface IOrderDraft extends Document {
 const OrderDraftSchema = new Schema<IOrderDraft>({
     draftCode: { type: String, required: true, trim: true },
     items: [{
+        sizeId: { type: String, default: '' },
+        selectedSize: { type: Number },
+        productUnit: { type: String },
         productId: { type: String, required: true, trim: true },
         productName: { type: String, required: true, trim: true },
-        quantity: { type: Number, required: true, min: 1 },
+        quantity: { type: Number, required: true, min: Number.MIN_VALUE },
         unitPrice: { type: Number, required: true, min: 0 },
         _id: false,
     }],
