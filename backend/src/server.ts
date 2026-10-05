@@ -45,7 +45,8 @@ const configuredOrigins = process.env.CLIENT_URL
 
 const defaultAllowedOrigins = [
     'https://itemhiveinventorysystem.netlify.app',
-    'http://localhost:5173'
+    'http://localhost:5173',
+    'https://itemhive-staging.netlify.app',
 ];
 
 const allowedOrigins = Array.from(new Set([...configuredOrigins, ...defaultAllowedOrigins]));
