@@ -2,8 +2,13 @@ import { createSlice, createAsyncThunk, type PayloadAction } from '@reduxjs/tool
 import api from '../../api/axios';
 import { DEFAULT_PRODUCT_UNIT } from '../../lib/productUnits';
 import { loginUser, logout } from '../auth/authSlice';
+import { verifySavedSellingDetails } from '../../lib/productSelling';
 
+export interface ProductSize { id: string; size: number; purchasePrice: number; salePrice: number; stock: number }
 export interface Product {
+    unitSizeEnabled?: boolean;
+    sellingType?: 'quantity' | 'fixed' | '';
+    sizes?: ProductSize[];
     _id?: string;
     id: string; // The readable ID (e.g. "1")
     sku: string;
@@ -62,7 +67,7 @@ const initialState: InventoryState = {
 
 const getApiErrorMessage = (error: unknown, fallback: string) => {
     const apiError = error as ApiError;
-    return apiError.response?.data?.message || fallback;
+    return apiError.response?.data?.message || (error instanceof Error ? error.message : fallback);
 };
 
 const normalizeProduct = (product: ProductResponse): Product => {
@@ -110,7 +115,7 @@ export const addProductApi = createAsyncThunk(
     async (product: Product, { rejectWithValue }) => {
         try {
             const response = await api.post<ProductResponse>('/products', product);
-            return normalizeProduct(response.data);
+            return verifySavedSellingDetails(product, normalizeProduct(response.data));
         } catch (error: unknown) {
             return rejectWithValue(getApiErrorMessage(error, 'Failed to add product'));
         }
@@ -151,7 +156,7 @@ export const updateProductApi = createAsyncThunk(
     async (product: Product, { rejectWithValue }) => {
         try {
             const response = await api.put<ProductResponse>(`/products/${product.id}`, product);
-            return normalizeProduct(response.data);
+            return verifySavedSellingDetails(product, normalizeProduct(response.data));
         } catch (error: unknown) {
             return rejectWithValue(getApiErrorMessage(error, 'Failed to update product'));
         }

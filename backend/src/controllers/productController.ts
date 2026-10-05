@@ -617,15 +617,11 @@ export const bulkCreateProducts = async (req: AuthRequest, res: Response) => {
 
 export const updateProduct = async (req: AuthRequest, res: Response) => {
     try {
-        const updatedProduct = await Product.findOneAndUpdate(
-            { id: req.params.id, ...buildTenantFilter(req.user!) },
-            {
-                ...req.body,
-                price: req.body.salePrice ?? req.body.price,
-            },
-            { new: true, runValidators: true }
-        );
+        const updatedProduct = await Product.findOne({ id: req.params.id, ...buildTenantFilter(req.user!) });
         if (!updatedProduct) return res.status(404).json({ message: 'Product not found' });
+        const { _id, businessId, businessName, id, ...changes } = req.body;
+        updatedProduct.set({ ...changes, price: req.body.salePrice ?? updatedProduct.salePrice });
+        await updatedProduct.save();
         invalidateProductListCache(String(req.user!.businessId));
         res.json(updatedProduct);
     } catch (error: any) {

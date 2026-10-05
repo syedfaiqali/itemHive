@@ -3,6 +3,9 @@ import mongoose, { Schema, Document } from 'mongoose';
 export interface ITransaction extends Document {
     id: string;
     timestamp: Date;
+    sizeId?: string;
+    selectedSize?: number;
+    productUnit?: string;
     productId: string;
     productName: string;
     userName: string;
@@ -36,7 +39,10 @@ export interface ITransaction extends Document {
 const TransactionSchema: Schema = new Schema({
     id: { type: String, required: true, index: true },
     timestamp: { type: Date, default: Date.now, index: true },
-    productId: { type: String, required: true, index: true },
+    sizeId: { type: String, default: '' },
+        selectedSize: { type: Number },
+        productUnit: { type: String },
+        productId: { type: String, required: true, index: true },
     productName: { type: String, required: true },
     userName: { type: String, required: true },
     type: { type: String, enum: ['addition', 'reduction'], required: true, index: true },
