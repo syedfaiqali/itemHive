@@ -7,6 +7,8 @@ import type { AuthRequest } from '../middleware/auth';
 import { ensureDeleteAllowed, ensureManageableTarget, normalizeRole, serializeUser } from '../utils/accessControl';
 import { isAdminScreenPermission } from '../utils/screenPermissions';
 import { getAppSettingsForTenant, invalidateAppSettingsCache } from '../utils/tenancy';
+import { effectiveBusinessTypeId, getBusinessTypeCatalog } from '../utils/businessTypes';
+import { buildTeamUsersPipeline } from '../utils/teamUsers';
 
 const isMonthlyPaymentOverdue = (settings: any, now = new Date()) => {
     if (!settings?.monthlyPaymentTrackingEnabled) return false;
@@ -20,18 +22,21 @@ const isMonthlyPaymentOverdue = (settings: any, now = new Date()) => {
 const serializeUsersWithBusinessNames = async (users: any[]) => {
     const businessIds = [...new Set(users.map((user) => String(user.businessId || '')).filter(Boolean))];
     const [businesses, businessSettings, linkedEmployees] = await Promise.all([
-        Business.find({ _id: { $in: businessIds } }).select('name'),
+        Business.find({ _id: { $in: businessIds } }).select('name isLegacy'),
         AppSetting.find({
             $or: [
                 { businessId: { $in: businessIds } },
                 { key: { $in: businessIds.map((businessId) => `business:${businessId}`) } },
+                { key: 'global' },
             ],
-        }).select('key businessId restaurantEnabled monthlyPaymentTrackingEnabled monthlyPaymentPaidAt monthlyPaymentTrackingStartedAt'),
+        }).select('key businessId businessTypeId restaurantEnabled monthlyPaymentTrackingEnabled monthlyPaymentPaidAt monthlyPaymentTrackingStartedAt'),
         Employee.find({ userId: { $in: users.map((user) => user._id) } }).select('_id userId').lean(),
     ]);
     const employeeIdByUserId = new Map(linkedEmployees.map((employee) => [String(employee.userId), String(employee._id)]));
     const businessNameById = new Map(businesses.map((business) => [String(business._id), business.name]));
     const restaurantEnabledByBusinessId = new Map<string, boolean>();
+    const businessTypeByBusinessId = new Map<string, string>();
+    const legacyBusinessId = String(businesses.find((business) => business.isLegacy)?._id || '');
     const monthlyPaymentByBusinessId = new Map<string, { enabled: boolean; paidAt?: string; trackingStartedAt?: string; overdue: boolean }>();
 
     // Old legacy data may contain both a global settings record and the newer
@@ -40,9 +45,10 @@ const serializeUsersWithBusinessNames = async (users: any[]) => {
     const applyRestaurantSetting = (setting: any) => {
         const settingBusinessId = String(setting.key || '').startsWith('business:')
             ? String(setting.key).slice('business:'.length)
-            : String(setting.businessId || '');
+            : setting.key === 'global' ? legacyBusinessId : String(setting.businessId || '');
         if (settingBusinessId) {
             restaurantEnabledByBusinessId.set(settingBusinessId, Boolean(setting.restaurantEnabled));
+            businessTypeByBusinessId.set(settingBusinessId, effectiveBusinessTypeId(setting));
             monthlyPaymentByBusinessId.set(settingBusinessId, {
                 enabled: Boolean(setting.monthlyPaymentTrackingEnabled),
                 paidAt: setting.monthlyPaymentPaidAt ? new Date(setting.monthlyPaymentPaidAt).toISOString() : undefined,
@@ -58,6 +64,7 @@ const serializeUsersWithBusinessNames = async (users: any[]) => {
         ...serializeUser(user),
         businessName: businessNameById.get(String(user.businessId || '')) || '',
         restaurantEnabled: restaurantEnabledByBusinessId.get(String(user.businessId || '')) || false,
+        businessTypeId: businessTypeByBusinessId.get(String(user.businessId || '')) || '',
         monthlyPayment: monthlyPaymentByBusinessId.get(String(user.businessId || '')) || { enabled: false, overdue: false },
         employeeId: employeeIdByUserId.get(String(user._id)) || null,
     }));
@@ -65,41 +72,38 @@ const serializeUsersWithBusinessNames = async (users: any[]) => {
 
 export const getUsers = async (req: AuthRequest, res: Response) => {
     try {
-        const actorRole = normalizeRole(req.user?.role);
-        const baseQuery = actorRole === 'super_admin'
-            ? {}
-            : { createdBy: req.user?.id, role: 'user' };
         const search = String(req.query.search || '').trim();
+        const account = String(req.query.account || '').trim();
+        const business = String(req.query.business || '').trim();
+        const role = String(req.query.role || '').trim();
+        const userLimit = String(req.query.userLimit ?? '').trim();
+        const businessSort = String(req.query.businessSort || 'asc');
+        if (role && !['super_admin', 'admin', 'user'].includes(role)) return res.status(400).json({ message: 'Invalid role filter.' });
+        if (userLimit && userLimit !== '-' && (!/^\d+$/.test(userLimit) || !Number.isSafeInteger(Number(userLimit)))) return res.status(400).json({ message: 'User limit must be a non-negative integer or -.' });
+        if (!['asc', 'desc'].includes(businessSort)) return res.status(400).json({ message: 'Invalid business sort direction.' });
         const requestedPage = Number(req.query.page || 1);
         const requestedLimit = Number(req.query.limit || 20);
         const page = Number.isFinite(requestedPage) ? Math.max(1, Math.floor(requestedPage)) : 1;
         const limit = Number.isFinite(requestedLimit) ? Math.min(100, Math.max(1, Math.floor(requestedLimit))) : 20;
-        const paginated = Boolean(req.query.page || req.query.limit || search);
-        const escapedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const query = search
-            ? {
-                ...baseQuery,
-                $or: [
-                    { name: { $regex: escapedSearch, $options: 'i' } },
-                    { email: { $regex: escapedSearch, $options: 'i' } },
-                    { role: { $regex: escapedSearch, $options: 'i' } },
-                ],
-            }
-            : baseQuery;
-
-        const usersQuery = User.find(query)
-            .select('name email role isActive isVisible installmentAccess discountAccess digitalMenuAccess screenPermissions userCreationLimit createdBy businessId preferences avatar +visiblePassword')
-            .sort({ createdAt: -1 });
+        const paginated = Boolean(req.query.page || req.query.limit || search || account || business || role || userLimit);
+        const pipeline = buildTeamUsersPipeline({
+            actorId: req.user?.id || '', actorRole: req.user?.role || 'user',
+            search, account, business, role, userLimit, businessSort,
+        });
 
         if (!paginated) {
-            const users = await usersQuery;
+            const users = await User.aggregate(pipeline);
             return res.json(await serializeUsersWithBusinessNames(users));
         }
 
-        const [users, total] = await Promise.all([
-            usersQuery.skip((page - 1) * limit).limit(limit),
-            User.countDocuments(query),
-        ]);
+        const [result] = await User.aggregate([...pipeline, {
+            $facet: {
+                users: [{ $skip: (page - 1) * limit }, { $limit: limit }],
+                count: [{ $count: 'total' }],
+            },
+        }]);
+        const users = result?.users || [];
+        const total = result?.count?.[0]?.total || 0;
 
         return res.json({
             users: await serializeUsersWithBusinessNames(users),
@@ -121,10 +125,10 @@ export const updateUserStatus = async (req: AuthRequest, res: Response) => {
             return res.status(404).json({ message: 'User not found' });
         }
 
-        const isRestaurantModeUpdate = typeof req.body.restaurantEnabled === 'boolean';
+        const isRestaurantModeUpdate = typeof req.body.restaurantEnabled === 'boolean' || typeof req.body.businessTypeId === 'string';
         // Restaurant mode belongs to a workspace. A super admin must be able
         // to configure it for the legacy workspace as well.
-        if (!isRestaurantModeUpdate) {
+        if (!isRestaurantModeUpdate || Object.keys(req.body).some((key) => !['restaurantEnabled', 'businessTypeId'].includes(key))) {
             ensureManageableTarget(user.role);
         }
 
@@ -157,9 +161,9 @@ export const updateUserStatus = async (req: AuthRequest, res: Response) => {
             user.digitalMenuAccess = req.body.digitalMenuAccess;
         }
 
-        if (typeof req.body.restaurantEnabled === 'boolean') {
+        if (isRestaurantModeUpdate) {
             if (!['admin', 'super_admin'].includes(normalizeRole(user.role)) || !user.businessId) {
-                return res.status(400).json({ message: 'Restaurant mode can only be assigned to client admin accounts' });
+                return res.status(400).json({ message: 'Business type can only be assigned through an admin workspace account' });
             }
 
             // Use the same tenant-settings lookup that POS uses. In particular,
@@ -181,7 +185,12 @@ export const updateUserStatus = async (req: AuthRequest, res: Response) => {
             if (!appSettings.businessId || String(appSettings.businessId) !== tenant.businessId) {
                 appSettings.businessId = user.businessId;
             }
-            appSettings.restaurantEnabled = req.body.restaurantEnabled;
+            const typeId = typeof req.body.businessTypeId === 'string' ? req.body.businessTypeId : req.body.restaurantEnabled ? 'restaurant' : '';
+            const catalog = await getBusinessTypeCatalog();
+            const selectedType = catalog.types.find((type) => type.id === typeId);
+            if (typeId && !selectedType) return res.status(400).json({ message: 'Business type not found. Refresh and choose an available type.' });
+            appSettings.businessTypeId = typeId;
+            appSettings.restaurantEnabled = Boolean(selectedType?.restaurantEnabled);
             await appSettings.save();
             invalidateAppSettingsCache(tenant);
         }

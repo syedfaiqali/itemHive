@@ -1,0 +1,26 @@
+import mongoose, { Schema } from 'mongoose';
+
+export interface BusinessTypeOption {
+    id: string;
+    name: string;
+    restaurantEnabled: boolean;
+}
+
+export const DEFAULT_BUSINESS_TYPES: BusinessTypeOption[] = [
+    { id: 'restaurant', name: 'Restaurant / KOT', restaurantEnabled: true },
+    { id: 'stationery', name: 'Stationery', restaurantEnabled: false },
+    { id: 'super-mart', name: 'Super Mart', restaurantEnabled: false },
+];
+
+const optionSchema = new Schema<BusinessTypeOption>({
+    id: { type: String, required: true },
+    name: { type: String, required: true, trim: true },
+    restaurantEnabled: { type: Boolean, default: false },
+}, { _id: false });
+
+const catalogSchema = new Schema({
+    key: { type: String, required: true, unique: true },
+    types: { type: [optionSchema], default: () => DEFAULT_BUSINESS_TYPES },
+}, { timestamps: true });
+
+export default mongoose.model('BusinessTypeCatalog', catalogSchema);

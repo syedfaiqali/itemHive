@@ -56,6 +56,7 @@ import {
 import type { AppDispatch } from '../../store';
 import { prepareBannerDataUrl } from '../../lib/imageBanner';
 import api from '../../api/axios';
+import BusinessTypesManager from '../../components/Settings/BusinessTypesManager';
 
 interface Business {
     id: string;
@@ -480,6 +481,16 @@ const SettingsPage: React.FC = () => {
                                     </Table>
                                 </TableContainer>
                             </AccordionDetails>
+                        </Accordion>
+                    </Grid>
+                )}
+                {user?.role === 'super_admin' && (
+                    <Grid size={{ xs: 12 }}>
+                        <Accordion disableGutters elevation={0} sx={premiumAccordionSx}>
+                            <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={premiumSummarySx}>
+                                <Box><Typography variant="h6" fontWeight={700}>Business Types</Typography><Typography variant="body2" color="text.secondary">Manage the types available for your businesses</Typography></Box>
+                            </AccordionSummary>
+                            <AccordionDetails sx={{ px: 2.5, pb: 2.5 }}><BusinessTypesManager /></AccordionDetails>
                         </Accordion>
                     </Grid>
                 )}

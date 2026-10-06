@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { deleteBusiness, deleteUser, getAdminPermissionAssignments, getBusinesses, getMonthlyPaymentAlerts, getUsers, updateAdminScreenPermissions, updateBusiness, updateMonthlyPayment, updateUserStatus, updateUserCreationLimit, updateUserAccount } from '../controllers/userController';
 import { protect, authorize, requireScreenAccess } from '../middleware/auth';
 import { getUnlinkedEmployees } from '../controllers/employeeController';
+import { createBusinessType, deleteBusinessType, getBusinessTypes } from '../controllers/businessTypeController';
+import { createBusinessTypeSchema } from '../middleware/validate';
 import { updateAdminLimitSchema, updateBusinessSchema, updateMonthlyPaymentSchema, updateScreenPermissionsSchema, updateUserAccountSchema, updateUserStatusSchema, validate } from '../middleware/validate';
 
 const router = Router();
@@ -9,6 +11,9 @@ const router = Router();
 router.get('/', protect, authorize('super_admin', 'admin'), requireScreenAccess('team'), getUsers);
 router.get('/unlinked-employees', protect, authorize('super_admin', 'admin'), requireScreenAccess('team'), getUnlinkedEmployees);
 router.get('/businesses', protect, authorize('super_admin'), getBusinesses);
+router.get('/business-types', protect, authorize('super_admin', 'admin'), getBusinessTypes);
+router.post('/business-types', protect, authorize('super_admin'), validate(createBusinessTypeSchema), createBusinessType);
+router.delete('/business-types/:id', protect, authorize('super_admin'), deleteBusinessType);
 router.get('/admin-permissions', protect, authorize('super_admin'), getAdminPermissionAssignments);
 router.get('/monthly-payment-alerts', protect, getMonthlyPaymentAlerts);
 router.patch('/businesses/:id', protect, authorize('super_admin'), validate(updateBusinessSchema), updateBusiness);

@@ -30,14 +30,17 @@ import {
     TableHead,
     TablePagination,
     TableRow,
+    TableSortLabel,
     TextField,
     Tooltip,
     Typography,
 } from '@mui/material';
-import { Edit3, Eye, EyeOff, IdCard, Info, KeyRound, Search, ShieldCheck, Trash2, UserPlus, Users } from 'lucide-react';
-import { useSelector } from 'react-redux';
+import { Edit3, Eye, EyeOff, IdCard, Info, KeyRound, ShieldCheck, Trash2, UserPlus, Users } from 'lucide-react';
+import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import type { RootState } from '../../store';
+import type { AppDispatch, RootState } from '../../store';
+import { fetchSettings } from '../../features/settings/settingsSlice';
+import type { BusinessType } from '../../types/businessType';
 import type { User, UserRole } from '../../features/auth/authSlice';
 import api from '../../api/axios';
 import CreateLoginDialog, { type LoginTarget } from '../../components/Employees/CreateLoginDialog';
@@ -106,6 +109,7 @@ const BusinessLabel = () => (
 );
 
 const TeamManagementPage: React.FC = () => {
+    const dispatch = useDispatch<AppDispatch>();
     const { user: currentUser } = useSelector((state: RootState) => state.auth);
     const isSuperAdmin = currentUser?.role === 'super_admin';
     const navigate = useNavigate();
@@ -116,9 +120,19 @@ const TeamManagementPage: React.FC = () => {
     const [loginTarget, setLoginTarget] = React.useState<LoginTarget | null>(null);
     const [users, setUsers] = React.useState<User[]>([]);
     const [businesses, setBusinesses] = React.useState<BusinessOption[]>([]);
+    const [businessTypes, setBusinessTypes] = React.useState<BusinessType[]>([]);
+    const [businessTypesLoading, setBusinessTypesLoading] = React.useState(true);
+    const [businessTypesError, setBusinessTypesError] = React.useState('');
     const [loading, setLoading] = React.useState(true);
     const [savingId, setSavingId] = React.useState('');
-    const [search, setSearch] = React.useState('');
+    const [filters, setFilters] = React.useState({ account: '', business: '', role: '', userLimit: '' });
+    const [businessSort, setBusinessSort] = React.useState<'asc' | 'desc'>('asc');
+    const trimmedLimit = filters.userLimit.trim();
+    const limitFilterInvalid = Boolean(trimmedLimit && trimmedLimit !== '-' && (!/^\d+$/.test(trimmedLimit) || !Number.isSafeInteger(Number(trimmedLimit))));
+    const changeFilter = (key: keyof typeof filters, value: string) => {
+        setFilters((current) => ({ ...current, [key]: value }));
+        setPage(0);
+    };
     const [page, setPage] = React.useState(0);
     const [rowsPerPage, setRowsPerPage] = React.useState(20);
     const [total, setTotal] = React.useState(0);
@@ -152,28 +166,45 @@ const TeamManagementPage: React.FC = () => {
     });
     const [snack, setSnack] = React.useState('');
     const [error, setError] = React.useState('');
+    const usersRequestVersion = React.useRef(0);
 
     const loadUsers = React.useCallback(async () => {
+        const requestVersion = ++usersRequestVersion.current;
+        if (limitFilterInvalid) {
+            setLoading(false);
+            return;
+        }
         setLoading(true);
         setError('');
 
         try {
             const response = await api.get<UsersResponse>('/users', {
-                params: { page: page + 1, limit: rowsPerPage, search: search.trim() || undefined },
+                params: {
+                    page: page + 1, limit: rowsPerPage, businessSort,
+                    account: filters.account.trim() || undefined,
+                    business: filters.business.trim() || undefined,
+                    role: filters.role || undefined,
+                    userLimit: filters.userLimit.trim() || undefined,
+                },
             });
+            if (requestVersion !== usersRequestVersion.current) return;
             const nextUsers = Array.isArray(response.data) ? response.data : response.data.users || [];
             setUsers(nextUsers);
             setTotal(Array.isArray(response.data) ? nextUsers.length : response.data.total || 0);
         } catch (requestError: unknown) {
+            if (requestVersion !== usersRequestVersion.current) return;
             setError(getApiErrorMessage(requestError, 'Unable to load team members right now.'));
         } finally {
-            setLoading(false);
+            if (requestVersion === usersRequestVersion.current) setLoading(false);
         }
-    }, [page, rowsPerPage, search]);
+    }, [page, rowsPerPage, filters, businessSort, limitFilterInvalid]);
 
     React.useEffect(() => {
         const timeoutId = window.setTimeout(loadUsers, 250);
-        return () => window.clearTimeout(timeoutId);
+        return () => {
+            window.clearTimeout(timeoutId);
+            usersRequestVersion.current += 1;
+        };
     }, [loadUsers]);
 
     const loadUnlinkedEmployees = React.useCallback(async () => {
@@ -215,12 +246,34 @@ const TeamManagementPage: React.FC = () => {
         loadBusinesses();
     }, [loadBusinesses]);
 
-    const handleStatusChange = async (target: User, updates: { isActive?: boolean; isVisible?: boolean; installmentAccess?: boolean; discountAccess?: boolean; digitalMenuAccess?: 'none' | 'menu' | 'pos'; restaurantEnabled?: boolean }) => {
+    const loadBusinessTypes = React.useCallback(async () => {
+        setBusinessTypesLoading(true);
+        setBusinessTypesError('');
+        try {
+            const response = await api.get<BusinessType[]>('/users/business-types');
+            setBusinessTypes(response.data);
+        } catch (requestError: unknown) {
+            setBusinessTypesError(getApiErrorMessage(requestError, 'Unable to load business types.'));
+        } finally {
+            setBusinessTypesLoading(false);
+        }
+    }, []);
+
+    React.useEffect(() => {
+        loadBusinessTypes();
+        window.addEventListener('itemhive-business-types-updated', loadBusinessTypes);
+        return () => window.removeEventListener('itemhive-business-types-updated', loadBusinessTypes);
+    }, [loadBusinessTypes]);
+
+    const handleStatusChange = async (target: User, updates: { isActive?: boolean; isVisible?: boolean; installmentAccess?: boolean; discountAccess?: boolean; digitalMenuAccess?: 'none' | 'menu' | 'pos'; businessTypeId?: string }) => {
         setSavingId(target.id);
         setError('');
         try {
             await api.patch(`/users/${target.id}/status`, updates);
             await loadUsers();
+            if (typeof updates.businessTypeId === 'string' && target.businessId === activeBusinessId) {
+                dispatch(fetchSettings());
+            }
             setSnack('Account updated successfully.');
             return true;
         } catch (requestError: unknown) {
@@ -232,6 +285,7 @@ const TeamManagementPage: React.FC = () => {
     };
 
     const openAccountSettings = (target: User) => {
+        loadBusinessTypes();
         setError('');
         setSettingsTab('settings');
         setProfileOpened(false);
@@ -381,30 +435,39 @@ const TeamManagementPage: React.FC = () => {
 
             {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
 
-            <TextField
-                fullWidth
-                size="small"
-                type="search"
-                name="team-account-search"
-                autoComplete="off"
-                value={search}
-                onChange={(event) => {
-                    setSearch(event.target.value);
-                    setPage(0);
-                }}
-                placeholder="Search by name, login email, or role"
-                InputProps={{ startAdornment: <InputAdornment position="start"><Search size={18} /></InputAdornment> }}
-                sx={{ mb: 2, maxWidth: 560 }}
-            />
-
             <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3 }}>
                 <Table size="small" sx={{ minWidth: 760 }}>
                     <TableHead>
                         <TableRow>
-                            <TableCell>Account</TableCell>
-                            <TableCell><BusinessLabel /></TableCell>
-                            <TableCell>Role</TableCell>
-                            <TableCell align="center">User Limit</TableCell>
+                            <TableCell sx={{ verticalAlign: 'top', minWidth: 210 }}>
+                                <Stack spacing={1} sx={{ py: 1 }}>
+                                    <span>Account</span>
+                                    <TextField size="small" type="search" placeholder="Name or email" value={filters.account} onChange={(event) => changeFilter('account', event.target.value)} inputProps={{ 'aria-label': 'Filter accounts by name or email' }} />
+                                </Stack>
+                            </TableCell>
+                            <TableCell sortDirection={businessSort} sx={{ verticalAlign: 'top', minWidth: 220 }}>
+                                <Stack spacing={1} sx={{ py: 1 }}>
+                                    <TableSortLabel active direction={businessSort} sx={{ flexDirection: 'row', alignSelf: 'flex-start', whiteSpace: 'nowrap' }} onClick={() => { setBusinessSort((current) => current === 'asc' ? 'desc' : 'asc'); setPage(0); }}><BusinessLabel /></TableSortLabel>
+                                    <TextField size="small" type="search" placeholder="Business name" value={filters.business} onChange={(event) => changeFilter('business', event.target.value)} inputProps={{ 'aria-label': 'Filter by business name' }} />
+                                </Stack>
+                            </TableCell>
+                            <TableCell sx={{ verticalAlign: 'top', minWidth: 160 }}>
+                                <Stack spacing={1} sx={{ py: 1 }}>
+                                    <span>Role</span>
+                                    <TextField select size="small" value={filters.role} onChange={(event) => changeFilter('role', event.target.value)} SelectProps={{ displayEmpty: true, inputProps: { 'aria-label': 'Filter by role' } }}>
+                                        <MenuItem value="">All roles</MenuItem>
+                                        <MenuItem value="super_admin">Super Admin</MenuItem>
+                                        <MenuItem value="admin">Admin</MenuItem>
+                                        <MenuItem value="user">User</MenuItem>
+                                    </TextField>
+                                </Stack>
+                            </TableCell>
+                            <TableCell align="center" sx={{ verticalAlign: 'top', minWidth: 140 }}>
+                                <Stack spacing={1} sx={{ py: 1 }}>
+                                    <span>User Limit</span>
+                                    <TextField size="small" type="search" placeholder="Limit or -" value={filters.userLimit} onChange={(event) => changeFilter('userLimit', event.target.value)} error={limitFilterInvalid} helperText={limitFilterInvalid ? 'Enter a whole number or -' : undefined} inputProps={{ 'aria-label': 'Filter by user limit; use - for not applicable' }} />
+                                </Stack>
+                            </TableCell>
                             <TableCell align="right">Actions</TableCell>
                         </TableRow>
                     </TableHead>
@@ -540,11 +603,13 @@ const TeamManagementPage: React.FC = () => {
                                     <FormControlLabel label="Discount Access" control={<Switch checked={Boolean(settingsUser.discountAccess)} disabled={!canManageSettings || settingsUser.role !== 'admin' || settingsBusy} onChange={(_, checked) => handleStatusChange(settingsUser, { discountAccess: checked })} />} />
                                     {settingsUser.role !== 'admin' && <Typography variant="caption" color="text.secondary" display="block">Managed on the business admin account.</Typography>}
                                 </Box>
-                                <Box>
-                                    <FormControlLabel label="Restaurant / KOT" control={<Switch checked={Boolean(settingsUser.restaurantEnabled)} disabled={!canManageWorkspaceSettings || settingsBusy} onChange={(_, checked) => handleStatusChange(settingsUser, { restaurantEnabled: checked })} />} />
-                                    {!workspaceSettingsApply && <Typography variant="caption" color="text.secondary" display="block">Managed on the business admin account.</Typography>}
-                                </Box>
                             </Box>
+                            {businessTypesError && <Alert severity="error" action={<Button size="small" onClick={loadBusinessTypes}>Retry</Button>}>{businessTypesError}</Alert>}
+                            <TextField select fullWidth label="Business Type" value={settingsUser.businessTypeId || (settingsUser.restaurantEnabled ? 'restaurant' : '')} disabled={!canManageWorkspaceSettings || settingsBusy || businessTypesLoading || Boolean(businessTypesError)} onChange={(event) => handleStatusChange(settingsUser, { businessTypeId: event.target.value })} helperText={!workspaceSettingsApply ? 'Managed on the business admin account.' : 'Restaurant / KOT enables restaurant features. Manage available types in Settings → Business Types.'}>
+                                <MenuItem value="">Not assigned</MenuItem>
+                                {businessTypes.map((type) => <MenuItem key={type.id} value={type.id}>{type.name}</MenuItem>)}
+                                {(settingsUser.businessTypeId || settingsUser.restaurantEnabled) && !businessTypes.some((type) => type.id === (settingsUser.businessTypeId || 'restaurant')) && <MenuItem value={settingsUser.businessTypeId || 'restaurant'} disabled>{settingsUser.restaurantEnabled ? 'Restaurant / KOT' : 'Selected business type'}</MenuItem>}
+                            </TextField>
                             <Divider />
                             <TextField select fullWidth label="Digital Menu Access" value={settingsUser.digitalMenuAccess || 'none'} disabled={!canManageSettings || settingsBusy} onChange={(event) => handleStatusChange(settingsUser, { digitalMenuAccess: event.target.value as 'none' | 'menu' | 'pos' })} helperText={settingsUser.role === 'super_admin' ? 'Assigned to admin and user accounts.' : 'Changes are saved automatically.'}>
                                 <MenuItem value="none">No access</MenuItem>

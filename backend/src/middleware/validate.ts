@@ -226,7 +226,12 @@ export const updateUserStatusSchema = Joi.object({
     discountAccess: Joi.boolean().optional(),
     digitalMenuAccess: Joi.string().valid('none', 'menu', 'pos').optional(),
     restaurantEnabled: Joi.boolean().optional(),
-}).or('isActive', 'isVisible', 'installmentAccess', 'discountAccess', 'digitalMenuAccess', 'restaurantEnabled');
+    businessTypeId: Joi.string().trim().max(80).allow('').optional(),
+}).or('isActive', 'isVisible', 'installmentAccess', 'discountAccess', 'digitalMenuAccess', 'restaurantEnabled', 'businessTypeId');
+
+export const createBusinessTypeSchema = Joi.object({
+    name: Joi.string().trim().min(2).max(80).required(),
+});
 
 export const updateMonthlyPaymentSchema = Joi.object({
     enabled: Joi.boolean().required(),
