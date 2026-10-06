@@ -270,8 +270,16 @@ const PROFILE_TABS: Array<{ key: ProfileTab; label: string; icon: React.ReactEle
     { key: 'notes', label: 'Notes', icon: <StickyNote size={17} /> },
 ];
 
-const EmployeeProfilePage: React.FC = () => {
-    const { id = 'new' } = useParams();
+interface EmployeeProfilePageProps {
+    employeeId?: string;
+    embedded?: boolean;
+    onManageTeam?: () => void;
+    onBusyChange?: (busy: boolean) => void;
+}
+
+const EmployeeProfilePage: React.FC<EmployeeProfilePageProps> = ({ employeeId, embedded = false, onManageTeam, onBusyChange }) => {
+    const { id: routeId = 'new' } = useParams();
+    const id = employeeId || routeId;
     const isNew = id === 'new';
     const navigate = useNavigate();
     const { currencySymbol } = useAppCurrency();
@@ -297,6 +305,10 @@ const EmployeeProfilePage: React.FC = () => {
     const [notFound, setNotFound] = React.useState(false);
     const [saving, setSaving] = React.useState(false);
     const [busy, setBusy] = React.useState(false);
+    React.useEffect(() => {
+        onBusyChange?.(saving || busy);
+        return () => onBusyChange?.(false);
+    }, [saving, busy, onBusyChange]);
     const [error, setError] = React.useState('');
     const [successMessage, setSuccessMessage] = React.useState('');
     /** Set when a new profile is saved, so opening its URL refreshes quietly instead of showing a loader. */
@@ -532,7 +544,7 @@ const EmployeeProfilePage: React.FC = () => {
         return (
             <Box sx={{ py: 8, textAlign: 'center' }}>
                 <Typography variant="h6" fontWeight={800} sx={{ mb: 2 }}>Employee not found</Typography>
-                <Button variant="contained" startIcon={<ArrowLeft size={18} />} onClick={() => navigate('/employees')}>Back to Employees</Button>
+                {!embedded && <Button variant="contained" startIcon={<ArrowLeft size={18} />} onClick={() => navigate('/employees')}>Back to Employees</Button>}
             </Box>
         );
     }
@@ -550,11 +562,11 @@ const EmployeeProfilePage: React.FC = () => {
         <Box>
             <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', gap: 2, alignItems: { xs: 'stretch', sm: 'center' }, flexDirection: { xs: 'column', sm: 'row' } }}>
                 <Stack direction="row" spacing={1.5} alignItems="center">
-                    <IconButton onClick={() => navigate('/employees')} sx={{ border: '1px solid', borderColor: 'divider' }}>
+                    {!embedded && <IconButton onClick={() => navigate('/employees')} sx={{ border: '1px solid', borderColor: 'divider' }}>
                         <ArrowLeft size={20} />
-                    </IconButton>
+                    </IconButton>}
                     <Box>
-                        <Typography variant="h4" fontWeight={800}>{isNew ? 'New Employee' : 'Employee Profile'}</Typography>
+                        <Typography variant={embedded ? 'h6' : 'h4'} fontWeight={800}>{isNew ? 'New Employee' : 'Employee Profile'}</Typography>
                         <Typography variant="body2" color="text.secondary">
                             {isNew ? 'Create the profile and register the face used for attendance.' : `${employee?.employeeCode} · ${form.fullName}`}
                         </Typography>
@@ -644,7 +656,7 @@ const EmployeeProfilePage: React.FC = () => {
                                         Active status and rights such as installments and discounts are managed in Team.
                                     </Typography>
                                     {canManageTeam && (
-                                        <Button variant="outlined" onClick={() => navigate('/team')} sx={{ alignSelf: 'flex-start' }}>Manage in Team</Button>
+                                        <Button variant="outlined" onClick={() => embedded ? onManageTeam?.() : navigate('/team')} sx={{ alignSelf: 'flex-start' }}>{embedded ? 'Account Settings' : 'Manage in Team'}</Button>
                                     )}
                                 </Stack>
                             ) : (

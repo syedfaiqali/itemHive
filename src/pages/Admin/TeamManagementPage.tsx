@@ -13,6 +13,7 @@ import {
     DialogActions,
     DialogContent,
     DialogTitle,
+    Divider,
     FormControlLabel,
     IconButton,
     InputAdornment,
@@ -20,6 +21,8 @@ import {
     Snackbar,
     Stack,
     Switch,
+    Tab,
+    Tabs,
     Table,
     TableBody,
     TableCell,
@@ -31,7 +34,7 @@ import {
     Tooltip,
     Typography,
 } from '@mui/material';
-import { CircleDollarSign, Edit3, Eye, EyeOff, IdCard, Info, KeyRound, QrCode, Search, ShieldCheck, Trash2, UserPlus, Users } from 'lucide-react';
+import { Edit3, Eye, EyeOff, IdCard, Info, KeyRound, Search, ShieldCheck, Trash2, UserPlus, Users } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import type { RootState } from '../../store';
@@ -40,6 +43,8 @@ import api from '../../api/axios';
 import CreateLoginDialog, { type LoginTarget } from '../../components/Employees/CreateLoginDialog';
 import { hasScreenAccess } from '../../lib/screenPermissions';
 import { getInitials } from '../../lib/employees';
+
+const EmployeeProfilePage = React.lazy(() => import('../Employees/EmployeeProfilePage'));
 
 interface UsersPage {
     users: User[];
@@ -117,9 +122,17 @@ const TeamManagementPage: React.FC = () => {
     const [page, setPage] = React.useState(0);
     const [rowsPerPage, setRowsPerPage] = React.useState(20);
     const [total, setTotal] = React.useState(0);
+    const [settingsUserId, setSettingsUserId] = React.useState('');
+    const settingsUser = users.find((user) => user.id === settingsUserId);
+    const [settingsTab, setSettingsTab] = React.useState<'settings' | 'account' | 'employee'>('settings');
+    const [profileBusy, setProfileBusy] = React.useState(false);
+    const [profileOpened, setProfileOpened] = React.useState(false);
+    const settingsBusy = Boolean(savingId) || profileBusy;
+    const canManageSettings = isSuperAdmin && settingsUser?.role !== 'super_admin';
+    const workspaceSettingsApply = settingsUser?.role === 'admin' || settingsUser?.role === 'super_admin';
+    const canManageWorkspaceSettings = isSuperAdmin && workspaceSettingsApply;
     const [editingUser, setEditingUser] = React.useState<User | null>(null);
     const [deletingUser, setDeletingUser] = React.useState<User | null>(null);
-    const [monthlyPaymentUser, setMonthlyPaymentUser] = React.useState<User | null>(null);
     const [monthlyPaymentEnabled, setMonthlyPaymentEnabled] = React.useState(false);
     const [monthlyPaymentPaid, setMonthlyPaymentPaid] = React.useState(false);
     const [monthlyPaymentDate, setMonthlyPaymentDate] = React.useState(new Date().toISOString().slice(0, 10));
@@ -139,8 +152,6 @@ const TeamManagementPage: React.FC = () => {
     });
     const [snack, setSnack] = React.useState('');
     const [error, setError] = React.useState('');
-    const [digitalMenuUser, setDigitalMenuUser] = React.useState<User | null>(null);
-    const [digitalMenuAccess, setDigitalMenuAccess] = React.useState<'none' | 'menu' | 'pos'>('none');
 
     const loadUsers = React.useCallback(async () => {
         setLoading(true);
@@ -182,7 +193,7 @@ const TeamManagementPage: React.FC = () => {
 
     const handleLoginCreated = async () => {
         setLoginTarget(null);
-        setSnack('Login created. Set their rights in the table.');
+        setSnack('Login created. Open Manage to set their rights.');
         await Promise.all([loadUsers(), loadUnlinkedEmployees()]);
     };
 
@@ -206,24 +217,28 @@ const TeamManagementPage: React.FC = () => {
 
     const handleStatusChange = async (target: User, updates: { isActive?: boolean; isVisible?: boolean; installmentAccess?: boolean; discountAccess?: boolean; digitalMenuAccess?: 'none' | 'menu' | 'pos'; restaurantEnabled?: boolean }) => {
         setSavingId(target.id);
+        setError('');
         try {
             await api.patch(`/users/${target.id}/status`, updates);
             await loadUsers();
             setSnack('Account updated successfully.');
+            return true;
         } catch (requestError: unknown) {
             setError(getApiErrorMessage(requestError, 'Unable to update this account.'));
+            return false;
         } finally {
             setSavingId('');
         }
     };
 
-    const saveDigitalMenuAccess = async () => {
-        if (!digitalMenuUser) return;
-        await handleStatusChange(digitalMenuUser, { digitalMenuAccess });
-        setDigitalMenuUser(null);
-    };
-
-    const openEditDialog = (target: User) => {
+    const openAccountSettings = (target: User) => {
+        setError('');
+        setSettingsTab('settings');
+        setProfileOpened(false);
+        setSettingsUserId(target.id);
+        setMonthlyPaymentEnabled(Boolean(target.monthlyPayment?.enabled));
+        setMonthlyPaymentPaid(Boolean(target.monthlyPayment?.paidAt) && !target.monthlyPayment?.overdue);
+        setMonthlyPaymentDate(target.monthlyPayment?.paidAt?.slice(0, 10) || new Date().toISOString().slice(0, 10));
         setShowPassword(false);
         setEditingUser(target);
         setDraft({
@@ -293,7 +308,7 @@ const TeamManagementPage: React.FC = () => {
                     userCreationLimit: Number(draft.userCreationLimit || 0),
                 });
             }
-            setEditingUser(null);
+            setSettingsTab('settings');
             await loadUsers();
             window.dispatchEvent(new Event('itemhive-team-updated'));
             setSnack('Account details updated successfully.');
@@ -324,23 +339,16 @@ const TeamManagementPage: React.FC = () => {
         }
     };
 
-    const openMonthlyPayment = (target: User) => {
-        setMonthlyPaymentUser(target);
-        setMonthlyPaymentEnabled(Boolean(target.monthlyPayment?.enabled));
-        setMonthlyPaymentPaid(Boolean(target.monthlyPayment?.paidAt) && !Boolean(target.monthlyPayment?.overdue));
-        setMonthlyPaymentDate(target.monthlyPayment?.paidAt?.slice(0, 10) || new Date().toISOString().slice(0, 10));
-    };
-
     const saveMonthlyPayment = async () => {
-        if (!monthlyPaymentUser) return;
-        setSavingId(monthlyPaymentUser.id);
+        if (!settingsUser) return;
+        setSavingId(settingsUser.id);
+        setError('');
         try {
-            await api.patch(`/users/${monthlyPaymentUser.id}/monthly-payment`, {
+            await api.patch(`/users/${settingsUser.id}/monthly-payment`, {
                 enabled: monthlyPaymentEnabled,
                 paid: monthlyPaymentPaid,
                 paidAt: new Date(`${monthlyPaymentDate}T12:00:00`).toISOString(),
             });
-            setMonthlyPaymentUser(null);
             await loadUsers();
             window.dispatchEvent(new Event('itemhive-team-updated'));
             setSnack('Monthly payment updated successfully.');
@@ -390,19 +398,12 @@ const TeamManagementPage: React.FC = () => {
             />
 
             <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3 }}>
-                <Table size="small" sx={{ minWidth: 1260 }}>
+                <Table size="small" sx={{ minWidth: 760 }}>
                     <TableHead>
                         <TableRow>
                             <TableCell>Account</TableCell>
                             <TableCell><BusinessLabel /></TableCell>
                             <TableCell>Role</TableCell>
-                            <TableCell align="center">Active</TableCell>
-                            <TableCell align="center">Visible</TableCell>
-                            <TableCell align="center">Installments</TableCell>
-                            <TableCell align="center">Discount Access</TableCell>
-                            <TableCell align="center">Restaurant / KOT</TableCell>
-                            <TableCell align="center">Digital Menu</TableCell>
-                            <TableCell align="center">Monthly</TableCell>
                             <TableCell align="center">User Limit</TableCell>
                             <TableCell align="right">Actions</TableCell>
                         </TableRow>
@@ -410,13 +411,11 @@ const TeamManagementPage: React.FC = () => {
                     <TableBody>
                         {loading && (
                             <TableRow>
-                                <TableCell colSpan={11} align="center" sx={{ py: 8 }}><CircularProgress size={30} /></TableCell>
+                                <TableCell colSpan={5} align="center" sx={{ py: 8 }}><CircularProgress size={30} /></TableCell>
                             </TableRow>
                         )}
                         {!loading && users.map((teamUser) => {
                             const isBusy = savingId === teamUser.id;
-                            const isManageable = isSuperAdmin && teamUser.role !== 'super_admin';
-                            const canManageRestaurantMode = isSuperAdmin && (teamUser.role === 'admin' || teamUser.role === 'super_admin');
                             const canDelete = teamUser.id !== currentUser?.id && (
                                 isSuperAdmin
                                     ? teamUser.role !== 'super_admin'
@@ -434,64 +433,12 @@ const TeamManagementPage: React.FC = () => {
                                     <TableCell>
                                         <Chip icon={<ShieldCheck size={14} />} label={roleLabel(teamUser.role)} color={teamUser.role === 'user' ? 'default' : 'primary'} size="small" />
                                     </TableCell>
-                                    <TableCell align="center">
-                                        <Switch size="small" checked={Boolean(teamUser.isActive)} disabled={!isManageable || isBusy} onChange={(_, checked) => handleStatusChange(teamUser, { isActive: checked })} />
-                                    </TableCell>
-                                    <TableCell align="center">
-                                        <Switch size="small" checked={Boolean(teamUser.isVisible)} disabled={!isManageable || isBusy} onChange={(_, checked) => handleStatusChange(teamUser, { isVisible: checked })} />
-                                    </TableCell>
-                                    <TableCell align="center">
-                                        <Switch size="small" checked={Boolean(teamUser.installmentAccess)} disabled={!isManageable || isBusy} onChange={(_, checked) => handleStatusChange(teamUser, { installmentAccess: checked })} />
-                                    </TableCell>
-                                    <TableCell align="center">
-                                        {teamUser.role === 'admin' ? (
-                                            <Switch
-                                                size="small"
-                                                checked={Boolean(teamUser.discountAccess)}
-                                                disabled={!isManageable || isBusy}
-                                                onChange={(_, checked) => handleStatusChange(teamUser, { discountAccess: checked })}
-                                                inputProps={{ 'aria-label': `Discount access for ${teamUser.name}` }}
-                                            />
-                                        ) : '-'}
-                                    </TableCell>
-                                    <TableCell align="center">
-                                        {canManageRestaurantMode ? (
-                                            <Switch
-                                                size="small"
-                                                checked={Boolean(teamUser.restaurantEnabled)}
-                                                disabled={isBusy}
-                                                onChange={(_, checked) => handleStatusChange(teamUser, { restaurantEnabled: checked })}
-                                                inputProps={{ 'aria-label': `Restaurant mode for ${teamUser.businessName || teamUser.name}` }}
-                                            />
-                                        ) : '-'}
-                                    </TableCell>
-                                    <TableCell align="center">
-                                        {isSuperAdmin && teamUser.role !== 'super_admin' ? (
-                                            <Tooltip title="Configure Digital Menu access"><span><IconButton size="small" disabled={isBusy} color={teamUser.digitalMenuAccess === 'pos' ? 'primary' : teamUser.digitalMenuAccess === 'menu' ? 'secondary' : 'default'} onClick={() => { setDigitalMenuUser(teamUser); setDigitalMenuAccess(teamUser.digitalMenuAccess || 'none'); }} aria-label={`Digital menu access for ${teamUser.name}`}><QrCode size={19} /></IconButton></span></Tooltip>
-                                        ) : '-'}
-                                    </TableCell>
-                                    <TableCell align="center">
-                                        {(teamUser.role === 'admin' || teamUser.role === 'super_admin') ? (
-                                            <Tooltip title={!teamUser.monthlyPayment?.enabled ? 'Monthly payment tracking is off' : teamUser.monthlyPayment.overdue ? 'Monthly payment is overdue' : teamUser.monthlyPayment.paidAt ? `Paid: ${new Date(teamUser.monthlyPayment.paidAt).toLocaleDateString()}` : 'Payment pending'}>
-                                                <span><IconButton size="small" color={teamUser.monthlyPayment?.overdue ? 'error' : teamUser.monthlyPayment?.paidAt ? 'success' : 'default'} onClick={() => openMonthlyPayment(teamUser)} disabled={!isSuperAdmin || isBusy} aria-label={`Monthly payment for ${teamUser.businessName || teamUser.name}`}><CircleDollarSign size={19} /></IconButton></span>
-                                            </Tooltip>
-                                        ) : '-'}
-                                    </TableCell>
                                     <TableCell align="center">{teamUser.role === 'admin' ? teamUser.userCreationLimit ?? 0 : '-'}</TableCell>
                                     <TableCell align="right">
                                         <Stack direction="row" spacing={1} justifyContent="flex-end">
-                                            {canOpenEmployees && teamUser.employeeId && teamUser.businessId === activeBusinessId && (
-                                                <Tooltip title="Employee profile">
-                                                    <IconButton size="small" color="primary" onClick={() => navigate(`/employees/${teamUser.employeeId}`)} aria-label={`Employee profile for ${teamUser.name}`}>
-                                                        <IdCard size={18} />
-                                                    </IconButton>
-                                                </Tooltip>
-                                            )}
-                                            {isManageable && (
-                                                <Button size="small" variant="outlined" startIcon={<Edit3 size={15} />} onClick={() => openEditDialog(teamUser)} disabled={isBusy}>
-                                                    Edit
-                                                </Button>
-                                            )}
+                                            <Button size="small" variant="outlined" startIcon={<Edit3 size={15} />} onClick={() => openAccountSettings(teamUser)} disabled={isBusy} aria-label={`Manage ${teamUser.name}`}>
+                                                Manage
+                                            </Button>
                                             {canDelete && (
                                                 <Button
                                                     size="small"
@@ -511,7 +458,7 @@ const TeamManagementPage: React.FC = () => {
                         })}
                         {!loading && !users.length && (
                             <TableRow>
-                                <TableCell colSpan={10} align="center" sx={{ py: 8 }}>
+                                <TableCell colSpan={5} align="center" sx={{ py: 8 }}>
                                     <Users size={34} style={{ opacity: 0.45, marginBottom: 8 }} />
                                     <Typography variant="body2" color="text.secondary">No matching accounts found.</Typography>
                                 </TableCell>
@@ -539,7 +486,7 @@ const TeamManagementPage: React.FC = () => {
                         <Typography variant="h6" fontWeight={800}>Employees without a login</Typography>
                         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                             {isSuperAdmin ? 'In the workspace you are viewing, these' : 'These'} employees have a profile in Employees but cannot sign in yet.
-                            Create a login to give them access, then set their rights in the table above.
+                            Create a login to give them access, then open Manage to set their rights.
                         </Typography>
                         <Stack spacing={1}>
                             {unlinkedEmployees.map((employee) => (
@@ -566,32 +513,136 @@ const TeamManagementPage: React.FC = () => {
                 </Card>
             )}
 
-            <CreateLoginDialog employee={loginTarget} onClose={() => setLoginTarget(null)} onCreated={handleLoginCreated} />
+            <Dialog open={Boolean(settingsUser)} onClose={() => !settingsBusy && setSettingsUserId('')} fullWidth maxWidth={settingsTab === 'employee' ? 'lg' : 'sm'}>
+                <DialogTitle>Account Settings</DialogTitle>
+                <Tabs value={settingsTab} onChange={(_, value) => { setSettingsTab(value); if (value === 'employee') setProfileOpened(true); }} variant="scrollable" scrollButtons="auto" sx={{ px: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
+                    <Tab value="settings" label="Access & Settings" disabled={settingsBusy} />
+                    {canManageSettings && <Tab value="account" label="Account Details" disabled={settingsBusy} />}
+                    {canOpenEmployees && settingsUser?.employeeId && settingsUser.businessId === activeBusinessId && <Tab value="employee" label="Employee Profile" disabled={settingsBusy} />}
+                </Tabs>
+                <DialogContent>
+                    {settingsUser && (
+                        <Stack spacing={2} sx={{ pt: 1, display: settingsTab === 'settings' ? undefined : 'none' }}>
+                            <Box>
+                                <Typography variant="h6" fontWeight={800}>{settingsUser.name}</Typography>
+                                <Typography variant="body2" color="text.secondary" sx={{ overflowWrap: 'anywhere' }}>{settingsUser.email}</Typography>
+                                <Typography variant="body2" color="text.secondary">{settingsUser.businessName || '-'} · {roleLabel(settingsUser.role)}</Typography>
+                            </Box>
+                            {error && <Alert severity="error">{error}</Alert>}
+                            <Divider />
+                            <Typography variant="subtitle2" fontWeight={800}>Account access</Typography>
+                            <Typography variant="caption" color="text.secondary">Switch changes are saved automatically.</Typography>
+                            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 1 }}>
+                                <FormControlLabel label="Active" control={<Switch checked={Boolean(settingsUser.isActive)} disabled={!canManageSettings || settingsBusy} onChange={(_, checked) => handleStatusChange(settingsUser, { isActive: checked })} />} />
+                                <FormControlLabel label="Visible" control={<Switch checked={Boolean(settingsUser.isVisible)} disabled={!canManageSettings || settingsBusy} onChange={(_, checked) => handleStatusChange(settingsUser, { isVisible: checked })} />} />
+                                <FormControlLabel label="Installments" control={<Switch checked={Boolean(settingsUser.installmentAccess)} disabled={!canManageSettings || settingsBusy} onChange={(_, checked) => handleStatusChange(settingsUser, { installmentAccess: checked })} />} />
+                                <Box>
+                                    <FormControlLabel label="Discount Access" control={<Switch checked={Boolean(settingsUser.discountAccess)} disabled={!canManageSettings || settingsUser.role !== 'admin' || settingsBusy} onChange={(_, checked) => handleStatusChange(settingsUser, { discountAccess: checked })} />} />
+                                    {settingsUser.role !== 'admin' && <Typography variant="caption" color="text.secondary" display="block">Managed on the business admin account.</Typography>}
+                                </Box>
+                                <Box>
+                                    <FormControlLabel label="Restaurant / KOT" control={<Switch checked={Boolean(settingsUser.restaurantEnabled)} disabled={!canManageWorkspaceSettings || settingsBusy} onChange={(_, checked) => handleStatusChange(settingsUser, { restaurantEnabled: checked })} />} />
+                                    {!workspaceSettingsApply && <Typography variant="caption" color="text.secondary" display="block">Managed on the business admin account.</Typography>}
+                                </Box>
+                            </Box>
+                            <Divider />
+                            <TextField select fullWidth label="Digital Menu Access" value={settingsUser.digitalMenuAccess || 'none'} disabled={!canManageSettings || settingsBusy} onChange={(event) => handleStatusChange(settingsUser, { digitalMenuAccess: event.target.value as 'none' | 'menu' | 'pos' })} helperText={settingsUser.role === 'super_admin' ? 'Assigned to admin and user accounts.' : 'Changes are saved automatically.'}>
+                                <MenuItem value="none">No access</MenuItem>
+                                <MenuItem value="menu">Menu only — manage and show QR menus</MenuItem>
+                                <MenuItem value="pos">Menu + Add to POS — send table bills to billing</MenuItem>
+                            </TextField>
+                            <Stack spacing={1.5}>
+                                <Typography variant="subtitle2" fontWeight={800}>Monthly Payment</Typography>
+                                <Typography variant="caption" color={settingsUser.monthlyPayment?.overdue ? 'error.main' : 'text.secondary'}>
+                                    {!workspaceSettingsApply ? 'Managed on the business admin account.' : !settingsUser.monthlyPayment?.enabled ? 'Tracking is off' : settingsUser.monthlyPayment.overdue ? 'Payment overdue' : settingsUser.monthlyPayment.paidAt ? `Paid: ${new Date(settingsUser.monthlyPayment.paidAt).toLocaleDateString()}` : 'Payment pending'}
+                                </Typography>
+                                <FormControlLabel control={<Switch checked={monthlyPaymentEnabled} disabled={!canManageWorkspaceSettings || settingsBusy} onChange={(_, checked) => setMonthlyPaymentEnabled(checked)} />} label="Track monthly payment" />
+                                <FormControlLabel control={<Switch checked={monthlyPaymentPaid} disabled={!canManageWorkspaceSettings || settingsBusy || !monthlyPaymentEnabled} onChange={(_, checked) => setMonthlyPaymentPaid(checked)} />} label="Payment received" />
+                                <TextField label="Payment date" type="date" value={monthlyPaymentDate} disabled={!canManageWorkspaceSettings || settingsBusy || !monthlyPaymentEnabled || !monthlyPaymentPaid} onChange={(event) => setMonthlyPaymentDate(event.target.value)} InputLabelProps={{ shrink: true }} />
+                                <Typography variant="caption" color="text.secondary">If tracking is enabled and a payment remains unpaid for one full month, an overdue notification will be shown.</Typography>
+                                {isSuperAdmin && <Button variant="outlined" onClick={saveMonthlyPayment} disabled={!canManageWorkspaceSettings || settingsBusy} sx={{ alignSelf: 'flex-start' }}>Save Monthly Payment</Button>}
+                            </Stack>
+                        </Stack>
+                    )}
+                    {settingsUser && canManageSettings && (
+                        <Box hidden={settingsTab !== 'account'}>
+                            {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+                            <Box component="fieldset" disabled={settingsBusy} sx={{ border: 0, p: 0, m: 0, minWidth: 0 }}>
+                                <Stack spacing={2} sx={{ pt: 1 }}>
+                                    <TextField label="Full Name" name="account-name" autoComplete="off" value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} required />
+                                    <TextField label="Login Email / ID" name="account-email" type="email" autoComplete="off" value={draft.email} onChange={(event) => setDraft({ ...draft, email: event.target.value })} required />
+                                    <TextField
+                                        select
+                                        label="Role"
+                                        value={draft.role}
+                                        onChange={(event) => setDraft({ ...draft, role: event.target.value as UserRole })}
+                                        required
+                                    >
+                                        <MenuItem value="super_admin">Super Admin</MenuItem>
+                                        <MenuItem value="admin">Administrator</MenuItem>
+                                        <MenuItem value="user">User</MenuItem>
+                                    </TextField>
+                                    {draft.role !== 'super_admin' && (
+                                        <TextField
+                                            select
+                                            label={<BusinessLabel />}
+                                            value={draft.businessId}
+                                            onChange={(event) => setDraft({ ...draft, businessId: event.target.value })}
+                                            helperText="Move this account to an existing shop/workspace."
+                                            required
+                                        >
+                                            {businesses.map((business) => (
+                                                <MenuItem key={business.id} value={business.id}>
+                                                    {business.name}{business.isLegacy ? ' (Default)' : ''}
+                                                </MenuItem>
+                                            ))}
+                                        </TextField>
+                                    )}
+                                    <TextField
+                                        label="Password"
+                                        name="new-password"
+                                        type={showPassword ? 'text' : 'password'}
+                                        autoComplete="new-password"
+                                        value={draft.password}
+                                        onChange={(event) => setDraft({ ...draft, password: event.target.value })}
+                                        helperText={editingUser?.visiblePassword ? 'Use the eye icon to view or update this password.' : 'Old password is not available. Enter a new password to reset it.'}
+                                        InputProps={{
+                                            endAdornment: (
+                                                <InputAdornment position="end">
+                                                    <IconButton
+                                                        onClick={() => setShowPassword((visible) => !visible)}
+                                                        edge="end"
+                                                        size="small"
+                                                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                                                    >
+                                                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                                    </IconButton>
+                                                </InputAdornment>
+                                            ),
+                                        }}
+                                    />
+                                    {draft.role === 'admin' && (
+                                        <TextField label="User Creation Limit" type="number" value={draft.userCreationLimit} onChange={(event) => setDraft({ ...draft, userCreationLimit: event.target.value })} inputProps={{ min: 0 }} />
+                                    )}
+                                </Stack>
+                            </Box>
+                        </Box>
+                    )}
+                    {profileOpened && canOpenEmployees && settingsUser?.employeeId && settingsUser.businessId === activeBusinessId && (
+                        <Box hidden={settingsTab !== 'employee'} sx={{ pt: 2 }}>
+                            <React.Suspense fallback={<Box sx={{ py: 4, textAlign: 'center' }}><CircularProgress size={28} /></Box>}>
+                                <EmployeeProfilePage key={settingsUser.employeeId} employeeId={settingsUser.employeeId} embedded onManageTeam={() => setSettingsTab('settings')} onBusyChange={setProfileBusy} />
+                            </React.Suspense>
+                        </Box>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    {settingsTab === 'account' && canManageSettings && <Button variant="contained" onClick={saveAccount} disabled={settingsBusy}>Save Account Details</Button>}
+                    <Button onClick={() => setSettingsUserId('')} disabled={settingsBusy}>Close</Button>
+                </DialogActions>
+            </Dialog>
 
-            <Dialog open={Boolean(monthlyPaymentUser)} onClose={() => !savingId && setMonthlyPaymentUser(null)} fullWidth maxWidth="xs">
-                <DialogTitle>Monthly Payment — {monthlyPaymentUser?.businessName || monthlyPaymentUser?.name}</DialogTitle>
-                <DialogContent>
-                    <Stack spacing={1.5} sx={{ pt: 1 }}>
-                        <FormControlLabel control={<Switch checked={monthlyPaymentEnabled} onChange={(event) => setMonthlyPaymentEnabled(event.target.checked)} />} label="Track monthly payment" />
-                        <FormControlLabel control={<Switch checked={monthlyPaymentPaid} disabled={!monthlyPaymentEnabled} onChange={(event) => setMonthlyPaymentPaid(event.target.checked)} />} label="Payment received" />
-                        <TextField label="Payment date" type="date" value={monthlyPaymentDate} disabled={!monthlyPaymentEnabled || !monthlyPaymentPaid} onChange={(event) => setMonthlyPaymentDate(event.target.value)} InputLabelProps={{ shrink: true }} />
-                        <Typography variant="caption" color="text.secondary">If tracking is enabled and a payment remains unpaid for one full month, an overdue notification will be shown.</Typography>
-                    </Stack>
-                </DialogContent>
-                <DialogActions><Button onClick={() => setMonthlyPaymentUser(null)} disabled={Boolean(savingId)}>Cancel</Button><Button variant="contained" onClick={saveMonthlyPayment} disabled={Boolean(savingId)}>Save</Button></DialogActions>
-            </Dialog>
-            <Dialog open={Boolean(digitalMenuUser)} onClose={() => !savingId && setDigitalMenuUser(null)} fullWidth maxWidth="xs">
-                <DialogTitle>Digital Menu Access — {digitalMenuUser?.name}</DialogTitle>
-                <DialogContent>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>Choose what this account can do with QR table menus.</Typography>
-                    <TextField select fullWidth label="Access level" value={digitalMenuAccess} onChange={(event) => setDigitalMenuAccess(event.target.value as 'none' | 'menu' | 'pos')}>
-                        <MenuItem value="none">No access</MenuItem>
-                        <MenuItem value="menu">Menu only — manage and show QR menus</MenuItem>
-                        <MenuItem value="pos">Menu + Add to POS — send table bills to billing</MenuItem>
-                    </TextField>
-                </DialogContent>
-                <DialogActions><Button onClick={() => setDigitalMenuUser(null)} disabled={Boolean(savingId)}>Cancel</Button><Button variant="contained" onClick={saveDigitalMenuAccess} disabled={Boolean(savingId)}>Save</Button></DialogActions>
-            </Dialog>
+            <CreateLoginDialog employee={loginTarget} onClose={() => setLoginTarget(null)} onCreated={handleLoginCreated} />
 
             <Dialog open={createDialogOpen} onClose={() => !createSaving && setCreateDialogOpen(false)} fullWidth maxWidth="sm">
                 <DialogTitle>{isSuperAdmin ? 'Create Account' : 'Add User'}</DialogTitle>
@@ -692,73 +743,6 @@ const TeamManagementPage: React.FC = () => {
                         </Button>
                     </DialogActions>
                 </Box>
-            </Dialog>
-
-            <Dialog open={Boolean(editingUser)} onClose={() => setEditingUser(null)} fullWidth maxWidth="sm">
-                <DialogTitle>Edit Account</DialogTitle>
-                <DialogContent>
-                    <Stack spacing={2} sx={{ pt: 1 }}>
-                        <TextField label="Full Name" name="account-name" autoComplete="off" value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} required />
-                        <TextField label="Login Email / ID" name="account-email" type="email" autoComplete="off" value={draft.email} onChange={(event) => setDraft({ ...draft, email: event.target.value })} required />
-                        <TextField
-                            select
-                            label="Role"
-                            value={draft.role}
-                            onChange={(event) => setDraft({ ...draft, role: event.target.value as UserRole })}
-                            required
-                        >
-                            <MenuItem value="super_admin">Super Admin</MenuItem>
-                            <MenuItem value="admin">Administrator</MenuItem>
-                            <MenuItem value="user">User</MenuItem>
-                        </TextField>
-                        {draft.role !== 'super_admin' && (
-                            <TextField
-                                select
-                                label={<BusinessLabel />}
-                                value={draft.businessId}
-                                onChange={(event) => setDraft({ ...draft, businessId: event.target.value })}
-                                helperText="Move this account to an existing shop/workspace."
-                                required
-                            >
-                                {businesses.map((business) => (
-                                    <MenuItem key={business.id} value={business.id}>
-                                        {business.name}{business.isLegacy ? ' (Default)' : ''}
-                                    </MenuItem>
-                                ))}
-                            </TextField>
-                        )}
-                        <TextField
-                            label="Password"
-                            name="new-password"
-                            type={showPassword ? 'text' : 'password'}
-                            autoComplete="new-password"
-                            value={draft.password}
-                            onChange={(event) => setDraft({ ...draft, password: event.target.value })}
-                            helperText={editingUser?.visiblePassword ? 'Use the eye icon to view or update this password.' : 'Old password is not available. Enter a new password to reset it.'}
-                            InputProps={{
-                                endAdornment: (
-                                    <InputAdornment position="end">
-                                        <IconButton
-                                            onClick={() => setShowPassword((visible) => !visible)}
-                                            edge="end"
-                                            size="small"
-                                            aria-label={showPassword ? 'Hide password' : 'Show password'}
-                                        >
-                                            {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                                        </IconButton>
-                                    </InputAdornment>
-                                ),
-                            }}
-                        />
-                        {draft.role === 'admin' && (
-                            <TextField label="User Creation Limit" type="number" value={draft.userCreationLimit} onChange={(event) => setDraft({ ...draft, userCreationLimit: event.target.value })} inputProps={{ min: 0 }} />
-                        )}
-                    </Stack>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setEditingUser(null)}>Cancel</Button>
-                    <Button variant="contained" onClick={saveAccount} disabled={savingId === editingUser?.id}>Save Changes</Button>
-                </DialogActions>
             </Dialog>
 
             <Dialog open={Boolean(deletingUser)} onClose={() => !deleteSaving && setDeletingUser(null)} fullWidth maxWidth="xs">
