@@ -8,6 +8,7 @@ export interface IOrderDraftItem {
 }
 
 export interface IOrderDraft extends Document {
+    salespersonEmployeeId?: mongoose.Types.ObjectId;
     draftCode: string;
     items: IOrderDraftItem[];
     discountPercent: number;
@@ -23,6 +24,7 @@ export interface IOrderDraft extends Document {
 }
 
 const OrderDraftSchema = new Schema<IOrderDraft>({
+    salespersonEmployeeId: { type: Schema.Types.ObjectId, ref: 'Employee' },
     draftCode: { type: String, required: true, trim: true },
     items: [{
         productId: { type: String, required: true, trim: true },

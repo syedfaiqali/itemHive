@@ -181,7 +181,7 @@ const toJpegAsset = (dataUrl: string): Promise<JpegAsset> => new Promise((resolv
 });
 
 // ── Document layout ──────────────────────────────────────────────────
-const drawDocument = (input: InvoicePdfInput, banner: JpegAsset | null) => {
+export const drawDocument = (input: InvoicePdfInput, banner: JpegAsset | null) => {
     const canvas = new Canvas();
     let y = MARGIN + 10;
 

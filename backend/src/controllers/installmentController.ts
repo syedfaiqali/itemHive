@@ -4,6 +4,7 @@ import { randomUUID } from 'crypto';
 import InstallmentPlan from '../models/InstallmentPlan';
 import Product from '../models/Product';
 import Transaction from '../models/Transaction';
+import { recordCommission, salesPerson } from '../services/payrollService';
 import type { AuthRequest } from '../middleware/auth';
 import { normalizeRole } from '../utils/accessControl';
 import { buildTenantFilter, getTenantObjectId } from '../utils/tenancy';
@@ -140,7 +141,9 @@ export const createInstallmentPlan = async (req: AuthRequest, res: Response) => 
         const schedule = buildSchedule(saleDate, resolvedMonths, financedAmount);
         const planId = String(planCode || `INS-${Date.now()}`);
 
+        const salesperson = await salesPerson(req.user!.businessId, req.user!.id, req.body.salespersonEmployeeId, session);
         const transaction = new Transaction({
+            ...salesperson,
             id: `INS-${randomUUID()}`,
             productId,
             productName,
@@ -163,13 +166,14 @@ export const createInstallmentPlan = async (req: AuthRequest, res: Response) => 
             unitPrice: resolvedUnitPrice,
             grossProfit: (resolvedUnitPrice - (product.purchasePrice ?? 0)) * Number(amount || 0),
             installmentPlanId: planId,
-            source: resolvedShiftId ? 'pos' : undefined,
+            source: resolvedShiftId ? 'pos' : 'order_desk',
             orderId: resolvedShiftId ? String(orderId || planId) : '',
             shiftId: resolvedShiftId,
             paidVia: advancePaidVia === 'card' ? 'card' : 'cash',
             businessId: getTenantObjectId(req.user!),
         });
         await transaction.save({ session });
+        await recordCommission(transaction, session);
 
         product.stock -= Number(amount || 0);
         await product.save({ session });

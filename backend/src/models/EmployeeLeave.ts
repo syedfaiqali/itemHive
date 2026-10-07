@@ -4,6 +4,8 @@ export const LEAVE_TYPES = ['casual', 'sick', 'annual', 'unpaid', 'other'] as co
 export type LeaveType = typeof LEAVE_TYPES[number];
 
 export interface IEmployeeLeave extends Document {
+    fraction: number;
+    payrollRequestId?: mongoose.Types.ObjectId;
     employeeId: mongoose.Types.ObjectId;
     /** Inclusive YYYY-MM-DD range. */
     startDate: string;
@@ -18,6 +20,8 @@ export interface IEmployeeLeave extends Document {
 
 const EmployeeLeaveSchema: Schema<IEmployeeLeave> = new Schema(
     {
+        fraction: { type: Number, enum: [0.5, 1], default: 1 },
+        payrollRequestId: { type: Schema.Types.ObjectId },
         employeeId: { type: Schema.Types.ObjectId, ref: 'Employee', required: true },
         startDate: { type: String, required: true },
         endDate: { type: String, required: true },

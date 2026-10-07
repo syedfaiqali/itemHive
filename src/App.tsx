@@ -41,6 +41,9 @@ const InstallmentsPage = React.lazy(() => import('./pages/Installments/Installme
 const EmployeesPage = React.lazy(() => import('./pages/Employees/EmployeesPage'));
 const EmployeeProfilePage = React.lazy(() => import('./pages/Employees/EmployeeProfilePage'));
 const AttendancePage = React.lazy(() => import('./pages/Attendance/AttendancePage'));
+const PayrollPage = React.lazy(() => import('./pages/Payroll/PayrollPage'));
+const MyPayrollPage = React.lazy(() => import('./pages/Payroll/MyPayrollPage'));
+const ExpensesPage = React.lazy(() => import('./pages/Finance/ExpensesPage'));
 const NotificationsPage = React.lazy(() => import('./pages/Notifications/NotificationsPage'));
 const StickyNotes = React.lazy(() => import('./pages/Notes/StickyNotes'));
 const TeamManagementPage = React.lazy(() => import('./pages/Admin/TeamManagementPage'));
@@ -153,6 +156,9 @@ const AppContent: React.FC = () => {
                   <EmployeesPage />
                 </ProtectedRoute>
               } />
+              <Route path="payroll" element={<ProtectedRoute allowedRoles={['super_admin', 'admin']} requiredScreen="payroll_view"><PayrollPage /></ProtectedRoute>} />
+              <Route path="my-payroll" element={<ProtectedRoute><MyPayrollPage /></ProtectedRoute>} />
+              <Route path="expenses" element={<ProtectedRoute><ExpensesPage /></ProtectedRoute>} />
               {/* One route for "new" and saved profiles keeps the page mounted when a new profile gets its id. */}
               <Route path="employees/:id" element={
                 <ProtectedRoute allowedRoles={['super_admin', 'admin']} requiredScreen="employees">

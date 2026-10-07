@@ -62,6 +62,7 @@ import {
 } from '../../lib/employees';
 import DesignationManagerDialog from '../../components/Employees/DesignationManagerDialog';
 import CreateLoginDialog from '../../components/Employees/CreateLoginDialog';
+import EmployeePayrollPanel from '../../components/Payroll/EmployeePayrollPanel';
 import { hasScreenAccess } from '../../lib/screenPermissions';
 import FaceEnrollmentDialog, { type FaceEnrollmentResult } from '../../components/Attendance/FaceEnrollmentDialog';
 import {
@@ -257,11 +258,14 @@ const RepeatableSection = <T extends object>({ description, addLabel, emptyText,
     </>
 );
 
-type ProfileTab = 'personal' | 'job' | 'education' | 'experience' | 'references' | 'achievements' | 'documents' | 'notes';
+type ProfileTab = 'personal' | 'job' | 'education' | 'experience' | 'references' | 'achievements' | 'documents' | 'notes' | 'payroll' | 'loans' | 'payrollHistory';
 
 const PROFILE_TABS: Array<{ key: ProfileTab; label: string; icon: React.ReactElement }> = [
     { key: 'personal', label: 'Personal', icon: <UserRound size={17} /> },
     { key: 'job', label: 'Job & Salary', icon: <Wallet size={17} /> },
+    { key: 'payroll', label: 'Payroll', icon: <Wallet size={17} /> },
+    { key: 'loans', label: 'Loans & Advances', icon: <Wallet size={17} /> },
+    { key: 'payrollHistory', label: 'Payroll History', icon: <FileText size={17} /> },
     { key: 'education', label: 'Education', icon: <GraduationCap size={17} /> },
     { key: 'experience', label: 'Experience', icon: <BriefcaseBusiness size={17} /> },
     { key: 'references', label: 'References', icon: <Handshake size={17} /> },
@@ -273,6 +277,14 @@ const PROFILE_TABS: Array<{ key: ProfileTab; label: string; icon: React.ReactEle
 const EmployeeProfilePage: React.FC = () => {
     const { id = 'new' } = useParams();
     const isNew = id === 'new';
+    React.useEffect(() => {
+        const changed = (event: Event) => {
+            if ((event as CustomEvent<string>).detail !== id) return;
+            api.get<Employee>(`/employees/${id}`).then(({ data }) => { setEmployee(data); setForm(current => ({ ...current, salary: data.salary, salaryType: data.salaryType })); }).catch(() => {});
+        };
+        window.addEventListener('itemhive-payroll-profile-updated', changed);
+        return () => window.removeEventListener('itemhive-payroll-profile-updated', changed);
+    }, [id]);
     const navigate = useNavigate();
     const { currencySymbol } = useAppCurrency();
     const { country } = useSelector((state: RootState) => state.settings);
@@ -475,7 +487,8 @@ const EmployeeProfilePage: React.FC = () => {
             emergencyContactNumber: form.emergencyContactNumber.trim(),
             medicalConditions: form.medicalConditions.trim(),
             notes: form.notes.trim(),
-            salary: Number(form.salary || 0),
+            salary: employee?.payrollEnrolled ? undefined : Number(form.salary || 0),
+            salaryType: employee?.payrollEnrolled ? undefined : form.salaryType,
             education: withoutBlankRows(form.education),
             experience: withoutBlankRows(form.experience),
             references: withoutBlankRows(form.references),
@@ -682,6 +695,7 @@ const EmployeeProfilePage: React.FC = () => {
                             </Tabs>
                         </Box>
                         <CardContent sx={{ p: { xs: 2, md: 3 } }}>
+                            {['payroll', 'loans', 'payrollHistory'].includes(tab) && (isNew ? <Alert severity="info">Save the employee profile before configuring payroll.</Alert> : <EmployeePayrollPanel employeeId={id} view={tab === 'loans' ? 'loans' : tab === 'payrollHistory' ? 'history' : 'profile'} />)}
                             {tab === 'personal' && (
                                 <Stack spacing={3}>
                                     <Grid container spacing={2}>
@@ -793,13 +807,14 @@ const EmployeeProfilePage: React.FC = () => {
                                                 fullWidth
                                                 type="number"
                                                 label="Salary"
+                                                disabled={employee?.payrollEnrolled}
                                                 value={form.salary}
                                                 onChange={(event) => updateField('salary', Number(event.target.value))}
                                                 InputProps={{ startAdornment: <InputAdornment position="start">{currencySymbol}</InputAdornment> }}
                                             />
                                         </Grid>
                                         <Grid size={{ xs: 12, md: 4 }}>
-                                            <TextField select fullWidth label="Salary Type" value={form.salaryType} onChange={(event) => updateField('salaryType', event.target.value as SalaryType)}>
+                                            <TextField select fullWidth label="Salary Type" disabled={employee?.payrollEnrolled} value={form.salaryType} onChange={(event) => updateField('salaryType', event.target.value as SalaryType)}>
                                                 {Object.entries(SALARY_TYPE_LABELS).map(([value, label]) => <MenuItem key={value} value={value}>{label}</MenuItem>)}
                                             </TextField>
                                         </Grid>

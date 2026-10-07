@@ -56,6 +56,8 @@ import {
 import type { AppDispatch } from '../../store';
 import { prepareBannerDataUrl } from '../../lib/imageBanner';
 import api from '../../api/axios';
+import { Link as RouterLink } from 'react-router-dom';
+import { hasScreenAccess } from '../../lib/screenPermissions';
 
 interface Business {
     id: string;
@@ -264,6 +266,24 @@ const SettingsPage: React.FC = () => {
             </Box>
 
             <Grid container spacing={2.25}>
+                <Grid size={{ xs: 12 }}>
+                    <Accordion disableGutters elevation={0} sx={premiumAccordionSx}>
+                        <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={premiumSummarySx}>
+                            <Box><Typography variant="h6" fontWeight={800}>Payroll & Employee Requests</Typography><Typography variant="body2" color="text.secondary">Payroll setup, leave, loans and salary advances</Typography></Box>
+                        </AccordionSummary>
+                        <AccordionDetails sx={{ px: { xs: 2, sm: 2.5 }, pb: 2.5 }}>
+                            <Stack gap={2}>
+                                {hasScreenAccess(user, 'payroll_view') && hasScreenAccess(user, 'payroll_settings') && (
+                                    <>
+                                        <Button component={RouterLink} to="/payroll?tab=settings" variant="contained">Open Payroll Settings</Button>
+                                    </>
+                                )}
+                                <Button component={RouterLink} to="/my-payroll" variant="outlined">My Payroll & Requests</Button>
+                                <Button component={RouterLink} to="/expenses" variant="outlined">Finance & Expenses</Button>
+                            </Stack>
+                        </AccordionDetails>
+                    </Accordion>
+                </Grid>
                 <Grid size={{ xs: 12 }}>
                     <Accordion defaultExpanded disableGutters elevation={0} sx={premiumAccordionSx}>
                         <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={premiumSummarySx}>

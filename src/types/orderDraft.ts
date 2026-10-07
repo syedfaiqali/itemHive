@@ -6,6 +6,7 @@ export interface OrderDraftItem {
 }
 
 export interface OrderDraft {
+    salespersonEmployeeId?: string;
     _id: string;
     draftCode: string;
     items: OrderDraftItem[];

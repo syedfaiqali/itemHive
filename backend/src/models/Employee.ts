@@ -36,6 +36,13 @@ export interface IEmployeeAchievement {
 }
 
 export interface IEmployee extends Document {
+    payrollEnrolled: boolean;
+    payrollRevision: number;
+    department: string;
+    employmentEndDate: string;
+    paymentMethod: 'cash' | 'bank';
+    bankName: string;
+    bankAccount: string;
     employeeCode: string;
     fullName: string;
     fatherName: string;
@@ -106,6 +113,13 @@ const AchievementSchema = new Schema<IEmployeeAchievement>({
 
 const EmployeeSchema: Schema<IEmployee> = new Schema(
     {
+        payrollEnrolled: { type: Boolean, default: false },
+        payrollRevision: { type: Number, default: 0 },
+        department: { type: String, default: '', trim: true },
+        employmentEndDate: { type: String, default: '' },
+        paymentMethod: { type: String, enum: ['cash', 'bank'], default: 'cash' },
+        bankName: { type: String, default: '', select: false },
+        bankAccount: { type: String, default: '', select: false },
         employeeCode: { type: String, required: true, trim: true },
         fullName: { type: String, required: true, trim: true },
         fatherName: { type: String, default: '', trim: true },

@@ -1,6 +1,8 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 export interface ITransaction extends Document {
+    salespersonEmployeeId?: mongoose.Types.ObjectId;
+    salespersonName?: string;
     id: string;
     timestamp: Date;
     productId: string;
@@ -34,6 +36,8 @@ export interface ITransaction extends Document {
 }
 
 const TransactionSchema: Schema = new Schema({
+    salespersonEmployeeId: { type: Schema.Types.ObjectId, ref: 'Employee' },
+    salespersonName: { type: String, default: '' },
     id: { type: String, required: true, index: true },
     timestamp: { type: Date, default: Date.now, index: true },
     productId: { type: String, required: true, index: true },

@@ -46,6 +46,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
 import { addToCart, updateCartItemPrice, updateQuantity, clearCart, replaceCart, setCartDiscountPercent } from '../../features/pos/posSlice';
+import SalespersonSelect from '../../components/Payroll/SalespersonSelect';
 import { resolveProductImage, fetchProducts, placeholderFallback } from '../../features/inventory/inventorySlice';
 import { fetchTransactions } from '../../features/transactions/transactionSlice';
 import type { Product } from '../../features/inventory/inventorySlice';
@@ -159,6 +160,7 @@ const POSTerminal: React.FC = () => {
     // State updates apply on the next render; this ref blocks a rapid double
     // click immediately, before the button visually becomes disabled.
     const checkoutInFlightRef = React.useRef(false);
+    const [salespersonEmployeeId, setSalespersonEmployeeId] = useState('');
     const [creditOpen, setCreditOpen] = useState(false);
     const [creditPaidInput, setCreditPaidInput] = useState('');
     const [creditPaidVia, setCreditPaidVia] = useState<'cash' | 'card'>('cash');
@@ -268,6 +270,7 @@ const POSTerminal: React.FC = () => {
         const loadDraft = async () => {
             try {
                 const response = await api.get<OrderDraft>(`/order-drafts/${requestedDraftId}`);
+                if (response.data.salespersonEmployeeId) setSalespersonEmployeeId(response.data.salespersonEmployeeId);
                 if (cancelled) return;
                 const unavailableNames: string[] = [];
                 const restoredCart = response.data.items.flatMap((draftItem) => {
@@ -477,6 +480,7 @@ const POSTerminal: React.FC = () => {
         setSavingDraft(true);
         try {
             const payload = {
+                salespersonEmployeeId: salespersonEmployeeId || undefined,
                 items: cart.map((item) => ({
                     productId: item.id,
                     quantity: item.quantity,
@@ -707,6 +711,7 @@ const POSTerminal: React.FC = () => {
 
             try {
                 await api.post('/installments', {
+                    salespersonEmployeeId: salespersonEmployeeId || undefined,
                     planCode: `INS-${crypto.randomUUID()}`,
                     productId: item.id,
                     productName: item.name,
@@ -753,6 +758,7 @@ const POSTerminal: React.FC = () => {
 
         try {
             await api.post('/transactions/checkout', {
+                salespersonEmployeeId: salespersonEmployeeId || undefined,
                 orderId: id,
                 draftId: activeDraftId || undefined,
                 shiftId: openShift._id,
@@ -1064,6 +1070,7 @@ const POSTerminal: React.FC = () => {
                         overscrollBehavior: 'contain'
                     }}
                 >
+                    <Box sx={{ p: 1.25 }}><SalespersonSelect value={salespersonEmployeeId} onChange={setSalespersonEmployeeId} /></Box>
                     <Box sx={{ minHeight: cart.length === 0 ? 210 : 'auto', display: 'flex', flexDirection: 'column', justifyContent: cart.length === 0 ? 'center' : 'flex-start' }}>
                         {cart.length === 0 ? (
                             <Box sx={{
