@@ -1,3 +1,4 @@
+import { resolveSellingLine } from '../utils/productSelling';
 import { Request, Response } from 'express';
 import Transaction from '../models/Transaction';
 import { recordCommission, reverseCommission, salesPerson } from '../services/payrollService';
@@ -75,27 +76,28 @@ export const createPOSCheckout = async (req: AuthRequest, res: Response) => {
                 : 0;
             const taxRate = Number(appSettings?.salesTaxRate || 0) / 100;
             const productIds = requestedItems.map((item: any) => String(item.productId || ''));
-            if (new Set(productIds).size !== productIds.length) throw new Error('Duplicate products are not allowed in one checkout');
+            const lineKeys = requestedItems.map((item: any) => `${item.productId}::${item.sizeId || ''}`);
+            if (new Set(lineKeys).size !== lineKeys.length) throw new Error('Duplicate product sizes are not allowed in one checkout');
             // Do not pull descriptions, supplier data, or potentially-megabyte
             // image URLs into the payment transaction. Checkout only needs
             // these fields to validate price/stock and write its ledger lines.
             const products = await Product.find({ id: { $in: productIds }, ...buildTenantFilter(req.user!) })
-                .select('_id id name stock salePrice price purchasePrice')
+                .select('_id id name stock salePrice price purchasePrice unitSizeEnabled sellingType productUnitCode productUnit sizes')
                 .session(session)
                 .lean();
             const productMap = new Map(products.map((product) => [product.id, product]));
-            if (productMap.size !== productIds.length) throw new Error('One or more products no longer exist');
+            if (productMap.size !== new Set(productIds).size) throw new Error('One or more products no longer exist');
 
             const lineInputs = requestedItems.map((item: any) => {
                 const productId = String(item.productId || '');
                 const product = productMap.get(productId)!;
                 const quantity = Number(item.quantity);
-                if (!Number.isInteger(quantity) || quantity < 1) throw new Error(`Invalid quantity for ${product.name}`);
-                if (product.stock < quantity) throw new Error(`Insufficient stock for ${product.name}`);
-                const defaultPrice = Number(product.salePrice ?? product.price ?? 0);
+                const sizeId = String(item.sizeId || '');
+                const sellingLine = resolveSellingLine(product, quantity, sizeId);
+                const defaultPrice = sellingLine.unitPrice;
                 const requestedPrice = Number(item.unitPrice ?? defaultPrice);
                 if (!Number.isFinite(requestedPrice) || requestedPrice < 0) throw new Error(`Invalid sale price for ${product.name}`);
-                const savedLine = qrDraft?.items.find(line => line.productId === productId);
+                const savedLine = qrDraft?.items.find(line => line.productId === productId && (line.sizeId || '') === sizeId);
                 const matchesQrPrice = savedLine?.quantity === quantity && savedLine?.unitPrice === requestedPrice;
                 if (actorRole === 'user' && requestedPrice !== defaultPrice && !matchesQrPrice) throw new Error('Users are not allowed to change the sale price');
                 const subtotal = requestedPrice * quantity;
@@ -103,6 +105,8 @@ export const createPOSCheckout = async (req: AuthRequest, res: Response) => {
                 const taxAmount = subtotal * taxRate;
                 return {
                     product,
+                    sizeId,
+                    sellingLine,
                     quantity,
                     unitPrice: requestedPrice,
                     subtotal,
@@ -142,7 +146,10 @@ export const createPOSCheckout = async (req: AuthRequest, res: Response) => {
                 source: 'pos',
                 shiftId: activeShiftId,
                 productId: line.product.id,
-                productName: line.product.name,
+                productName: line.sellingLine.name,
+                sizeId: line.sizeId,
+                selectedSize: line.sellingLine.size?.size,
+                productUnit: line.product.unitSizeEnabled ? line.product.productUnit : undefined,
                 type: 'reduction',
                 amount: line.quantity,
                 subtotal: line.subtotal,
@@ -161,9 +168,9 @@ export const createPOSCheckout = async (req: AuthRequest, res: Response) => {
                 otherOrderType: isRestaurantOrder && requestedOrderType === 'other' ? String(req.body.otherOrderType || '').trim() : '',
                 foodpandaOrderNumber,
                 foodpandaRiderName,
-                unitCost: Number(line.product.purchasePrice || 0),
+                unitCost: line.sellingLine.unitCost,
                 unitPrice: line.unitPrice,
-                grossProfit: (line.subtotal - line.discountAmount) - (Number(line.product.purchasePrice || 0) * line.quantity),
+                grossProfit: (line.subtotal - line.discountAmount) - (line.sellingLine.unitCost * line.quantity),
                 businessId: getTenantObjectId(req.user!),
             }));
 
@@ -177,9 +184,14 @@ export const createPOSCheckout = async (req: AuthRequest, res: Response) => {
             const stockUpdate = await Product.bulkWrite(
                 lineInputs.map((line: any) => ({
                     updateOne: {
-                        filter: { _id: line.product._id, stock: { $gte: line.quantity } },
-                        update: {
-                            $inc: { stock: -line.quantity },
+                        filter: { _id: line.product._id, stock: { $gte: line.quantity }, ...(line.sizeId ? { sizes: { $elemMatch: { id: line.sizeId, stock: { $gte: line.quantity } } } } : {}) },
+                        update: line.product.unitSizeEnabled && line.product.sellingType === 'quantity' ? [{
+                            $set: {
+                                stock: { $toDouble: { $subtract: [{ $toDecimal: '$stock' }, { $toDecimal: line.quantity }] } },
+                                lastUpdated: new Date(),
+                            },
+                        }] : {
+                            $inc: { stock: -line.quantity, ...(line.sizeId ? { 'sizes.$.stock': -line.quantity } : {}) },
                             $set: { lastUpdated: new Date() },
                         },
                     },
@@ -266,8 +278,11 @@ export const createTransaction = async (req: AuthRequest, res: Response) => {
         }
 
         const actorRole = normalizeRole(req.user?.role);
-        const resolvedUnitCost = product.purchasePrice ?? 0;
-        const defaultUnitPrice = Number(product.salePrice ?? product.price ?? 0);
+        const sizeId = String(req.body.sizeId || '');
+        const numericAmount = Number(amount);
+        const sellingLine = resolveSellingLine(type === 'addition' ? { ...product.toObject(), stock: Number.MAX_VALUE, sizes: product.sizes?.map(row => ({ ...row, stock: Number.MAX_VALUE })) } : product, numericAmount, sizeId);
+        const resolvedUnitCost = sellingLine.unitCost;
+        const defaultUnitPrice = sellingLine.unitPrice;
         const requestedUnitPrice = unitPrice != null ? Number(unitPrice) : defaultUnitPrice;
 
         if (actorRole === 'user' && requestedUnitPrice !== defaultUnitPrice) {
@@ -320,7 +335,10 @@ export const createTransaction = async (req: AuthRequest, res: Response) => {
             discountAmount: resolvedDiscountAmount,
             taxAmount: resolvedTaxAmount,
             userName: req.user?.name || userName || 'Staff',
-            productName,
+            productName: sellingLine.name,
+            sizeId,
+            selectedSize: sellingLine.size?.size,
+            productUnit: product.unitSizeEnabled ? product.productUnit : undefined,
             paymentMethod: paymentMethod || 'cash',
             paidVia,
             paidNow: paidNow || 0,
@@ -340,13 +358,15 @@ export const createTransaction = async (req: AuthRequest, res: Response) => {
         await transaction.save({ session });
         await recordCommission(transaction, session);
 
+        const selectedSize = sizeId ? product.sizes?.find(row => row.id === sizeId) : undefined;
+        if (selectedSize) selectedSize.stock += type === 'reduction' ? -numericAmount : numericAmount;
         if (type === 'reduction') {
             if (product.stock < amount) {
                 throw new Error('Insufficient stock');
             }
             product.stock -= amount;
         } else {
-            product.stock += amount;
+            product.stock += numericAmount;
         }
 
         await product.save({ session });
@@ -427,6 +447,12 @@ export const deleteTransaction = async (req: AuthRequest, res: Response) => {
                 throw error;
             }
 
+            if (transaction.sizeId) {
+                const size = product.sizes?.find(row => row.id === transaction.sizeId);
+                if (!size || !product.unitSizeEnabled || product.sellingType !== 'fixed') throw new Error('The original product size is no longer available, so stock cannot be restored');
+                if (size.stock + stockChange < 0) throw new Error('This reversal would make the size stock negative');
+                size.stock += stockChange;
+            } else if (product.unitSizeEnabled && product.sellingType === 'fixed') throw new Error('The product selling type has changed, so stock cannot be restored');
             product.stock += stockChange;
             await product.save({ session });
             await reverseCommission(transaction, session);

@@ -1,3 +1,4 @@
+import { resolveSellingLine } from '../utils/productSelling';
 import { Response } from 'express';
 import Product from '../models/Product';
 import Employee from '../models/Employee';
@@ -7,6 +8,7 @@ import { normalizeRole } from '../utils/accessControl';
 import { buildTenantFilter, getCachedAppSettingsForTenant, getTenantObjectId } from '../utils/tenancy';
 
 type DraftItemInput = {
+    sizeId?: unknown;
     productId?: unknown;
     quantity?: unknown;
     unitPrice?: unknown;
@@ -19,16 +21,17 @@ const buildDraftPayload = async (req: AuthRequest) => {
 
     const normalizedItems = requestedItems.map((item) => ({
         productId: String(item.productId || '').trim(),
+        sizeId: String(item.sizeId || ''),
         quantity: Number(item.quantity),
         unitPrice: Number(item.unitPrice),
     }));
 
-    if (normalizedItems.some((item) => !item.productId || !Number.isInteger(item.quantity) || item.quantity < 1)) {
+    if (normalizedItems.some((item) => !item.productId || !Number.isFinite(item.quantity) || item.quantity <= 0)) {
         throw new Error('Every draft product must have a valid quantity');
     }
 
     const productIds = Array.from(new Set(normalizedItems.map((item) => item.productId)));
-    if (productIds.length !== normalizedItems.length) throw new Error('Duplicate products are not allowed in a draft');
+    if (new Set(normalizedItems.map(item => `${item.productId}::${item.sizeId}`)).size !== normalizedItems.length) throw new Error('Duplicate product sizes are not allowed in a draft');
 
     // These two reads are independent. Running them together removes a remote
     // database round trip from every Save as Draft request while preserving
@@ -40,7 +43,7 @@ const buildDraftPayload = async (req: AuthRequest) => {
         })
             // Draft validation has no need for product images or inventory
             // metadata; avoid transferring those large fields on Save as Draft.
-            .select('id name salePrice price')
+            .select('id name stock salePrice price purchasePrice unitSizeEnabled sellingType productUnitCode productUnit sizes')
             .lean(),
         getCachedAppSettingsForTenant(req.user!),
     ]);
@@ -53,13 +56,17 @@ const buildDraftPayload = async (req: AuthRequest) => {
         : null;
     const items = normalizedItems.map((item) => {
         const product = productsById.get(item.productId)!;
-        const currentPrice = Number(product.salePrice ?? product.price ?? 0);
+        const sellingLine = resolveSellingLine(product, item.quantity, item.sizeId);
+        const currentPrice = sellingLine.unitPrice;
         const requestedPrice = Number.isFinite(item.unitPrice) && item.unitPrice >= 0 ? item.unitPrice : currentPrice;
-        const savedLine = qrDraft?.items.find(line => line.productId === item.productId);
+        const savedLine = qrDraft?.items.find(line => line.productId === item.productId && (line.sizeId || '') === item.sizeId);
         const matchesQrPrice = savedLine?.quantity === item.quantity && savedLine?.unitPrice === requestedPrice;
         return {
             productId: item.productId,
-            productName: product.name,
+            productName: sellingLine.name,
+            sizeId: item.sizeId,
+            selectedSize: sellingLine.size?.size,
+            productUnit: product.unitSizeEnabled ? product.productUnit : undefined,
             quantity: item.quantity,
             unitPrice: actorRole === 'user' && !matchesQrPrice ? currentPrice : requestedPrice,
         };

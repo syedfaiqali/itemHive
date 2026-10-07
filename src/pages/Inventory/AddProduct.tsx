@@ -1,3 +1,5 @@
+import ProductSellingFields from '../../components/Common/ProductSellingFields';
+import { emptySellingDetails, sellingPayload, sellingError, isFixedProduct } from '../../lib/productSelling';
 import useProductCategories from '../../hooks/useProductCategories';
 import React, { useRef, useState } from 'react';
 import {
@@ -36,7 +38,7 @@ import type { RootState } from '../../store';
 import { motion } from 'framer-motion';
 import useAppCurrency from '../../hooks/useAppCurrency';
 import api from '../../api/axios';
-import { DEFAULT_PRODUCT_UNIT, getProductUnit, PRODUCT_UNITS } from '../../lib/productUnits';
+import { DEFAULT_PRODUCT_UNIT, getProductUnit } from '../../lib/productUnits';
 import { optimizeProductImage, PRODUCT_IMAGE_HELPER_TEXT } from '../../lib/productImage';
 
 
@@ -78,7 +80,8 @@ const AddProduct: React.FC = () => {
         salePrice: '',
         stock: '',
         minStock: '',
-        productUnitCode: DEFAULT_PRODUCT_UNIT.code,
+        ...emptySellingDetails,
+        productUnitCode: DEFAULT_PRODUCT_UNIT.code as string,
         description: '',
         imageUrl: ''
     });
@@ -193,7 +196,9 @@ const AddProduct: React.FC = () => {
             return;
         }
 
-        const payload = {
+        const validationError = sellingError(formData);
+        if (validationError) { setSubmitError(validationError); return; }
+        const payload = sellingPayload({
             id: Math.random().toString(36).substr(2, 9),
             sku: formData.sku.toUpperCase(),
             name: formData.name,
@@ -201,14 +206,17 @@ const AddProduct: React.FC = () => {
             purchasePrice: parseFloat(formData.purchasePrice),
             salePrice: parseFloat(formData.salePrice),
             price: parseFloat(formData.salePrice),
-            stock: parseInt(formData.stock),
-            minStock: parseInt(formData.minStock),
-            productUnitCode: selectedUnit.code,
-            productUnit: selectedUnit.english,
+            stock: Number(formData.stock),
+            minStock: Number(formData.minStock),
+            unitSizeEnabled: formData.unitSizeEnabled,
+            sellingType: formData.sellingType,
+            sizes: formData.sizes,
+            productUnitCode: formData.productUnitCode,
+            productUnit: formData.productUnit || selectedUnit.english,
             productUnitUrdu: selectedUnit.urdu,
             description: formData.description,
             imageUrl: formData.imageUrl
-        };
+        });
 
         setSubmitting(true);
 
@@ -319,24 +327,7 @@ const AddProduct: React.FC = () => {
                                     </TextField>
                                 </Grid>
 
-                                <Grid size={{ xs: 12, md: 6 }}>
-                                    <TextField
-                                        select
-                                        fullWidth
-                                        label="Selling Unit / فروخت کی اکائی"
-                                        name="productUnitCode"
-                                        required
-                                        value={formData.productUnitCode}
-                                        onChange={handleChange}
-                                        helperText={`Example display: 10 ${selectedUnit.english} / ${selectedUnit.urdu}`}
-                                    >
-                                        {PRODUCT_UNITS.map((unit) => (
-                                            <MenuItem key={unit.code} value={unit.code}>
-                                                {unit.english} / {unit.urdu}
-                                            </MenuItem>
-                                        ))}
-                                    </TextField>
-                                </Grid>
+                                <Grid size={12}><ProductSellingFields value={formData} onChange={details => setFormData(current => ({ ...current, ...details }))} /></Grid>
 
                                 <Grid size={12}>
                                     <TextField
@@ -361,10 +352,10 @@ const AddProduct: React.FC = () => {
                                 <Grid size={{ xs: 12, md: 4 }}>
                                     <TextField
                                         fullWidth
-                                        label={`Upload Price (${currency})`}
+                                        label={`Purchase Price (${currency})${formData.unitSizeEnabled && formData.sellingType === 'quantity' ? ` per ${formData.productUnit}` : ''}`}
                                         name="purchasePrice"
                                         type="number"
-                                        required
+                                        disabled={!!isFixedProduct(formData)} slotProps={{ htmlInput: { min: 0, step: 'any' } }} required={!isFixedProduct(formData)}
                                         value={formData.purchasePrice}
                                         onChange={handleChange}
                                         InputProps={{
@@ -376,10 +367,10 @@ const AddProduct: React.FC = () => {
                                 <Grid size={{ xs: 12, md: 4 }}>
                                     <TextField
                                         fullWidth
-                                        label={`Sell Price (${currency})`}
+                                        label={`Sell Price (${currency})${formData.unitSizeEnabled && formData.sellingType === 'quantity' ? ` per ${formData.productUnit}` : ''}`}
                                         name="salePrice"
                                         type="number"
-                                        required
+                                        disabled={!!isFixedProduct(formData)} slotProps={{ htmlInput: { min: 0, step: 'any' } }} required={!isFixedProduct(formData)}
                                         value={formData.salePrice}
                                         onChange={handleChange}
                                         InputProps={{
@@ -391,13 +382,13 @@ const AddProduct: React.FC = () => {
                                 <Grid size={{ xs: 12, md: 4 }}>
                                     <TextField
                                         fullWidth
-                                        label="Initial Stock"
+                                        label={formData.unitSizeEnabled && formData.sellingType === 'quantity' ? `Initial Stock (${formData.productUnit})` : 'Initial Stock'}
                                         name="stock"
                                         type="number"
-                                        required
+                                        disabled={!!isFixedProduct(formData)} slotProps={{ htmlInput: { min: 0, step: 'any' } }} required={!isFixedProduct(formData)}
                                         value={formData.stock}
                                         onChange={handleChange}
-                                        helperText={`Stock will be shown as ${formData.stock || 0} ${selectedUnit.english} / ${selectedUnit.urdu}`}
+                                        helperText={isFixedProduct(formData) ? 'Stock is entered for each size above.' : formData.unitSizeEnabled ? `Stock in ${formData.productUnit}` : 'Available item quantity'}
                                     />
                                 </Grid>
 
@@ -405,7 +396,7 @@ const AddProduct: React.FC = () => {
                                     <TextField
                                         fullWidth
                                         label="Minimum Stock Level"
-                                        name="minStock"
+                                        slotProps={{ htmlInput: { min: 0, step: 'any' } }} name="minStock"
                                         type="number"
                                         required
                                         value={formData.minStock}

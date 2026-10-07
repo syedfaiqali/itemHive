@@ -1,4 +1,7 @@
 export interface OrderDraftItem {
+    sizeId?: string;
+    selectedSize?: number;
+    productUnit?: string;
     productId: string;
     productName: string;
     quantity: number;

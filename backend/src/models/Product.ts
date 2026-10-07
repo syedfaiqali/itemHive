@@ -1,6 +1,10 @@
 import mongoose, { Schema, Document } from 'mongoose';
+import { validateSellingProduct, type SizeData } from '../utils/productSelling';
 
 export interface IProduct extends Document {
+    unitSizeEnabled?: boolean;
+    sellingType?: string;
+    sizes?: SizeData[];
     id: string;
     sku: string;
     name: string;
@@ -24,6 +28,9 @@ export interface IProduct extends Document {
 }
 
 const ProductSchema: Schema<IProduct> = new Schema({
+    unitSizeEnabled: { type: Boolean, default: false },
+    sellingType: { type: String, enum: ['', 'quantity', 'fixed'], default: '' },
+    sizes: [{ id: { type: String, required: true }, size: { type: Number, required: true, min: Number.MIN_VALUE }, purchasePrice: { type: Number, required: true, min: 0 }, salePrice: { type: Number, required: true, min: 0 }, stock: { type: Number, required: true, min: 0 }, _id: false }],
     id: { type: String, required: true, index: true },
     sku: { type: String, required: true, index: true },
     name: { type: String, required: true, index: true },
@@ -31,10 +38,10 @@ const ProductSchema: Schema<IProduct> = new Schema({
     purchasePrice: { type: Number, required: true, min: 0 },
     salePrice: { type: Number, required: true, min: 0 },
     price: { type: Number, required: true },
-    stock: { type: Number, required: true, default: 0 },
+    stock: { type: Number, required: true, default: 0, min: 0 },
     minStock: { type: Number, required: true, default: 5 },
-    productUnitCode: { type: String, default: 'piece', trim: true },
-    productUnit: { type: String, default: 'Piece', trim: true },
+    productUnitCode: { type: String, default: function (this: IProduct) { return this.unitSizeEnabled ? undefined : 'piece'; }, trim: true },
+    productUnit: { type: String, default: function (this: IProduct) { return this.unitSizeEnabled ? undefined : 'Piece'; }, trim: true },
     productUnitUrdu: { type: String, default: 'عدد', trim: true },
     description: { type: String, default: '' },
     imageUrl: {
@@ -61,6 +68,7 @@ ProductSchema.index({ businessId: 1, id: 1 }, { unique: true });
 ProductSchema.index({ businessId: 1, sku: 1 }, { unique: true });
 
 // Automatically update lastUpdated before saving
+ProductSchema.pre('validate', function () { validateSellingProduct(this); });
 ProductSchema.pre('save', function () {
     this.price = this.salePrice;
     this.lastUpdated = new Date();
