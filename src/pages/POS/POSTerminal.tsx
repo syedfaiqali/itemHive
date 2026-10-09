@@ -327,7 +327,7 @@ const POSTerminal: React.FC = () => {
 
             try {
                 // A 58mm roll uses a 52mm receipt box, including its padding.
-                // printReceipt measures the items to determine the page height.
+                // Keep the ticket at thermal width on the selected printer paper.
                 await printReceipt(kitchenTicket, '#pos-draft-kot', 58);
                 if (!cancelled) setDraftKot(null);
             } catch {
