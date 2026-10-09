@@ -4,7 +4,7 @@ import { DEFAULT_PRODUCT_UNIT } from '../../lib/productUnits';
 import { loginUser, logout } from '../auth/authSlice';
 import { verifySavedSellingDetails } from '../../lib/productSelling';
 
-export interface ProductSize { id: string; size: number; purchasePrice: number; salePrice: number; stock: number }
+export interface ProductSize { id: string; size: number | string; purchasePrice: number; salePrice: number; stock: number }
 export interface Product {
     unitSizeEnabled?: boolean;
     sellingType?: 'quantity' | 'fixed' | '';

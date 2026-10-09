@@ -6,7 +6,7 @@ export interface ITransaction extends Document {
     id: string;
     timestamp: Date;
     sizeId?: string;
-    selectedSize?: number;
+    selectedSize?: number | string;
     productUnit?: string;
     productId: string;
     productName: string;
@@ -44,7 +44,7 @@ const TransactionSchema: Schema = new Schema({
     id: { type: String, required: true, index: true },
     timestamp: { type: Date, default: Date.now, index: true },
     sizeId: { type: String, default: '' },
-        selectedSize: { type: Number },
+        selectedSize: { type: Schema.Types.Mixed },
         productUnit: { type: String },
         productId: { type: String, required: true, index: true },
     productName: { type: String, required: true },

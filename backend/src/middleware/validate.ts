@@ -85,10 +85,10 @@ export const productSchema = Joi.object({
     }),
     sizes: Joi.array().items(Joi.object({
         id: Joi.string().trim().required(),
-        size: Joi.number().positive().required(),
-        purchasePrice: Joi.number().min(0).required(),
-        salePrice: Joi.number().min(0).required(),
-        stock: Joi.number().integer().min(0).required(),
+        size: Joi.alternatives().try(Joi.string().trim().min(1).max(100), Joi.number().positive()).required(),
+        purchasePrice: Joi.number().min(0).empty('').default(0),
+        salePrice: Joi.number().min(0).empty('').default(0),
+        stock: Joi.number().integer().min(0).empty('').default(0),
     })).unique('id').unique('size').when('unitSizeEnabled', {
         is: Joi.valid(true).required(),
         then: Joi.array().when('sellingType', { is: 'fixed', then: Joi.array().min(1).required(), otherwise: Joi.optional() }),
@@ -230,7 +230,12 @@ export const updateUserStatusSchema = Joi.object({
     businessTypeId: Joi.string().trim().max(80).allow('').optional(),
 }).or('isActive', 'isVisible', 'installmentAccess', 'discountAccess', 'digitalMenuAccess', 'restaurantEnabled', 'businessTypeId');
 
+export const updateBusinessTypeSchema = Joi.object({
+    productFields: Joi.array().items(Joi.string().valid('unitSize', 'supplier', 'batchNumber', 'expiryDate')).unique().required(),
+});
+
 export const createBusinessTypeSchema = Joi.object({
+    productFields: Joi.array().items(Joi.string().valid('unitSize', 'supplier', 'batchNumber', 'expiryDate')).unique().optional(),
     name: Joi.string().trim().min(2).max(80).required(),
 });
 

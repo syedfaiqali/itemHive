@@ -4,6 +4,7 @@ export interface BusinessTypeOption {
     id: string;
     name: string;
     restaurantEnabled: boolean;
+    productFields?: string[];
 }
 
 export const DEFAULT_BUSINESS_TYPES: BusinessTypeOption[] = [
@@ -16,6 +17,7 @@ const optionSchema = new Schema<BusinessTypeOption>({
     id: { type: String, required: true },
     name: { type: String, required: true, trim: true },
     restaurantEnabled: { type: Boolean, default: false },
+    productFields: { type: [String], enum: ['unitSize', 'supplier', 'batchNumber', 'expiryDate'], default: undefined },
 }, { _id: false });
 
 const catalogSchema = new Schema({

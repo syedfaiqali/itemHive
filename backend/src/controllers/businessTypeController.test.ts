@@ -7,10 +7,42 @@ import Business from '../models/Business';
 import AppSetting from '../models/AppSetting';
 import User from '../models/User';
 import BusinessTypeCatalog, { DEFAULT_BUSINESS_TYPES } from '../models/BusinessTypeCatalog';
-import { createBusinessType, deleteBusinessType } from './businessTypeController';
+import { createBusinessType, deleteBusinessType, updateBusinessType } from './businessTypeController';
 import { updateUserStatus } from './userController';
 import { getBusinessTypeCatalog } from '../utils/businessTypes';
-import { createBusinessTypeSchema, updateUserStatusSchema } from '../middleware/validate';
+import { createBusinessTypeSchema, updateUserStatusSchema, updateBusinessTypeSchema } from '../middleware/validate';
+import { businessProductFields } from '../utils/businessProductFields';
+
+test('product fields use business defaults and honor an explicitly empty custom configuration', () => {
+    assert.deepEqual(businessProductFields({ id: 'restaurant' }), ['unitSize']);
+    assert.deepEqual(businessProductFields({ id: 'stationery' }), ['unitSize', 'supplier']);
+    assert.deepEqual(businessProductFields({ id: 'super-mart' }), ['unitSize', 'supplier', 'batchNumber', 'expiryDate']);
+    assert.deepEqual(businessProductFields({ id: 'custom', productFields: ['expiryDate'] }), ['expiryDate']);
+    assert.deepEqual(businessProductFields({ id: 'super-mart', productFields: [] }), []);
+    assert.equal(updateBusinessTypeSchema.validate({ productFields: [] }).error, undefined);
+    assert.ok(updateBusinessTypeSchema.validate({ productFields: ['unknown'] }).error);
+    assert.ok(updateBusinessTypeSchema.validate({ productFields: ['supplier', 'supplier'] }).error);
+});
+
+test('product field updates target one catalog type and report a missing type', async (t) => {
+    let filter: unknown;
+    let update: unknown;
+    let found = true;
+    t.mock.method(BusinessTypeCatalog, 'findOneAndUpdate', async (query: unknown, changes: unknown) => {
+        filter = query; update = changes;
+        return found ? { types: [] } : null;
+    });
+    const req = { params: { id: 'custom' }, body: { productFields: ['supplier', 'expiryDate'] } } as unknown as AuthRequest;
+    const saved = response();
+    await updateBusinessType(req, saved.res);
+    assert.equal(saved.result.status, 200);
+    assert.deepEqual(filter, { key: 'global', 'types.id': 'custom' });
+    assert.deepEqual(update, { $set: { 'types.$.productFields': ['supplier', 'expiryDate'] } });
+    found = false;
+    const missing = response();
+    await updateBusinessType(req, missing.res);
+    assert.equal(missing.result.status, 404);
+});
 
 const response = () => {
     const result = { status: 200, body: {} as Record<string, unknown> };

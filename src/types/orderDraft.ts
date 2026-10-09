@@ -1,6 +1,6 @@
 export interface OrderDraftItem {
     sizeId?: string;
-    selectedSize?: number;
+    selectedSize?: number | string;
     productUnit?: string;
     productId: string;
     productName: string;

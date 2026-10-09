@@ -2,7 +2,7 @@ import mongoose, { Document, Schema } from 'mongoose';
 
 export interface IOrderDraftItem {
     sizeId?: string;
-    selectedSize?: number;
+    selectedSize?: number | string;
     productUnit?: string;
     productId: string;
     productName: string;
@@ -31,7 +31,7 @@ const OrderDraftSchema = new Schema<IOrderDraft>({
     draftCode: { type: String, required: true, trim: true },
     items: [{
         sizeId: { type: String, default: '' },
-        selectedSize: { type: Number },
+        selectedSize: { type: Schema.Types.Mixed },
         productUnit: { type: String },
         productId: { type: String, required: true, trim: true },
         productName: { type: String, required: true, trim: true },

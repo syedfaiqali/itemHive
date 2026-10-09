@@ -30,7 +30,7 @@ export interface IProduct extends Document {
 const ProductSchema: Schema<IProduct> = new Schema({
     unitSizeEnabled: { type: Boolean, default: false },
     sellingType: { type: String, enum: ['', 'quantity', 'fixed'], default: '' },
-    sizes: [{ id: { type: String, required: true }, size: { type: Number, required: true, min: Number.MIN_VALUE }, purchasePrice: { type: Number, required: true, min: 0 }, salePrice: { type: Number, required: true, min: 0 }, stock: { type: Number, required: true, min: 0 }, _id: false }],
+    sizes: [{ id: { type: String, required: true }, size: { type: Schema.Types.Mixed, required: true }, purchasePrice: { type: Number, default: 0, min: 0 }, salePrice: { type: Number, default: 0, min: 0 }, stock: { type: Number, default: 0, min: 0 }, _id: false }],
     id: { type: String, required: true, index: true },
     sku: { type: String, required: true, index: true },
     name: { type: String, required: true, index: true },

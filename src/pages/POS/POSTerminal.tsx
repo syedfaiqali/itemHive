@@ -1733,7 +1733,7 @@ const POSTerminal: React.FC = () => {
                         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                             {(sellingProduct.sizes || []).map(size => <Button key={size.id} type="button" variant={sellingSizeId === size.id ? 'contained' : 'outlined'} disabled={size.stock <= 0} aria-pressed={sellingSizeId === size.id} onClick={() => { setSellingSizeId(size.id); setSellingError(''); }} sx={{ flex: '1 1 140px', py: 1.5 }}>
                                 <Stack spacing={0.5}>
-                                    <Typography fontWeight={800}>{size.size} {sellingProduct.productUnit}</Typography>
+                                    <Typography fontWeight={800}>{size.size} {typeof size.size === 'number' ? sellingProduct.productUnit : ''}</Typography>
                                     <Typography variant="body2">{formatCurrency(size.salePrice)}</Typography>
                                     <Typography variant="caption">{size.stock} bottles/packs available</Typography>
                                 </Stack>

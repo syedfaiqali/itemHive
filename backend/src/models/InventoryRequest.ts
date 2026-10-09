@@ -45,7 +45,7 @@ const InventoryRequestSchema = new Schema<IInventoryRequest>({
     productData: {
         unitSizeEnabled: { type: Boolean, default: false },
         sellingType: { type: String, default: '' },
-        sizes: [{ id: String, size: Number, purchasePrice: Number, salePrice: Number, stock: Number, _id: false }],
+        sizes: [{ id: String, size: Schema.Types.Mixed, purchasePrice: { type: Number, default: 0 }, salePrice: { type: Number, default: 0 }, stock: { type: Number, default: 0 }, _id: false }],
         id: { type: String, required: true },
         sku: { type: String, required: true },
         name: { type: String, required: true },
