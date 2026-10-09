@@ -42,8 +42,6 @@ import { DEFAULT_PRODUCT_UNIT, getProductUnit } from '../../lib/productUnits';
 import { optimizeProductImage, PRODUCT_IMAGE_HELPER_TEXT } from '../../lib/productImage';
 import { BUSINESS_PRODUCT_FIELDS } from '../../types/businessType';
 
-
-
 const getErrorMessage = (error: unknown, fallback: string) => {
     if (typeof error === 'string') return error;
     if (error instanceof Error && error.message) return error.message;
