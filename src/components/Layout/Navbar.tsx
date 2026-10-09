@@ -96,6 +96,7 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
     const [monthlyPaymentAlerts, setMonthlyPaymentAlerts] = React.useState<Array<{ businessId: string; businessName: string }>>([]);
     const [workspaceOptions, setWorkspaceOptions] = React.useState<WorkspaceOption[]>([]);
     const [selectedWorkspaceId, setSelectedWorkspaceId] = React.useState(() => localStorage.getItem('itemhive-workspace-id') || '');
+    const [selectedWorkspaceUserId, setSelectedWorkspaceUserId] = React.useState(() => localStorage.getItem('itemhive-workspace-user-id') || '');
     const roleLabel = formatRoleLabel(user?.role);
 
     const drawerWidth = 260;
@@ -173,16 +174,22 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
     }, [user?.role]);
 
     const selectedWorkspace = React.useMemo(
-        () => workspaceOptions.find((option) => option.businessId === selectedWorkspaceId),
-        [selectedWorkspaceId, workspaceOptions]
+        () => workspaceOptions.find((option) => option.id === selectedWorkspaceUserId && option.businessId === selectedWorkspaceId)
+            || workspaceOptions.find((option) => option.businessId === selectedWorkspaceId),
+        [selectedWorkspaceId, selectedWorkspaceUserId, workspaceOptions]
     );
 
-    const handleWorkspaceChange = (businessId: string) => {
+    const handleWorkspaceChange = (userId: string) => {
+        const option = workspaceOptions.find((entry) => entry.id === userId);
+        const businessId = option?.businessId || '';
+        setSelectedWorkspaceUserId(option?.id || '');
         setSelectedWorkspaceId(businessId);
         if (businessId) {
             localStorage.setItem('itemhive-workspace-id', businessId);
+            localStorage.setItem('itemhive-workspace-user-id', option!.id);
         } else {
             localStorage.removeItem('itemhive-workspace-id');
+            localStorage.removeItem('itemhive-workspace-user-id');
         }
         // Remove the previous workspace immediately; do not leave another
         // client's inventory visible while the new tenant request is pending.
@@ -360,14 +367,14 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
                             <TextField
                                 select
                                 size="small"
-                                value={workspaceOptions.some((option) => option.businessId === selectedWorkspaceId) ? selectedWorkspaceId : ''}
+                                value={selectedWorkspace?.id || ''}
                                 onChange={(event) => handleWorkspaceChange(event.target.value)}
                                 variant="standard"
                                 InputProps={{ disableUnderline: true }}
                                 SelectProps={{
                                     displayEmpty: true,
                                     renderValue: (value) => {
-                                        const option = workspaceOptions.find((entry) => entry.businessId === value);
+                                        const option = workspaceOptions.find((entry) => entry.id === value);
                                         return (
                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0 }}>
                                                 <Typography variant="caption" sx={{ fontWeight: 900, color: navbarFontColor || 'text.secondary' }}>
@@ -375,6 +382,7 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
                                                 </Typography>
                                                 <Typography
                                                     variant="body2"
+                                                    title={option ? `${option.name} · ${option.email} · ${option.businessName || 'Workspace'}` : 'Own workspace'}
                                                     sx={{
                                                         fontWeight: 900,
                                                         maxWidth: 160,
@@ -383,7 +391,7 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
                                                         whiteSpace: 'nowrap',
                                                     }}
                                                 >
-                                                    {option?.businessName || option?.name || 'Own workspace'}
+                                                    {option ? `${option.name} · ${option.businessName || 'Workspace'}` : 'Own workspace'}
                                                 </Typography>
                                             </Box>
                                         );
@@ -405,7 +413,7 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
                                     </Box>
                                 </MenuItem>
                                 {workspaceOptions.map((option) => (
-                                    <MenuItem key={`${option.id}-${option.businessId}`} value={option.businessId}>
+                                    <MenuItem key={option.id} value={option.id}>
                                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, width: '100%' }}>
                                             <Avatar sx={{ width: 28, height: 28, bgcolor: 'primary.main', fontSize: 12, fontWeight: 900 }}>
                                                 {option.name.charAt(0).toUpperCase()}

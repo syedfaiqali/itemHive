@@ -1,6 +1,16 @@
 import type { User } from '../features/auth/authSlice';
 
 export const ADMIN_SCREEN_PERMISSIONS = [
+    { key: 'finance_view', label: 'Finance: View All Expenses', group: 'Finance' },
+    { key: 'finance_expense_approve', label: 'Finance: Approve Expenses', group: 'Finance' },
+    { key: 'finance_pay', label: 'Finance: Expense Payments', group: 'Finance' },
+    { key: 'payroll_view', label: 'Payroll: View', group: 'Payroll' },
+    { key: 'payroll_prepare', label: 'Payroll: Prepare', group: 'Payroll' },
+    { key: 'payroll_approve', label: 'Payroll: Approve', group: 'Payroll' },
+    { key: 'payroll_pay', label: 'Payroll: Payments', group: 'Payroll' },
+    { key: 'payroll_reports', label: 'Payroll: Reports', group: 'Payroll' },
+    { key: 'payroll_settings', label: 'Payroll: Settings & Salaries', group: 'Payroll' },
+    { key: 'payroll_hr', label: 'Payroll: HR Requests', group: 'Payroll' },
     { key: 'dashboard', label: 'Dashboard', group: 'Overview' },
     { key: 'pos', label: 'POS Terminal', group: 'Sales' },
     { key: 'orders', label: 'Order Desk', group: 'Sales' },
@@ -31,6 +41,7 @@ export type ScreenPermission = typeof ADMIN_SCREEN_PERMISSIONS[number]['key'];
 export const ALL_ADMIN_SCREEN_KEYS = ADMIN_SCREEN_PERMISSIONS.map((permission) => permission.key);
 
 export const hasScreenAccess = (user: User | null | undefined, permission: ScreenPermission) => {
+    if (permission.startsWith('payroll_') || permission.startsWith('finance_')) return user?.role === 'super_admin' || (user?.role === 'admin' && Boolean(user.screenPermissions?.includes(permission)));
     if (!user || user.role !== 'admin') return true;
     // null/undefined preserves full access for existing Admin accounts until
     // the Super Admin explicitly saves a permission assignment.

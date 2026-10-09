@@ -5,6 +5,8 @@ import EmployeeDocument from '../models/EmployeeDocument';
 import Designation, { DEFAULT_DESIGNATIONS, normalizeDesignation } from '../models/Designation';
 import Attendance from '../models/Attendance';
 import EmployeeLeave from '../models/EmployeeLeave';
+import { PayrollRun, SalaryStructure, PayrollRequest, PayrollLoan, PayrollCommission } from '../models/Payroll';
+import { syncSalarySummary } from '../services/payrollService';
 import User from '../models/User';
 import type { AuthRequest } from '../middleware/auth';
 import { buildTenantFilter, getTenantObjectId } from '../utils/tenancy';
@@ -74,6 +76,8 @@ export const getEmployees = async (req: AuthRequest, res: Response) => {
     try {
         // Every staff login in Team shows up here, including accounts created before the two were linked.
         await syncStaffEmployees(req.user!.businessId);
+        const enrolled = await Employee.find({ ...buildTenantFilter(req.user!), payrollEnrolled: true }).select('_id');
+        for (const e of enrolled) await syncSalarySummary(req.user!.businessId, String(e._id));
         const employees = await Employee.find(buildTenantFilter(req.user!)).sort({ fullName: 1 }).lean<LeanEmployee[]>();
         const accounts = await loadAccounts(employees);
         return res.json(employees.map((employee) => serializeEmployee(employee, accountFor(employee, accounts))));
@@ -87,6 +91,7 @@ export const getEmployee = async (req: AuthRequest, res: Response) => {
         const id = String(req.params.id);
         if (!isValidId(id)) return res.status(404).json({ message: 'Employee not found' });
 
+        if (await SalaryStructure.exists({ _id: { $exists: true }, employeeId: id, businessId: req.user!.businessId })) await syncSalarySummary(req.user!.businessId, id);
         const employee = await Employee.findOne({ _id: id, ...buildTenantFilter(req.user!) }).lean<LeanEmployee>();
         if (!employee) return res.status(404).json({ message: 'Employee not found' });
 
@@ -132,6 +137,13 @@ export const updateEmployee = async (req: AuthRequest, res: Response) => {
             return res.status(409).json({ message: `An employee with this CNIC already exists (${owner.fullName}).` });
         }
 
+        const existing = await Employee.findOne({ _id: id, ...buildTenantFilter(req.user!) });
+        if (existing?.payrollEnrolled && ((req.body.salary != null && req.body.salary !== existing.salary) || (req.body.salaryType && req.body.salaryType !== existing.salaryType))) {
+            return res.status(409).json({ message: 'Use the Payroll tab to create an effective-dated salary change for this enrolled employee.' });
+        }
+        if (existing?.payrollEnrolled && req.body.joiningDate !== undefined && req.body.joiningDate !== existing.joiningDate) return res.status(409).json({ message: 'Joining date is locked after payroll enrollment.' });
+        if (existing?.payrollEnrolled && req.body.status === 'inactive' && !existing.employmentEndDate) return res.status(409).json({ message: 'Record the employment end date in Payroll before marking this enrolled employee inactive.' });
+
         const employee = await Employee.findOneAndUpdate(
             { _id: id, ...buildTenantFilter(req.user!) },
             { $set: req.body },
@@ -159,6 +171,10 @@ export const deleteEmployee = async (req: AuthRequest, res: Response) => {
         if (!isValidId(id)) return res.status(404).json({ message: 'Employee not found' });
 
         const tenantFilter = buildTenantFilter(req.user!);
+        const protectedEmployee = await Employee.findOne({ _id: id, ...tenantFilter });
+        if (protectedEmployee && (protectedEmployee.payrollEnrolled || await SalaryStructure.exists({ employeeId: id, ...tenantFilter }) || await PayrollRun.exists({ employeeIds: id, ...tenantFilter }) || await PayrollLoan.exists({ employeeId: id, ...tenantFilter }) || await PayrollRequest.exists({ employeeId: id, ...tenantFilter }) || await PayrollCommission.exists({ employeeId: id, ...tenantFilter }))) {
+            return res.status(409).json({ message: 'This employee has payroll records. Set the profile to Inactive and record an employment end date instead of deleting it.' });
+        }
         const employee = await Employee.findOne({ _id: id, ...tenantFilter }).select('_id userId');
         if (!employee) return res.status(404).json({ message: 'Employee not found' });
 

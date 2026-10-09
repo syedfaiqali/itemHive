@@ -54,6 +54,7 @@ export interface EmployeeAccount {
 }
 
 export interface Employee {
+    payrollEnrolled?: boolean;
     _id: string;
     employeeCode: string;
     fullName: string;

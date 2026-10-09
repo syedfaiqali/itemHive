@@ -141,6 +141,7 @@ export const customerSchema = Joi.object({
 });
 
 export const installmentPlanSchema = Joi.object({
+    salespersonEmployeeId: Joi.string().hex().length(24).optional(),
     sizeId: Joi.string().optional(),
     planCode: Joi.string().required(),
     productId: Joi.string().required(),

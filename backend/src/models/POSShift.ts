@@ -21,6 +21,8 @@ export interface IShiftReportTotals {
     installmentCollectionsCard: number;
     totalCollected?: number;
     expectedDrawerCash: number;
+    expensePaidOut?: number;
+    expenseRefunds?: number;
     countedCash?: number;
     cashDifference?: number;
 }
@@ -45,6 +47,7 @@ export interface IShiftSoldItemSummary {
 }
 
 export interface IShiftReportSnapshot {
+    currency?: string;
     shiftCode: string;
     registerName: string;
     cashierName: string;
@@ -59,6 +62,7 @@ export interface IShiftReportSnapshot {
 }
 
 export interface IPOSShift extends Document {
+    currency?: string;
     shiftCode: string;
     registerName: string;
     openingCash: number;
@@ -97,6 +101,8 @@ const ShiftReportTotalsSchema = new Schema<IShiftReportTotals>({
     installmentCollectionsCard: { type: Number, required: true },
     totalCollected: { type: Number, default: 0 },
     expectedDrawerCash: { type: Number, required: true },
+    expensePaidOut: { type: Number, default: 0 },
+    expenseRefunds: { type: Number, default: 0 },
     countedCash: { type: Number, default: undefined },
     cashDifference: { type: Number, default: undefined },
 }, { _id: false });
@@ -121,6 +127,7 @@ const ShiftSoldItemSummarySchema = new Schema<IShiftSoldItemSummary>({
 }, { _id: false });
 
 const ShiftReportSnapshotSchema = new Schema<IShiftReportSnapshot>({
+    currency: { type: String },
     shiftCode: { type: String, required: true },
     registerName: { type: String, required: true },
     cashierName: { type: String, required: true },
@@ -135,6 +142,7 @@ const ShiftReportSnapshotSchema = new Schema<IShiftReportSnapshot>({
 }, { _id: false });
 
 const POSShiftSchema = new Schema<IPOSShift>({
+    currency: { type: String },
     shiftCode: { type: String, required: true, trim: true },
     registerName: { type: String, required: true, trim: true, maxlength: 80 },
     openingCash: { type: Number, required: true, min: 0 },
