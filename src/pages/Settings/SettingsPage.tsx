@@ -57,7 +57,8 @@ import type { AppDispatch } from '../../store';
 import { prepareBannerDataUrl } from '../../lib/imageBanner';
 import api from '../../api/axios';
 import BusinessTypesManager from '../../components/Settings/BusinessTypesManager';
-import { Link as RouterLink } from 'react-router-dom';
+import CategoriesManager from '../../components/Settings/CategoriesManager';
+import { Link as RouterLink, useLocation } from 'react-router-dom';
 import { hasScreenAccess } from '../../lib/screenPermissions';
 
 interface Business {
@@ -99,6 +100,7 @@ const countryOptions: Array<{ value: CountryCode; label: string }> = [
 
 const SettingsPage: React.FC = () => {
     const theme = useTheme();
+    const location = useLocation();
     const dispatch = useDispatch<AppDispatch>();
     const { mode } = useSelector((state: RootState) => state.theme);
     const { user } = useSelector((state: RootState) => state.auth);
@@ -267,6 +269,18 @@ const SettingsPage: React.FC = () => {
             </Box>
 
             <Grid container spacing={2.25}>
+                {(user?.role === 'super_admin' || user?.role === 'admin') && hasScreenAccess(user, 'inventory_categories') && (
+                    <Grid size={{ xs: 12 }}>
+                        <Accordion id="categories" defaultExpanded={location.hash === '#categories'} disableGutters elevation={0} sx={premiumAccordionSx} slotProps={{ transition: { unmountOnExit: true } }}>
+                            <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={premiumSummarySx} aria-controls="categories-content" id="categories-header">
+                                <Box><Typography variant="h6" fontWeight={800}>Categories</Typography><Typography variant="body2" color="text.secondary">Add, edit and delete product categories for this workspace</Typography></Box>
+                            </AccordionSummary>
+                            <AccordionDetails sx={{ px: { xs: 2, sm: 2.5 }, pb: 2.5 }}>
+                                <CategoriesManager />
+                            </AccordionDetails>
+                        </Accordion>
+                    </Grid>
+                )}
                 <Grid size={{ xs: 12 }}>
                     <Accordion disableGutters elevation={0} sx={premiumAccordionSx}>
                         <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={premiumSummarySx}>

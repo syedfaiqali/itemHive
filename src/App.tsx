@@ -19,7 +19,6 @@ import { logout, refreshCurrentUser } from './features/auth/authSlice';
 import Login from './pages/Auth/Login';
 const Dashboard = React.lazy(() => import('./pages/Dashboard/Dashboard'));
 const ProductList = React.lazy(() => import('./pages/Inventory/ProductList'));
-const CategoriesPage = React.lazy(() => import('./pages/Inventory/CategoriesPage'));
 const AddProduct = React.lazy(() => import('./pages/Inventory/AddProduct'));
 const ImportProducts = React.lazy(() => import('./pages/Inventory/ImportProducts'));
 const ReduceStock = React.lazy(() => import('./pages/Inventory/ReduceStock'));
@@ -103,7 +102,7 @@ const AppContent: React.FC = () => {
             }>
               <Route index element={<ProtectedRoute requiredScreen="dashboard"><Dashboard /></ProtectedRoute>} />
               <Route path="inventory" element={<ProtectedRoute requiredScreen="inventory"><ProductList /></ProtectedRoute>} />
-              <Route path="inventory/categories" element={<ProtectedRoute allowedRoles={['super_admin', 'admin']} requiredScreen="inventory_categories"><CategoriesPage /></ProtectedRoute>} />
+              <Route path="inventory/categories" element={<ProtectedRoute allowedRoles={['super_admin', 'admin']} requiredScreen="inventory_categories"><Navigate to="/settings#categories" replace /></ProtectedRoute>} />
               <Route path="inventory/add" element={<ProtectedRoute requiredScreen="inventory_add"><AddProduct /></ProtectedRoute>} />
               <Route path="inventory/import" element={<ProtectedRoute requiredScreen="inventory_import"><ImportProducts /></ProtectedRoute>} />
               <Route path="inventory/units" element={<ProtectedRoute requiredScreen="inventory_units"><ProductUnitsPage /></ProtectedRoute>} />

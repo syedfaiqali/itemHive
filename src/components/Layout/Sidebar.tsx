@@ -91,7 +91,6 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onDrawerToggle }) => {
         { text: 'Shift Management', icon: <ChartNoAxesCombined size={20} />, path: '/pos-reports', roles: ['super_admin', 'admin', 'user'], permission: 'pos' },
         { text: 'Order Drafts', icon: <FileClock size={20} />, path: '/order-drafts', roles: ['super_admin', 'admin', 'user'], permission: 'pos' },
         { text: 'Inventory', icon: <Package size={20} />, path: '/inventory', roles: ['super_admin', 'admin', 'user'], permission: 'inventory' },
-        { text: 'Categories', icon: <Package size={20} />, path: '/inventory/categories', roles: ['super_admin', 'admin'], permission: 'inventory_categories' },
         { text: 'Product Units', icon: <Scale size={20} />, path: '/inventory/units', roles: ['super_admin', 'admin', 'user'], permission: 'inventory_units' },
         { text: 'Inventory Requests', icon: <ClipboardCheck size={20} />, path: '/inventory/requests', roles: ['super_admin', 'admin', 'user'], permission: 'inventory_requests' },
         { text: 'Order Desk', icon: <ClipboardList size={20} />, path: '/orders', roles: ['super_admin', 'admin', 'user'], permission: 'orders' },

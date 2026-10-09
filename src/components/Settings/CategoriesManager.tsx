@@ -4,7 +4,7 @@ import { Plus, Pencil, Trash2 } from 'lucide-react';
 import api from '../../api/axios';
 import useProductCategories from '../../hooks/useProductCategories';
 
-export default function CategoriesPage() {
+export default function CategoriesManager() {
     const { categories, loading, error, reload } = useProductCategories();
     const [editing, setEditing] = useState<string | null>(null);
     const [deleting, setDeleting] = useState<string | null>(null);
@@ -28,9 +28,7 @@ export default function CategoriesPage() {
         } catch (error) { setSaveError(error instanceof Error && 'response' in error ? (error as { response?: { data?: { message?: string } } }).response?.data?.message || error.message : 'Unable to save category. Please retry.'); }
         finally { setSaving(false); }
     };
-    return <Box sx={{ maxWidth: 900, mx: 'auto' }}>
-        <Typography variant="h4" fontWeight={800} gutterBottom>Categories</Typography>
-        <Typography color="text.secondary" sx={{ mb: 3 }}>Add categories for products in this workspace.</Typography>
+    return <Box>
         <Card sx={{ borderRadius: 4, mb: 3 }}><CardContent>
             <Stack component="form" onSubmit={submit} spacing={2}>
                 <TextField label="Category name" value={name} onChange={e => setName(e.target.value)} required inputProps={{ maxLength: 100 }} disabled={saving} />
