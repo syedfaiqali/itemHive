@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test:menu-ai": "node --test scripts/test-menu-ai.mjs",
-    "test:auth": "node --test scripts/test-auth.mjs"
+    "test:auth": "node --test scripts/test-auth.mjs",
+    "test:api-url": "node --test scripts/test-api-url.mjs"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
