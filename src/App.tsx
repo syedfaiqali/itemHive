@@ -51,6 +51,7 @@ const InventoryRequestsPage = React.lazy(() => import('./pages/Inventory/Invento
 const PermissionManagementPage = React.lazy(() => import('./pages/Admin/PermissionManagementPage'));
 const AccessDeniedPage = React.lazy(() => import('./pages/Auth/AccessDeniedPage'));
 const DigitalMenusPage = React.lazy(() => import('./pages/DigitalMenus/DigitalMenusPage'));
+const CreateDigitalMenuPage = React.lazy(() => import('./pages/DigitalMenus/CreateDigitalMenuPage'));
 const PublicMenuPage = React.lazy(() => import('./pages/DigitalMenus/PublicMenuPage'));
 // Keep route elements stable during color previews. Only theme consumers need updates.
 const AppThemeProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
@@ -123,6 +124,9 @@ const AppContent: React.FC = () => {
                 </ProtectedRoute>
               } />
               <Route path="digital-menus" element={<ProtectedRoute allowedRoles={['super_admin', 'admin', 'user']} requiredScreen="digital_menus" requireDigitalMenuAccess><DigitalMenusPage /></ProtectedRoute>} />
+              <Route path="digital-menus/create" element={<ProtectedRoute allowedRoles={['super_admin', 'admin', 'user']} requiredScreen="digital_menus" requireDigitalMenuAccess><CreateDigitalMenuPage /></ProtectedRoute>} />
+              <Route path="digital-menus/:id/edit" element={<ProtectedRoute allowedRoles={['super_admin', 'admin', 'user']} requiredScreen="digital_menus" requireDigitalMenuAccess><CreateDigitalMenuPage /></ProtectedRoute>} />
+              <Route path="digital-menus/:id/preview" element={<ProtectedRoute allowedRoles={['super_admin', 'admin', 'user']} requiredScreen="digital_menus" requireDigitalMenuAccess><PublicMenuPage /></ProtectedRoute>} />
               <Route path="transactions" element={<ProtectedRoute requiredScreen="transactions"><TransactionHistory /></ProtectedRoute>} />
               <Route path="reports" element={<ProtectedRoute allowedRoles={['super_admin', 'admin']} requiredScreen="reports"><ReportsPage /></ProtectedRoute>} />
               <Route path="notes" element={

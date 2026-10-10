@@ -11,6 +11,7 @@ import {
 } from 'redux-persist';
 import storage from 'redux-persist/lib/storage';
 import authReducer from '../features/auth/authSlice';
+import { authPersistence } from '../features/auth/authPersistence';
 import inventoryReducer from '../features/inventory/inventorySlice';
 import transactionReducer from '../features/transactions/transactionSlice';
 import reportsReducer from '../features/reports/reportSlice';
@@ -36,10 +37,11 @@ const persistConfig = {
     key: 'root',
     version: 6,
     storage,
+    transforms: [authPersistence],
     whitelist: ['auth', 'theme', 'orders', 'settings'], // Only persist non-API-driven state
 };
 
-const persistedReducer = persistReducer(persistConfig, rootReducer);
+const persistedReducer = persistReducer<ReturnType<typeof rootReducer>>(persistConfig, rootReducer);
 
 export const store = configureStore({
     reducer: persistedReducer,

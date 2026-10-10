@@ -203,7 +203,7 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onDrawerToggle }) => {
                             && (!item.requiresDigitalMenuAccess || currentRole === 'super_admin' || user?.digitalMenuAccess !== 'none')
                             && (!item.requiresSignupApproval || !app?.autoRegistrationEnabled))
                         .map((item) => {
-                            const isActive = location.pathname === item.path || (item.path === '/employees' && location.pathname.startsWith('/employees/'));
+                            const isActive = location.pathname === item.path || (['/employees', '/digital-menus'].includes(item.path) && location.pathname.startsWith(`${item.path}/`));
                             return (
                                 <ListItem key={item.text} disablePadding sx={{ mb: 0.5 }}>
                                     <ListItemButton

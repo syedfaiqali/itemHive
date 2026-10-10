@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:menu-ai": "node --test scripts/test-menu-ai.mjs",
+    "test:auth": "node --test scripts/test-auth.mjs"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

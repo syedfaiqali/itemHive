@@ -1,4 +1,7 @@
 import mongoose, { Document, Schema } from 'mongoose';
+import { MENU_TEMPLATE_IDS, type MenuDesign } from '../utils/menuDesign';
+import type { MenuBlock } from '../utils/menuContent';
+import { parseMenuPrices, type MenuPrices } from '../utils/menuPrices';
 
 export interface IDigitalMenu extends Document {
     name: string;
@@ -7,7 +10,13 @@ export interface IDigitalMenu extends Document {
     sourceMenuId?: mongoose.Types.ObjectId;
     token: string;
     productIds: string[];
+    productPrices?: MenuPrices;
     dealPrice?: number;
+    clientRequestId?: string;
+    design?: MenuDesign;
+    content?: MenuBlock[];
+    pageCount?: number;
+    status?: 'draft';
     isActive: boolean;
     orderingEnabled: boolean;
     createdBy?: mongoose.Types.ObjectId;
@@ -15,6 +24,7 @@ export interface IDigitalMenu extends Document {
 }
 
 const DigitalMenuSchema = new Schema<IDigitalMenu>({
+    clientRequestId: { type: String, maxlength: 36 },
     name: { type: String, required: true, trim: true, maxlength: 100 },
     // Root menus and deals are reusable definitions. Only a QR/table record
     // needs a table name.
@@ -23,7 +33,34 @@ const DigitalMenuSchema = new Schema<IDigitalMenu>({
     sourceMenuId: { type: Schema.Types.ObjectId, ref: 'DigitalMenu', default: null, index: true },
     token: { type: String, required: true, unique: true, index: true },
     productIds: [{ type: String, required: true, trim: true }],
+    productPrices: { type: Schema.Types.Mixed, default: undefined, validate: function (this: IDigitalMenu, value: unknown) { return parseMenuPrices(value, this.productIds) !== null; } },
     dealPrice: { type: Number, min: 0 },
+    content: { type: [new Schema<MenuBlock>({
+        id: { type: String, required: true, match: /^[a-z0-9_-]{1,80}$/i },
+        type: { type: String, enum: ['title', 'section', 'heading', 'label'], required: true },
+        text: { type: String, trim: true, maxlength: 500 },
+        fontSize: { type: Number, min: 10, max: 96, required: true },
+        color: { type: String, match: /^#[0-9a-f]{6}$/i, required: true },
+        align: { type: String, enum: ['left', 'center', 'right'], required: true },
+        productIds: [{ type: String, required: true }],
+        page: { type: Number, min: 1, max: 20, validate: Number.isInteger },
+        span: { type: Number, enum: [2, 3, 6] },
+    }, { _id: false })], default: undefined },
+    pageCount: { type: Number, min: 1, max: 20, validate: Number.isInteger },
+    status: { type: String, enum: ['draft'] },
+    design: { type: new Schema<MenuDesign>({
+        templateId: { type: String, enum: MENU_TEMPLATE_IDS, required: true },
+        accentColor: { type: String, match: /^#[0-9a-f]{6}$/i, required: true },
+        headerColor: { type: String, match: /^#[0-9a-f]{6}$/i, required: true },
+        backgroundColor: { type: String, match: /^#[0-9a-f]{6}$/i, required: true },
+        surfaceColor: { type: String, match: /^#[0-9a-f]{6}$/i, required: true },
+        textColor: { type: String, match: /^#[0-9a-f]{6}$/i, required: true },
+        layout: { type: String, enum: ['list', 'grid'], required: true },
+        fontStyle: { type: String, enum: ['sans', 'serif'], required: true },
+        showImages: { type: Boolean, required: true },
+        pageSize: { type: String, enum: ['a4', 'a5', 'letter'] },
+        orientation: { type: String, enum: ['portrait', 'landscape'] },
+    }, { _id: false }), default: undefined },
     isActive: { type: Boolean, default: true },
     orderingEnabled: { type: Boolean, default: true },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', default: null, index: true },
@@ -31,4 +68,5 @@ const DigitalMenuSchema = new Schema<IDigitalMenu>({
 }, { timestamps: true });
 
 DigitalMenuSchema.index({ businessId: 1, tableName: 1 });
+DigitalMenuSchema.index({ businessId: 1, sourceMenuId: 1, clientRequestId: 1 }, { unique: true, partialFilterExpression: { clientRequestId: { $type: 'string' } } });
 export default mongoose.model<IDigitalMenu>('DigitalMenu', DigitalMenuSchema);

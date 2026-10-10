@@ -229,6 +229,9 @@ export const register = async (req: AuthRequest, res: Response) => {
 };
 
 export const login = async (req: AuthRequest, res: Response) => {
+    if (mongoose.connection.readyState !== 1) {
+        return res.status(503).json({ message: 'Sign in is temporarily unavailable. Please try again shortly.' });
+    }
     try {
         const { email, password } = req.body;
         const normalizedEmail = String(email || '').trim().toLowerCase();
